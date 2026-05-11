@@ -228,15 +228,7 @@ const DashboardPage: React.FC = () => {
                                 value={`${window.location.origin}/colaborador`}
                                 className="w-full bg-black/40 border border-slate-700 rounded-xl px-4 py-3 text-xs text-slate-300 font-mono"
                             />
-                            <Button 
-                                onClick={() => {
-                                    navigator.clipboard.writeText(`${window.location.origin}/colaborador`);
-                                    alert('Link do App copiado!');
-                                }}
-                                className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold"
-                            >
-                                Copiar Link de Convite
-                            </Button>
+                            <DashboardCopyButton text={`${window.location.origin}/colaborador`} />
                         </div>
                     </Card>
                 </div>

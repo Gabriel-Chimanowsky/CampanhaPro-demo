@@ -11,6 +11,26 @@ import {
 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
+import { Check } from 'lucide-react';
+
+const CopyButton: React.FC<{ text: string }> = ({ text }) => {
+    const [copied, setCopied] = useState(false);
+    
+    const handleCopy = () => {
+        navigator.clipboard.writeText(text);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
+    return (
+        <Button 
+            onClick={handleCopy}
+            className={`!py-2 !px-3 !text-[10px] !rounded-lg transition-all flex items-center gap-1 ${copied ? 'bg-emerald-600 hover:bg-emerald-600' : ''}`}
+        >
+            {copied ? <><Check size={10} /> Copiado!</> : 'Copiar'}
+        </Button>
+    );
+};
 
 // Fix Leaflet icon issue
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
@@ -230,15 +250,7 @@ const CityAlertsPage: React.FC = () => {
                                 value={`${window.location.origin}/colaborador`}
                                 className="flex-1 bg-black/40 border border-slate-700 rounded-lg px-3 py-2 text-[10px] text-slate-300 font-mono"
                             />
-                            <Button 
-                                onClick={() => {
-                                    navigator.clipboard.writeText(`${window.location.origin}/colaborador`);
-                                    alert('Link copiado para a área de transferência!');
-                                }}
-                                className="!py-2 !px-3 !text-[10px] !rounded-lg"
-                            >
-                                Copiar
-                            </Button>
+                            <CopyButton text={`${window.location.origin}/colaborador`} />
                         </div>
                     </Card>
                 </div>
