@@ -25,6 +25,22 @@ let DefaultIcon = L.icon({
 
 L.Marker.prototype.options.icon = DefaultIcon;
 
+// Custom Icons for sentiments
+const createColoredIcon = (color: string) => {
+    return L.divIcon({
+        className: 'custom-div-icon',
+        html: `<div style="background-color: ${color}; width: 14px; height: 14px; border: 2px solid white; border-radius: 50%; box-shadow: 0 0 10px ${color};"></div>`,
+        iconSize: [14, 14],
+        iconAnchor: [7, 7]
+    });
+};
+
+const icons = {
+    Positivo: createColoredIcon('#10b981'), // Green
+    Neutro: createColoredIcon('#f59e0b'),   // Orange
+    Negativo: createColoredIcon('#ef4444')  // Red
+};
+
 // Helper component to center map
 const ChangeView = ({ center, zoom }: { center: [number, number], zoom: number }) => {
     const map = useMap();
@@ -189,7 +205,7 @@ const CityAlertsPage: React.FC = () => {
                                             {styles.icon} {alert.clima}
                                         </div>
                                         <div className="flex items-center gap-1 text-[10px] text-slate-500 font-mono">
-                                            <Clock size={10} /> {new Date(alert.createdAt).toLocaleString([], { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                                            <Clock size={10} /> {new Date(alert.createdAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                         </div>
                                     </div>
                                     
@@ -266,6 +282,7 @@ const CityAlertsPage: React.FC = () => {
                                     <Marker 
                                         key={alert.id} 
                                         position={[alert.latitude, alert.longitude]}
+                                        icon={(icons as any)[alert.clima] || DefaultIcon}
                                         eventHandlers={{
                                             click: () => handleSelectAlert(alert)
                                         }}

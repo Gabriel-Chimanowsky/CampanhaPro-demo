@@ -5,7 +5,28 @@ import {
     Smile, Meh, Frown, LogOut, CheckCircle2, 
     Loader2, Navigation, Play, X, Video
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
+
+// Fix Leaflet icon issue
+import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+
+let DefaultIcon = L.icon({
+    iconUrl: markerIcon,
+    shadowUrl: markerShadow,
+    iconSize: [25, 41],
+    iconAnchor: [12, 41]
+});
+
+const ChangeView = ({ center, zoom }: { center: [number, number], zoom: number }) => {
+    const map = useMap();
+    useEffect(() => {
+        map.setView(center, zoom);
+    }, [center, zoom, map]);
+    return null;
+};
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 
@@ -134,16 +155,16 @@ const CollaboratorHubPage: React.FC = () => {
             }
 
             const { error } = await supabase.from('street_reports').insert({
-                campaignId: user?.user_metadata?.campaignId || 'demo',
+                campaign_id: user?.user_metadata?.campaignId || user?.campaignId || 'demo',
                 bairro: formData.bairro,
                 clima: formData.clima,
                 reclamacao: formData.reclamacao,
-                title: formData.title,
+                title: formData.title || `Alerta: ${formData.bairro}`,
                 latitude: formData.latitude,
                 longitude: formData.longitude,
-                photoUrl: uploadedUrls.length > 0 ? uploadedUrls[0] : formData.photoUrl, // Pega a primeira foto ou o link
-                createdBy: user?.id,
-                createdAt: new Date().toISOString()
+                photo_url: uploadedUrls.length > 0 ? uploadedUrls[0] : formData.photoUrl,
+                created_by: user?.id,
+                created_at: new Date().toISOString()
             });
 
             if (error) throw error;

@@ -19,6 +19,22 @@ let DefaultIcon = L.icon({
 
 L.Marker.prototype.options.icon = DefaultIcon;
 
+// Custom Icons for sentiments
+const createColoredIcon = (color: string) => {
+    return L.divIcon({
+        className: 'custom-div-icon',
+        html: `<div style="background-color: ${color}; width: 12px; height: 12px; border: 2px solid white; border-radius: 50%; box-shadow: 0 0 8px ${color};"></div>`,
+        iconSize: [12, 12],
+        iconAnchor: [6, 6]
+    });
+};
+
+const icons = {
+    Positivo: createColoredIcon('#10b981'), // Green
+    Neutro: createColoredIcon('#f59e0b'),   // Orange
+    Negativo: createColoredIcon('#ef4444')  // Red
+};
+
 const CityAlertsMap: React.FC<{ campaignId: string }> = ({ campaignId }) => {
     const [alerts, setAlerts] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -127,6 +143,10 @@ const CityAlertsMap: React.FC<{ campaignId: string }> = ({ campaignId }) => {
                             <Marker 
                                 key={alert.id} 
                                 position={[alert.latitude, alert.longitude]}
+                                icon={(icons as any)[alert.clima] || DefaultIcon}
+                                eventHandlers={{
+                                    click: () => setSelectedAlert(alert)
+                                }}
                             >
                                 <Popup className="custom-popup">
                                     <div className="p-1 min-w-[200px]">
