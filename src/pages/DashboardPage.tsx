@@ -42,6 +42,7 @@ const DashboardPage: React.FC = () => {
   const [isAdvisorLoading, setIsAdvisorLoading] = React.useState(false);
   const [isInstagramConnected, setIsInstagramConnected] = React.useState(false);
   const [checkingSocial, setCheckingSocial] = React.useState(true);
+  const [copied, setCopied] = React.useState(false);
 
   const {
     kpis,
@@ -228,7 +229,16 @@ const DashboardPage: React.FC = () => {
                                 value={`${window.location.origin}/colaborador`}
                                 className="w-full bg-black/40 border border-slate-700 rounded-xl px-4 py-3 text-xs text-slate-300 font-mono"
                             />
-                            <DashboardCopyButton text={`${window.location.origin}/colaborador`} />
+                            <Button 
+                                onClick={() => {
+                                    navigator.clipboard.writeText(`${window.location.origin}/colaborador`);
+                                    setCopied(true);
+                                    setTimeout(() => setCopied(false), 2000);
+                                }}
+                                className={`w-full py-3 font-bold transition-all ${copied ? 'bg-emerald-600 hover:bg-emerald-600' : 'bg-blue-600 hover:bg-blue-500 text-white'}`}
+                            >
+                                {copied ? 'Link Copiado!' : 'Copiar Link de Convite'}
+                            </Button>
                         </div>
                     </Card>
                 </div>
