@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { 
-    MapPin, Send, Camera, AlertTriangle, 
+    MapPin, Send, Camera, 
     Smile, Meh, Frown, LogOut, CheckCircle2, 
-    Loader2, Navigation, Info, Play, X, Camera, Video
+    Loader2, Navigation, Play, X, Video
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Button from '../components/ui/Button';

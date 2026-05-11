@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { supabase } from '../../lib/supabaseClient';
-import { AlertCircle, MapPin, Clock, User, MessageCircle } from 'lucide-react';
+import { AlertCircle, MapPin, User } from 'lucide-react';
 import Card from '../ui/Card';
 
 // Fix Leaflet icon issue
@@ -34,7 +34,7 @@ const CityAlertsMap: React.FC<{ campaignId: string }> = ({ campaignId }) => {
                 schema: 'public', 
                 table: 'street_reports',
                 filter: `campaignId=eq.${campaignId}`
-            }, (payload) => {
+            }, (payload: any) => {
                 setAlerts(prev => [payload.new, ...prev]);
             })
             .subscribe();
