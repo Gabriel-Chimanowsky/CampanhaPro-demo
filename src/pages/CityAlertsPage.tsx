@@ -71,7 +71,7 @@ const CityAlertsPage: React.FC = () => {
     const fetchAlerts = async () => {
         const { data, error } = await supabase
             .from('street_reports')
-            .select('*, users(name)')
+            .select('*, users!created_by(name)')
             .eq('campaignId', campaignId)
             .order('createdAt', { ascending: false });
 

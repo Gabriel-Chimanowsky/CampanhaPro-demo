@@ -303,17 +303,17 @@ CREATE TABLE IF NOT EXISTS pesquisas (
 -- Street Reports (reportes de rua/voluntários)
 CREATE TABLE IF NOT EXISTS street_reports (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    "campaignId" TEXT NOT NULL,
+    campaign_id TEXT NOT NULL,
     bairro TEXT NOT NULL,
     clima TEXT CHECK (clima IN ('Positivo', 'Neutro', 'Negativo')),
     reclamacao TEXT,
     latitude DECIMAL(10, 8),
     longitude DECIMAL(11, 8),
-    "photoUrl" TEXT,
+    photo_url TEXT,
     title TEXT,
     status TEXT DEFAULT 'pendente',
-    "createdBy" UUID REFERENCES users(id),
-    "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    created_by UUID REFERENCES users(id),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- =============================================
