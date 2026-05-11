@@ -11,6 +11,9 @@ import PublicColinhaPage from './pages/PublicColinhaPage';
 import PublicCapturePage from './pages/PublicCapturePage';
 import PublicTeamRegistrationPage from './pages/PublicTeamRegistrationPage';
 import UseCasesPage from './pages/UseCasesPage';
+import PublicCollaboratorLoginPage from './pages/PublicCollaboratorLoginPage';
+import PublicCollaboratorRegisterPage from './pages/PublicCollaboratorRegisterPage';
+import CollaboratorHubPage from './pages/CollaboratorHubPage';
 
 /**
  * Definição centralizada de rotas para a plataforma Campanha Pró.
@@ -45,6 +48,9 @@ export const AppRoutes: React.FC = () => {
                 <Route path="/cadastro" element={<PublicCapturePage />} />
                 <Route path="/cadastro-equipe/:campaignId" element={<PublicTeamRegistrationPage />} />
                 <Route path="/casos-de-uso" element={<UseCasesPage />} />
+                <Route path="/login-colaborador" element={<PublicCollaboratorLoginPage />} />
+                <Route path="/registro-colaborador" element={<PublicCollaboratorRegisterPage />} />
+                <Route path="/colaborador" element={<CollaboratorHubPage />} />
 
                 {/* Rota Privada (Main App) */}
                 <Route 

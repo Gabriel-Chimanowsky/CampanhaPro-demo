@@ -307,7 +307,12 @@ CREATE TABLE IF NOT EXISTS street_reports (
     bairro TEXT NOT NULL,
     clima TEXT CHECK (clima IN ('Positivo', 'Neutro', 'Negativo')),
     reclamacao TEXT,
-    "createdBy" TEXT,
+    latitude DECIMAL(10, 8),
+    longitude DECIMAL(11, 8),
+    "photoUrl" TEXT,
+    title TEXT,
+    status TEXT DEFAULT 'pendente',
+    "createdBy" UUID REFERENCES users(id),
     "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

@@ -25,6 +25,7 @@ import { useNavigate } from 'react-router-dom';
 import Card from '../components/ui/Card';
 import { useAuth } from '../contexts/AuthContext';
 import { askAdvisor } from '../services/agentsClientService';
+import CityAlertsMap from '../components/dashboard/CityAlertsMap';
 
 const DashboardPage: React.FC = () => {
   const { user, userType } = useAuth();
@@ -209,6 +210,10 @@ const DashboardPage: React.FC = () => {
                 <TeamTasksWidget />
                 <PesquisaChart data={pesquisas} />
                 <DigitalColinha />
+            </div>
+
+            <div className="mt-8">
+                <CityAlertsMap campaignId={user?.campaign_id || user?.campaignId || 'demo'} />
             </div>
 
             {userType === 'Admin' && allLeaders.length > 0 && (
