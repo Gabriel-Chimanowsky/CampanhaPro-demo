@@ -47,7 +47,7 @@ const CityAlertsMap: React.FC<{ campaignId: string }> = ({ campaignId }) => {
     const fetchAlerts = async () => {
         const { data, error } = await supabase
             .from('street_reports')
-            .select('*, users!created_by(name)')
+            .select('*')
             .eq('campaignId', campaignId)
             .order('createdAt', { ascending: false })
             .limit(50);
