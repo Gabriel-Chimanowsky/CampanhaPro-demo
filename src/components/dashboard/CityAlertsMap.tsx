@@ -38,6 +38,7 @@ const icons = {
 const CityAlertsMap: React.FC<{ campaignId: string }> = ({ campaignId }) => {
     const [alerts, setAlerts] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [selectedAlert, setSelectedAlert] = useState<any>(null);
 
     useEffect(() => {
         fetchAlerts();
@@ -178,6 +179,39 @@ const CityAlertsMap: React.FC<{ campaignId: string }> = ({ campaignId }) => {
                             </Marker>
                         ))}
                     </MapContainer>
+
+                    {/* Floating Detail Card if selected */}
+                    {selectedAlert && (
+                        <div className="absolute bottom-4 left-4 right-4 z-[1000] animate-in slide-in-from-bottom-2 duration-300">
+                            <Card className="!bg-[#161b22]/95 backdrop-blur-md border-slate-700 p-4 shadow-2xl relative">
+                                <button 
+                                    onClick={() => setSelectedAlert(null)}
+                                    className="absolute top-2 right-2 text-slate-500 hover:text-white"
+                                >
+                                    <X size={16} />
+                                </button>
+                                <div className="flex gap-4">
+                                    {selectedAlert.photoUrl && (
+                                        <div className="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0 border border-slate-800">
+                                            <img src={selectedAlert.photoUrl} className="w-full h-full object-cover" alt="Alerta" />
+                                        </div>
+                                    )}
+                                    <div>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${icons[selectedAlert.clima as keyof typeof icons] ? 'bg-slate-800' : ''}`}>
+                                                {selectedAlert.clima}
+                                            </span>
+                                            <span className="text-[10px] text-slate-500 font-mono">
+                                                {new Date(selectedAlert.createdAt).toLocaleString('pt-BR')}
+                                            </span>
+                                        </div>
+                                        <h4 className="font-bold text-slate-100 text-sm">{selectedAlert.title || selectedAlert.bairro}</h4>
+                                        <p className="text-[10px] text-slate-400 line-clamp-2">{selectedAlert.reclamacao}</p>
+                                    </div>
+                                </div>
+                            </Card>
+                        </div>
+                    )}
                 </div>
             </div>
         </Card>

@@ -5,6 +5,7 @@ import {
     Smile, Meh, Frown, LogOut, CheckCircle2, 
     Loader2, Navigation, Play, X, Video
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -243,6 +244,25 @@ const CollaboratorHubPage: React.FC = () => {
                             )}
                         </div>
                         <p className="text-xs text-slate-500 mb-4">Capture sua posição exata para que possamos mapear o problema.</p>
+
+                        {/* Mapa de Localização */}
+                        {formData.latitude && formData.longitude && (
+                            <div className="rounded-2xl overflow-hidden border border-slate-700 h-40 mb-4 animate-in zoom-in-95 duration-500">
+                                <MapContainer 
+                                    center={[formData.latitude, formData.longitude]} 
+                                    zoom={15} 
+                                    style={{ height: '100%', width: '100%' }}
+                                    zoomControl={false}
+                                >
+                                    <ChangeView center={[formData.latitude, formData.longitude]} zoom={15} />
+                                    <TileLayer
+                                        url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                                    />
+                                    <Marker position={[formData.latitude, formData.longitude]} icon={DefaultIcon} />
+                                </MapContainer>
+                            </div>
+                        )}
+
                         <Button 
                             type="button" 
                             onClick={handleGetLocation}
