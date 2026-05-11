@@ -30,10 +30,11 @@ const PricingPage = React.lazy(() => import('./pages/PricingPage'));
 const CRMPage = React.lazy(() => import('./pages/CRMPage'));
 const UseCasesPage = React.lazy(() => import('./pages/UseCasesPage'));
 const InstagramRankingPage = React.lazy(() => import('./pages/InstagramRankingPage'));
+const CityAlertsPage = React.lazy(() => import('./pages/CityAlertsPage'));
 
 
 // Import Icons for Tabs
-import { Bot, ShieldCheck, Zap, Instagram } from 'lucide-react';
+import { Bot, ShieldCheck, Zap, Instagram, AlertTriangle } from 'lucide-react';
 import { 
     BarChartIcon, CalculatorIcon, ClipboardListIcon, SparklesIcon,
     UsersGroupIcon, CurrencyDollarIcon, AcademicCapIcon, CogIcon,
@@ -92,7 +93,7 @@ const AdminApp: React.FC = () => {
                 'Dashboard', 'Agentes IA', 'Calculadora', 'Visitas', 'Engajamento', 'Instagram',
                 'Recursos', 'Equipes', 'Financeiro', 'Treinamento', 'Ferramentas', 
                 'Permissões', 'Configurações', 'Ajuda', 'Dia das Eleições', 
-                'Analytics', 'Planos', 'CRM', 'Demonstração'
+                'Analytics', 'Planos', 'CRM', 'Demonstração', 'Alertas Urbano'
             ];
             mandatory.forEach(tab => {
                 if (!allowedTabs.includes(tab)) allowedTabs.push(tab);
@@ -122,6 +123,7 @@ const AdminApp: React.FC = () => {
         Planos: <CreditCardIcon className="h-5 w-5" />,
         CRM: <UsersGroupIcon className="h-5 w-5" />,
         Demonstração: <Zap className="h-5 w-5" />,
+        'Alertas Urbano': <AlertTriangle className="h-5 w-5 text-orange-400" />,
     };
 
     // Componentes mapeados para as abas (deve seguir a ordem lógica do ALL_TABS para o componente Tabs indexar corretamente)
@@ -144,7 +146,8 @@ const AdminApp: React.FC = () => {
         'Analytics': <ElectionReportsPage />,
         'Planos': <PricingPage />,
         'CRM': <CRMPage />,
-        'Demonstração': <UseCasesPage />
+        'Demonstração': <UseCasesPage />,
+        'Alertas Urbano': <CityAlertsPage />
     };
 
     if (isLoading) {
