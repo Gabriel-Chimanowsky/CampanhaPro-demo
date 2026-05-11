@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabaseClient';
+import { supabase, rawSupabase } from '../lib/supabaseClient';
 import { 
     MapPin, Send, Camera, 
     Smile, Meh, Frown, LogOut, CheckCircle2, 
@@ -177,7 +177,8 @@ const CollaboratorHubPage: React.FC = () => {
                 uploadedUrl = URL.createObjectURL(formData.videoFile);
             }
 
-            const { error } = await supabase.from('street_reports').insert({
+            // Usamos o rawSupabase para garantir que as chaves snake_case cheguem puras ao banco
+            const { error, data, status, statusText } = await rawSupabase.from('street_reports').insert({
                 campaign_id: user?.user_metadata?.campaignId || user?.campaignId || 'demo',
                 bairro: formData.bairro,
                 clima: formData.clima,
@@ -190,7 +191,21 @@ const CollaboratorHubPage: React.FC = () => {
                 created_at: new Date().toISOString()
             });
 
-            if (error) throw error;
+            if (error) {
+                console.error('[StreetReport Error]', {
+                    error,
+                    data,
+                    status,
+                    statusText,
+                    payload: {
+                        campaign_id: user?.user_metadata?.campaignId || user?.campaignId || 'demo',
+                        bairro: formData.bairro,
+                        clima: formData.clima,
+                        created_by: user?.id
+                    }
+                });
+                throw error;
+            }
 
             setSuccess(true);
             setFormData({
