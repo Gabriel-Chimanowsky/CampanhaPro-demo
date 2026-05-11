@@ -7,7 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { 
     AlertTriangle, MapPin, Clock, User, 
     Search, Filter, ChevronRight, Maximize2,
-    Smile, Meh, Frown, Camera, CheckCircle2
+    Smile, Meh, Frown, Camera, CheckCircle2, Share2
 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -217,6 +217,30 @@ const CityAlertsPage: React.FC = () => {
                             );
                         })
                     )}
+                    
+                    {/* Share Link Section at the bottom of the sidebar */}
+                    <Card className="!bg-blue-600/10 border-blue-500/30 p-4 mt-auto">
+                        <h4 className="text-xs font-black text-blue-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                            <Share2 size={12} /> Convidar Colaboradores
+                        </h4>
+                        <p className="text-[10px] text-slate-400 mb-3">Compartilhe este link para que sua equipe possa baixar o App e enviar alertas.</p>
+                        <div className="flex gap-2">
+                            <input 
+                                readOnly
+                                value={`${window.location.origin}/colaborador`}
+                                className="flex-1 bg-black/40 border border-slate-700 rounded-lg px-3 py-2 text-[10px] text-slate-300 font-mono"
+                            />
+                            <Button 
+                                onClick={() => {
+                                    navigator.clipboard.writeText(`${window.location.origin}/colaborador`);
+                                    alert('Link copiado para a área de transferência!');
+                                }}
+                                className="!py-2 !px-3 !text-[10px] !rounded-lg"
+                            >
+                                Copiar
+                            </Button>
+                        </div>
+                    </Card>
                 </div>
 
                 {/* Map/Details Side */}
