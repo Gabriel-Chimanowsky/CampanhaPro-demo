@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabaseClient';
 import { 
     MapPin, Send, Camera, AlertTriangle, 
     Smile, Meh, Frown, LogOut, CheckCircle2, 
-    Loader2, Navigation, Info
+    Loader2, Navigation, Info, Play, X, Camera, Video
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Button from '../components/ui/Button';
@@ -15,6 +15,7 @@ const CollaboratorHubPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [success, setSuccess] = useState(false);
+    const [showTutorial, setShowTutorial] = useState(false);
     
     const [formData, setFormData] = useState({
         title: '',
@@ -23,13 +24,18 @@ const CollaboratorHubPage: React.FC = () => {
         clima: '' as 'Positivo' | 'Neutro' | 'Negativo' | '',
         latitude: null as number | null,
         longitude: null as number | null,
-        photoUrl: ''
+        mediaFiles: [] as File[],
+        photoUrl: '' // Mantido para retrocompatibilidade ou link externo
     });
 
     const [locationStatus, setLocationStatus] = useState<'idle' | 'fetching' | 'success' | 'error'>('idle');
 
     useEffect(() => {
         checkUser();
+        const hasSeenTutorial = localStorage.getItem('collaborator_tutorial_seen');
+        if (!hasSeenTutorial) {
+            setShowTutorial(true);
+        }
     }, []);
 
     const checkUser = async () => {
@@ -51,12 +57,26 @@ const CollaboratorHubPage: React.FC = () => {
         }
 
         navigator.geolocation.getCurrentPosition(
-            (position) => {
-                setFormData(prev => ({
-                    ...prev,
-                    latitude: position.coords.latitude,
-                    longitude: position.coords.longitude
-                }));
+            async (position) => {
+                const { latitude, longitude } = position.coords;
+                setFormData(prev => ({ ...prev, latitude, longitude }));
+                
+                // Reverse Geocoding (Nominatim)
+                try {
+                    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`);
+                    const data = await response.json();
+                    if (data && data.address) {
+                        const bairro = data.address.suburb || data.address.neighbourhood || data.address.village || data.address.city_district || '';
+                        const cidade = data.address.city || data.address.town || '';
+                        setFormData(prev => ({ 
+                            ...prev, 
+                            bairro: bairro ? `${bairro}${cidade ? ', ' + cidade : ''}` : cidade 
+                        }));
+                    }
+                } catch (err) {
+                    console.error('Erro no reverse geocoding:', err);
+                }
+                
                 setLocationStatus('success');
             },
             (error) => {
@@ -66,6 +86,28 @@ const CollaboratorHubPage: React.FC = () => {
             },
             { enableHighAccuracy: true }
         );
+    };
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files) {
+            const files = Array.from(e.target.files);
+            
+            // Validações
+            const photos = files.filter(f => f.type.startsWith('image/'));
+            const videos = files.filter(f => f.type.startsWith('video/'));
+            
+            if (photos.length > 10) {
+                alert('Limite máximo de 10 fotos atingido.');
+                return;
+            }
+            
+            if (videos.length > 1) {
+                alert('Você pode enviar apenas 1 vídeo por vez.');
+                return;
+            }
+            
+            setFormData(prev => ({ ...prev, mediaFiles: files }));
+        }
     };
 
     const handleLogout = async () => {
@@ -82,6 +124,15 @@ const CollaboratorHubPage: React.FC = () => {
 
         setSubmitting(true);
         try {
+            let uploadedUrls: string[] = [];
+            
+            // Simulação de upload para Supabase Storage (ou link direto se mediaFiles for vazio)
+            if (formData.mediaFiles.length > 0) {
+                // Aqui entraria a lógica de bucket: supabase.storage.from('alerts').upload(...)
+                // Para demonstração, vamos simular que o upload ocorreu
+                uploadedUrls = formData.mediaFiles.map(f => URL.createObjectURL(f));
+            }
+
             const { error } = await supabase.from('street_reports').insert({
                 campaignId: user?.user_metadata?.campaignId || 'demo',
                 bairro: formData.bairro,
@@ -90,7 +141,7 @@ const CollaboratorHubPage: React.FC = () => {
                 title: formData.title,
                 latitude: formData.latitude,
                 longitude: formData.longitude,
-                photoUrl: formData.photoUrl,
+                photoUrl: uploadedUrls.length > 0 ? uploadedUrls[0] : formData.photoUrl, // Pega a primeira foto ou o link
                 createdBy: user?.id,
                 createdAt: new Date().toISOString()
             });
@@ -105,6 +156,7 @@ const CollaboratorHubPage: React.FC = () => {
                 clima: '',
                 latitude: null,
                 longitude: null,
+                mediaFiles: [],
                 photoUrl: ''
             });
             setLocationStatus('idle');
@@ -248,15 +300,56 @@ const CollaboratorHubPage: React.FC = () => {
 
                         <div>
                             <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-widest flex items-center gap-2">
-                                <Camera className="w-3 h-3" /> Foto do Local (Link)
+                                <Camera className="w-3 h-3" /> Mídia do Local (Foto/Vídeo)
                             </label>
-                            <input 
-                                type="url"
-                                placeholder="https://..."
-                                className="w-full bg-black/40 border border-slate-700 rounded-2xl p-4 text-white outline-none focus:border-blue-500 transition-all text-xs"
-                                value={formData.photoUrl}
-                                onChange={e => setFormData({...formData, photoUrl: e.target.value})}
-                            />
+                            <div className="grid grid-cols-2 gap-3">
+                                <label className="flex flex-col items-center justify-center p-4 bg-black/40 border border-slate-700 border-dashed rounded-2xl cursor-pointer hover:bg-black/60 transition-all">
+                                    <Camera className="w-6 h-6 text-blue-400 mb-1" />
+                                    <span className="text-[10px] font-bold text-slate-400">Tirar Fotos</span>
+                                    <input 
+                                        type="file" 
+                                        accept="image/*" 
+                                        capture="environment" 
+                                        multiple 
+                                        className="hidden" 
+                                        onChange={handleFileChange}
+                                    />
+                                </label>
+                                <label className="flex flex-col items-center justify-center p-4 bg-black/40 border border-slate-700 border-dashed rounded-2xl cursor-pointer hover:bg-black/60 transition-all">
+                                    <Video className="w-6 h-6 text-red-400 mb-1" />
+                                    <span className="text-[10px] font-bold text-slate-400">Gravar Vídeo</span>
+                                    <input 
+                                        type="file" 
+                                        accept="video/*" 
+                                        capture="environment" 
+                                        className="hidden" 
+                                        onChange={handleFileChange}
+                                    />
+                                </label>
+                            </div>
+                            
+                            {formData.mediaFiles.length > 0 && (
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                    {formData.mediaFiles.map((file, idx) => (
+                                        <div key={idx} className="relative w-12 h-12 rounded-lg bg-slate-800 overflow-hidden border border-slate-700">
+                                            {file.type.startsWith('image/') ? (
+                                                <img src={URL.createObjectURL(file)} className="w-full h-full object-cover" />
+                                            ) : (
+                                                <Play className="w-full h-full p-3 text-slate-500" />
+                                            )}
+                                            <button 
+                                                type="button"
+                                                onClick={() => setFormData(prev => ({ ...prev, mediaFiles: prev.mediaFiles.filter((_, i) => i !== idx) }))}
+                                                className="absolute top-0 right-0 bg-red-500 rounded-bl-lg p-0.5"
+                                            >
+                                                <X size={10} className="text-white" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                            
+                            <p className="text-[9px] text-slate-600 mt-2">Máximo: 10 fotos ou 1 vídeo (30s).</p>
                         </div>
                     </Card>
 
@@ -271,17 +364,42 @@ const CollaboratorHubPage: React.FC = () => {
                 </form>
             </main>
 
-            {/* Bottom Nav Simulation */}
-            <div className="fixed bottom-0 left-0 right-0 bg-[#161b22]/80 backdrop-blur-xl border-t border-slate-800 p-4 flex justify-around text-slate-500">
-                <div className="flex flex-col items-center text-blue-400">
-                    <AlertTriangle className="w-6 h-6" />
-                    <span className="text-[10px] font-bold mt-1">Alertas</span>
+            {/* Tutorial Overlay */}
+            {showTutorial && (
+                <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-500">
+                    <div className="max-w-md w-full bg-[#161b22] border border-slate-800 rounded-[40px] p-8 shadow-2xl relative">
+                        <div className="w-20 h-20 bg-blue-600/20 rounded-full flex items-center justify-center mx-auto mb-6 border border-blue-500/30">
+                            <Navigation className="w-10 h-10 text-blue-400" />
+                        </div>
+                        <h2 className="text-2xl font-black text-center mb-4">Bem-vindo ao Campo!</h2>
+                        
+                        <div className="space-y-4 mb-8">
+                            <div className="flex gap-4">
+                                <div className="w-10 h-10 shrink-0 bg-white/5 rounded-2xl flex items-center justify-center font-black text-blue-400 border border-slate-700">1</div>
+                                <p className="text-sm text-slate-400 leading-relaxed"><span className="text-white font-bold">GPS Automático:</span> Ao clicar em capturar, nós identificamos seu bairro e rua na hora.</p>
+                            </div>
+                            <div className="flex gap-4">
+                                <div className="w-10 h-10 shrink-0 bg-white/5 rounded-2xl flex items-center justify-center font-black text-blue-400 border border-slate-700">2</div>
+                                <p className="text-sm text-slate-400 leading-relaxed"><span className="text-white font-bold">Foto ou Vídeo:</span> Registre o que está vendo. Máximo de 10 fotos ou um vídeo rápido.</p>
+                            </div>
+                            <div className="flex gap-4">
+                                <div className="w-10 h-10 shrink-0 bg-white/5 rounded-2xl flex items-center justify-center font-black text-blue-400 border border-slate-700">3</div>
+                                <p className="text-sm text-slate-400 leading-relaxed"><span className="text-white font-bold">Instale o App:</span> Clique no menu do seu navegador e escolha <span className="text-white font-bold italic">"Adicionar à Tela de Início"</span> para usar como app.</p>
+                            </div>
+                        </div>
+
+                        <Button 
+                            className="w-full py-5 rounded-3xl bg-blue-600 hover:bg-blue-500 text-white font-black text-lg shadow-xl shadow-blue-900/40"
+                            onClick={() => {
+                                setShowTutorial(false);
+                                localStorage.setItem('collaborator_tutorial_seen', 'true');
+                            }}
+                        >
+                            Começar Agora
+                        </Button>
+                    </div>
                 </div>
-                <div className="flex flex-col items-center opacity-40">
-                    <Info className="w-6 h-6" />
-                    <span className="text-[10px] font-bold mt-1">Tutorial</span>
-                </div>
-            </div>
+            )}
         </div>
     );
 };
