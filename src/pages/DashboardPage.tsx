@@ -20,7 +20,17 @@ import TerritorialAlerts from '../components/dashboard/TerritorialAlerts';
 import Button from '../components/ui/Button';
 import SyncButton from '../components/ui/SyncButton';
 import { PrintIcon, SparklesIcon } from '../components/icons';
-import { Share2, Target, Users, Bot, Briefcase, TrendingUp, AlertTriangle } from 'lucide-react';
+import { 
+    BarChart3, 
+    Calendar, 
+    ClipboardList,
+    Plus,
+    Target,
+    Settings,
+    Download,
+    Share2,
+    Check
+} from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Card from '../components/ui/Card';
 import { useAuth } from '../contexts/AuthContext';
@@ -326,6 +336,19 @@ const DashboardPage: React.FC = () => {
         onClose={() => setIsReportModalOpen(false)} 
         onGenerateReport={(id) => setSelectedReport(id)}
       />
+
+      {/* Toast Notification */}
+      {copied && (
+        <div className="fixed bottom-10 right-10 z-[2000] animate-in slide-in-from-right-10 fade-in duration-300">
+            <div className="bg-emerald-600 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 border border-emerald-500/50">
+                <Check className="w-5 h-5" />
+                <div>
+                    <p className="font-black text-sm">Link Copiado!</p>
+                    <p className="text-[10px] opacity-80 font-bold">Envie agora para seu colaborador.</p>
+                </div>
+            </div>
+        </div>
+      )}
     </div>
   );
 };

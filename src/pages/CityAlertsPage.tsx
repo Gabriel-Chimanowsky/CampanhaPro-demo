@@ -6,8 +6,8 @@ import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 import { 
     AlertTriangle, MapPin, Clock, User, 
-    Search, Filter, ChevronRight, Maximize2,
-    Smile, Meh, Frown, Camera, CheckCircle2, Share2
+    Search, Maximize2,
+    Smile, Meh, Frown, CheckCircle2, Share2, Check
 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -80,7 +80,7 @@ const CityAlertsPage: React.FC = () => {
             setAlerts(data);
             if (data.length > 0 && !selectedAlert) {
                 // Pre-select first alert if it has GPS
-                const firstWithGps = data.find(a => a.latitude && a.longitude);
+                const firstWithGps = data.find((a: any) => a.latitude && a.longitude);
                 if (firstWithGps) {
                     // setSelectedAlert(firstWithGps);
                 }
@@ -357,6 +357,18 @@ const CityAlertsPage: React.FC = () => {
                     </Card>
                 </div>
             </div>
+            {/* Toast Notification */}
+            {copied && (
+                <div className="fixed bottom-10 right-10 z-[2000] animate-in slide-in-from-right-10 fade-in duration-300">
+                    <div className="bg-emerald-600 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 border border-emerald-500/50">
+                        <Check className="w-5 h-5" />
+                        <div>
+                            <p className="font-black text-sm">Link Copiado!</p>
+                            <p className="text-[10px] opacity-80 font-bold">Envie agora para seu colaborador.</p>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
