@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { supabase } from '../../lib/supabaseClient';
-import { AlertCircle, MapPin, User } from 'lucide-react';
+import { AlertCircle, MapPin, User, Smile, Meh, Frown, X, Clock, AlertTriangle, Maximize2 } from 'lucide-react';
 import Card from '../ui/Card';
 
 // Fix Leaflet icon issue
