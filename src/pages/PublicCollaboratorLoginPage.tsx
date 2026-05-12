@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
-import { LogIn, UserPlus, Shield, Loader2, AlertCircle } from 'lucide-react';
+import { Mail, Lock, Loader2, AlertCircle, ShieldCheck } from 'lucide-react';
 import Button from '../components/ui/Button';
+import { motion } from 'framer-motion';
 
 const PublicCollaboratorLoginPage: React.FC = () => {
     const navigate = useNavigate();
@@ -19,87 +20,90 @@ const PublicCollaboratorLoginPage: React.FC = () => {
         try {
             const { error: authError } = await supabase.auth.signInWithPassword({
                 email,
-                password
+                password,
             });
 
             if (authError) throw authError;
-
             navigate('/colaborador');
         } catch (err: any) {
-            setError(err.message || 'Erro ao fazer login. Verifique suas credenciais.');
+            console.error('Erro no login:', err);
+            setError(err.message || 'Credenciais inválidas. Verifique seu e-mail e senha.');
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="min-h-screen bg-[#0d1117] flex items-center justify-center p-6 font-sans">
-            <div className="max-w-md w-full">
-                <div className="text-center mb-10">
-                    <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600/20 rounded-2xl mb-4 border border-blue-500/30">
-                        <Shield className="w-8 h-8 text-blue-400" />
+        <div className="min-h-[100dvh] bg-[#0d1117] flex flex-col items-center justify-center p-4 font-sans text-slate-200">
+            <div className="w-full max-w-[400px] mx-auto">
+                <div className="text-center mb-8 px-2">
+                    <div className="w-16 h-16 bg-blue-600/10 border border-blue-500/20 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-blue-900/10">
+                        <Lock className="w-8 h-8 text-blue-500" />
                     </div>
-                    <h1 className="text-3xl font-black text-white mb-2">CampanhaPró</h1>
-                    <p className="text-slate-400 font-medium">Área do Colaborador de Campo</p>
+                    <h1 className="text-3xl font-black text-white mb-2 tracking-tighter">Área do <span className="text-blue-500">Colaborador</span></h1>
+                    <p className="text-slate-400 text-sm font-medium">Faça login para gerenciar seus relatos e ajudar a cidade.</p>
                 </div>
 
-                <div className="bg-[#161b22] border border-slate-800 p-8 rounded-3xl shadow-2xl">
-                    <form onSubmit={handleLogin} className="space-y-6">
+                <motion.div 
+                    initial={{ opacity: 0, y: 15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-[#161b22] border border-slate-800 p-6 rounded-[32px] shadow-2xl relative overflow-hidden"
+                >
+                    <form onSubmit={handleLogin} className="space-y-5 relative z-10">
                         {error && (
-                            <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-xl flex items-center gap-3 text-red-400 text-sm">
-                                <AlertCircle className="w-5 h-5 shrink-0" />
+                            <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-2xl flex items-center gap-3 text-red-400 text-xs font-bold animate-in fade-in zoom-in-95">
+                                <AlertCircle className="w-4 h-4 shrink-0" />
                                 {error}
                             </div>
                         )}
 
-                        <div>
-                            <label className="block text-sm font-bold text-slate-300 mb-2 uppercase tracking-wider">E-mail</label>
-                            <input
-                                type="email"
-                                required
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                className="w-full bg-black/40 border border-slate-700 rounded-2xl p-4 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
-                                placeholder="seu@email.com"
-                            />
+                        <div className="space-y-3">
+                            <div className="relative group">
+                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-blue-500 transition-colors" />
+                                <input
+                                    required
+                                    type="email"
+                                    className="w-full bg-black/40 border border-slate-700 rounded-2xl py-4 pl-12 pr-4 text-white font-bold placeholder:text-slate-600 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all text-sm"
+                                    placeholder="Seu E-mail"
+                                    value={email}
+                                    onChange={e => setEmail(e.target.value)}
+                                />
+                            </div>
+
+                            <div className="relative group">
+                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-blue-500 transition-colors" />
+                                <input
+                                    required
+                                    type="password"
+                                    className="w-full bg-black/40 border border-slate-700 rounded-2xl py-4 pl-12 pr-4 text-white font-bold placeholder:text-slate-600 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all text-sm"
+                                    placeholder="Sua Senha"
+                                    value={password}
+                                    onChange={e => setPassword(e.target.value)}
+                                />
+                            </div>
                         </div>
 
-                        <div>
-                            <label className="block text-sm font-bold text-slate-300 mb-2 uppercase tracking-wider">Senha</label>
-                            <input
-                                type="password"
-                                required
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                className="w-full bg-black/40 border border-slate-700 rounded-2xl p-4 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
-                                placeholder="••••••••"
-                            />
+                        <div className="pt-2">
+                            <Button
+                                type="submit"
+                                disabled={loading}
+                                className="w-full py-5 rounded-[24px] bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black text-lg flex items-center justify-center gap-3 shadow-xl shadow-blue-900/20 transition-all active:scale-95 disabled:opacity-50"
+                            >
+                                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <ShieldCheck className="w-5 h-5" />}
+                                {loading ? 'Acessando...' : 'Entrar no Hub'}
+                            </Button>
                         </div>
-
-                        <Button
-                            type="submit"
-                            disabled={loading}
-                            className="w-full py-5 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-black text-lg flex items-center justify-center gap-3 shadow-lg shadow-blue-900/20"
-                        >
-                            {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : <LogIn className="w-6 h-6" />}
-                            Entrar no App
-                        </Button>
                     </form>
+                </motion.div>
 
-                    <div className="mt-8 pt-8 border-t border-slate-800 text-center">
-                        <p className="text-slate-500 text-sm mb-4">Ainda não é um colaborador oficial?</p>
-                        <Link
-                            to="/registro-colaborador"
-                            className="inline-flex items-center gap-2 text-blue-400 font-bold hover:text-blue-300 transition-colors"
-                        >
-                            <UserPlus className="w-4 h-4" /> Criar nova conta
-                        </Link>
-                    </div>
+                <div className="mt-8 text-center space-y-4">
+                    <p className="text-slate-500 text-sm font-medium">
+                        Não tem uma conta? <Link to="/registro-colaborador" className="text-blue-400 font-black hover:text-blue-300 transition-colors ml-1">Cadastre-se</Link>
+                    </p>
+                    <p className="text-slate-800 text-[9px] font-black uppercase tracking-[0.2em]">
+                        © 2026 CampanhaPró Intelligence
+                    </p>
                 </div>
-
-                <p className="mt-10 text-center text-slate-600 text-xs">
-                    © 2026 CampanhaPró Intelligence System. Todos os direitos reservados.
-                </p>
             </div>
         </div>
     );

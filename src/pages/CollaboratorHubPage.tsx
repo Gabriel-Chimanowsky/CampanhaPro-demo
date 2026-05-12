@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { supabase, rawSupabase } from '../lib/supabaseClient';
+import { supabase } from '../lib/supabaseClient';
 import { 
     MapPin, Send, Camera, 
     Smile, Meh, Frown, LogOut, CheckCircle2, 
-    Loader2, Navigation, Play, X, Video,
-    ChevronRight, ChevronLeft, Trash2, ArrowUp, ArrowDown, Plus
+    Loader2, Navigation, Video,
+    ChevronRight, Trash2, Map as MapIcon, ClipboardList, Info
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import { motion, AnimatePresence } from 'framer-motion';
 
 // Fix Leaflet icon issue
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
@@ -97,42 +98,40 @@ const CollaboratorHubPage: React.FC = () => {
                             bairro: bairro ? `${bairro}${cidade ? ', ' + cidade : ''}` : cidade 
                         }));
                     }
-                } catch (err) {
-                    console.error('Erro no reverse geocoding:', err);
+                    setLocationStatus('success');
+                } catch (e) {
+                    console.error('Erro ao buscar endereço:', e);
+                    setLocationStatus('success');
                 }
-                
-                setLocationStatus('success');
             },
             (error) => {
-                console.error('Erro ao pegar localização:', error);
+                console.error('Erro de GPS:', error);
                 setLocationStatus('error');
-                alert('Não foi possível obter sua localização. Verifique as permissões de GPS.');
+                alert('Não foi possível capturar sua localização. Verifique as permissões de GPS.');
             },
-            { enableHighAccuracy: true }
+            { enableHighAccuracy: true, timeout: 10000 }
         );
     };
 
     const handleAddPhotos = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
-            const newFiles = Array.from(e.target.files);
-            setFormData(prev => {
-                const updated = [...prev.mediaFiles, ...newFiles].slice(0, 10);
-                if (prev.mediaFiles.length + newFiles.length > 10) {
-                    alert('Limite máximo de 10 fotos atingido.');
-                }
-                return { ...prev, mediaFiles: updated, videoFile: null }; // Reset video if adding photos
-            });
+            const files = Array.from(e.target.files);
+            if (formData.mediaFiles.length + files.length > 10) {
+                alert('Limite máximo de 10 fotos.');
+                return;
+            }
+            setFormData(prev => ({ ...prev, mediaFiles: [...prev.mediaFiles, ...files] }));
         }
     };
 
     const handleAddVideo = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0];
-            if (file.size > 50 * 1024 * 1024) { // 50MB limit approx
-                alert('O vídeo é muito grande.');
+            if (file.size > 50 * 1024 * 1024) { // 50MB
+                alert('O vídeo deve ter no máximo 50MB.');
                 return;
             }
-            setFormData(prev => ({ ...prev, videoFile: file, mediaFiles: [] })); // Reset photos if adding video
+            setFormData(prev => ({ ...prev, videoFile: file }));
         }
     };
 
@@ -143,15 +142,59 @@ const CollaboratorHubPage: React.FC = () => {
         }));
     };
 
-    const movePhoto = (index: number, direction: 'up' | 'down') => {
-        setFormData(prev => {
-            const newFiles = [...prev.mediaFiles];
-            const targetIndex = direction === 'up' ? index - 1 : index + 1;
-            if (targetIndex >= 0 && targetIndex < newFiles.length) {
-                [newFiles[index], newFiles[targetIndex]] = [newFiles[targetIndex], newFiles[index]];
+    const handleSubmit = async () => {
+        if (!formData.title || !formData.clima || !formData.latitude) {
+            alert('Por favor, preencha todos os campos obrigatórios e capture sua localização.');
+            return;
+        }
+
+        setSubmitting(true);
+        try {
+            const mediaUrls: string[] = [];
+            
+            // Upload Photos
+            for (const file of formData.mediaFiles) {
+                const fileName = `${Date.now()}-${file.name}`;
+                const { data, error } = await supabase.storage.from('reports').upload(fileName, file);
+                if (error) throw error;
+                const { data: { publicUrl } } = supabase.storage.from('reports').getPublicUrl(data.path);
+                mediaUrls.push(publicUrl);
             }
-            return { ...prev, mediaFiles: newFiles };
-        });
+
+            // Upload Video
+            let videoUrl = '';
+            if (formData.videoFile) {
+                const fileName = `${Date.now()}-${formData.videoFile.name}`;
+                const { data, error } = await supabase.storage.from('reports').upload(fileName, formData.videoFile);
+                if (error) throw error;
+                const { data: { publicUrl } } = supabase.storage.from('reports').getPublicUrl(data.path);
+                videoUrl = publicUrl;
+            }
+
+            // Save Report
+            const { error: insertError } = await supabase.from('street_reports').insert({
+                title: formData.title,
+                reclamacao: formData.reclamacao,
+                bairro: formData.bairro,
+                clima: formData.clima,
+                latitude: formData.latitude,
+                longitude: formData.longitude,
+                mediaUrls: mediaUrls,
+                videoUrl: videoUrl,
+                status: 'Pendente',
+                userId: user.id,
+                campaignId: user.user_metadata?.campaignId || 'demo'
+            });
+
+            if (insertError) throw insertError;
+
+            setSuccess(true);
+        } catch (e: any) {
+            console.error('Erro ao enviar:', e);
+            alert('Erro ao enviar relato: ' + (e.message || 'Erro desconhecido'));
+        } finally {
+            setSubmitting(false);
+        }
     };
 
     const handleLogout = async () => {
@@ -159,365 +202,330 @@ const CollaboratorHubPage: React.FC = () => {
         navigate('/login-colaborador');
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!formData.clima || !formData.bairro) {
-            alert('Por favor, informe o bairro e o sentimento das ruas.');
-            return;
-        }
-
-        setSubmitting(true);
-        try {
-            let uploadedUrl = '';
-            
-            // Simulação de upload (em produção usaria supabase.storage)
-            if (formData.mediaFiles.length > 0) {
-                uploadedUrl = URL.createObjectURL(formData.mediaFiles[0]);
-            } else if (formData.videoFile) {
-                uploadedUrl = URL.createObjectURL(formData.videoFile);
-            }
-
-            // Usamos o rawSupabase para garantir que as chaves snake_case cheguem puras ao banco
-            const { error, data, status, statusText } = await rawSupabase.from('street_reports').insert({
-                campaign_id: user?.user_metadata?.campaignId || user?.campaignId || 'demo',
-                bairro: formData.bairro,
-                clima: formData.clima,
-                reclamacao: formData.reclamacao,
-                title: formData.title || `Alerta: ${formData.bairro}`,
-                latitude: formData.latitude,
-                longitude: formData.longitude,
-                photo_url: uploadedUrl,
-                created_by: user?.id,
-                created_at: new Date().toISOString()
-            });
-
-            if (error) {
-                console.error('[StreetReport Error]', {
-                    error,
-                    data,
-                    status,
-                    statusText,
-                    payload: {
-                        campaign_id: user?.user_metadata?.campaignId || user?.campaignId || 'demo',
-                        bairro: formData.bairro,
-                        clima: formData.clima,
-                        created_by: user?.id
-                    }
-                });
-                throw error;
-            }
-
-            setSuccess(true);
-            setFormData({
-                title: '',
-                reclamacao: '',
-                bairro: '',
-                clima: '',
-                latitude: null,
-                longitude: null,
-                mediaFiles: [],
-                videoFile: null
-            });
-            setLocationStatus('idle');
-            setStep(1);
-            
-            setTimeout(() => setSuccess(false), 3000);
-        } catch (err) {
-            console.error('Erro ao enviar alerta:', err);
-            alert('Erro ao enviar alerta. Tente novamente.');
-        } finally {
-            setSubmitting(false);
-        }
-    };
-
     if (loading) {
         return (
             <div className="min-h-screen bg-[#0d1117] flex items-center justify-center">
-                <Loader2 className="w-10 h-10 text-blue-500 animate-spin" />
+                <Loader2 className="w-10 h-10 animate-spin text-blue-500" />
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-[#0d1117] pb-20 font-sans text-slate-100">
-            {/* Header */}
-            <header className="bg-[#161b22] border-b border-slate-800 p-6 flex justify-between items-center sticky top-0 z-50">
-                <div>
-                    <h1 className="text-xl font-black text-white">Hub do Colaborador</h1>
-                    <p className="text-xs text-slate-400">Logado como: {user?.user_metadata?.name || user?.email}</p>
+        <div className="min-h-[100dvh] bg-[#0d1117] flex flex-col font-sans text-slate-200">
+            {/* Header Compacto */}
+            <header className="sticky top-0 z-50 bg-[#0d1117]/80 backdrop-blur-xl border-b border-slate-800 px-4 py-3 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-blue-600/10 border border-blue-500/20 flex items-center justify-center text-blue-500 font-black shadow-lg shadow-blue-500/5">
+                        <MapPin size={22} />
+                    </div>
+                    <div>
+                        <h1 className="text-sm font-black text-white leading-none tracking-tight">CampanhaPró</h1>
+                        <p className="text-[10px] text-blue-400 font-bold uppercase tracking-wider">Colaborador</p>
+                    </div>
                 </div>
-                <button onClick={handleLogout} className="p-2 text-slate-500 hover:text-red-400 transition-colors">
-                    <LogOut className="w-5 h-5" />
+                <button 
+                    onClick={handleLogout}
+                    className="w-10 h-10 rounded-xl bg-red-500/5 border border-red-500/10 flex items-center justify-center text-red-400 hover:bg-red-500/10 transition-all active:scale-90"
+                >
+                    <LogOut size={20} />
                 </button>
             </header>
 
-            <main className="p-4 max-w-lg mx-auto">
-                {success && (
-                    <div className="bg-emerald-500/20 border border-emerald-500/30 p-4 rounded-2xl flex items-center gap-3 text-emerald-400 mb-6 animate-in fade-in slide-in-from-top-4">
-                        <CheckCircle2 className="w-6 h-6" />
-                        <span className="font-bold">Alerta enviado com sucesso!</span>
-                    </div>
-                )}
-
-                {/* Stepper Indicator */}
-                <div className="flex items-center justify-center gap-4 mb-8">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black transition-all ${step === 1 ? 'bg-blue-600 ring-4 ring-blue-600/20' : 'bg-emerald-600'}`}>
-                        {step > 1 ? <CheckCircle2 size={20} /> : 1}
-                    </div>
-                    <div className={`h-1 w-12 rounded-full ${step > 1 ? 'bg-emerald-600' : 'bg-slate-800'}`} />
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black transition-all ${step === 2 ? 'bg-blue-600 ring-4 ring-blue-600/20' : 'bg-slate-800'}`}>
-                        2
-                    </div>
-                </div>
-
-                {step === 1 ? (
-                    <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
-                        <div className="text-center mb-8">
-                            <h2 className="text-3xl font-black mb-2">Onde você está?</h2>
-                            <p className="text-slate-400">Precisamos da sua localização exata para o mapa.</p>
-                        </div>
-
-                        <Card className="!p-0 overflow-hidden !bg-[#161b22] border-slate-700 h-80 relative shadow-2xl">
-                            {formData.latitude && formData.longitude ? (
-                                <MapContainer 
-                                    center={[formData.latitude, formData.longitude]} 
-                                    zoom={16} 
-                                    style={{ height: '100%', width: '100%' }}
-                                    zoomControl={false}
+            <main className="flex-1 overflow-y-auto p-4 flex flex-col items-center pb-24">
+                <div className="w-full max-w-[440px] mx-auto space-y-6">
+                    <AnimatePresence mode="wait">
+                        {success ? (
+                            <motion.div 
+                                key="success-screen"
+                                initial={{ opacity: 0, scale: 0.9 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                className="py-12 px-6 bg-[#161b22] border border-emerald-500/30 rounded-[32px] text-center shadow-2xl mt-8"
+                            >
+                                <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-6 border border-emerald-500/30">
+                                    <CheckCircle2 className="w-10 h-10 text-emerald-400" />
+                                </div>
+                                <h2 className="text-2xl font-black text-white mb-2">Relato Enviado!</h2>
+                                <p className="text-slate-400 text-sm mb-8">Obrigado por ajudar a construir uma cidade melhor.</p>
+                                <Button 
+                                    onClick={() => {
+                                        setSuccess(false);
+                                        setStep(1);
+                                        setFormData({
+                                            title: '', reclamacao: '', bairro: '', clima: '',
+                                            latitude: null, longitude: null, mediaFiles: [], videoFile: null
+                                        });
+                                        setLocationStatus('idle');
+                                    }}
+                                    className="w-full py-5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 font-black text-lg shadow-xl shadow-emerald-900/20 transition-all active:scale-95"
                                 >
-                                    <ChangeView center={[formData.latitude, formData.longitude]} zoom={16} />
-                                    <TileLayer
-                                        url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-                                    />
-                                    <Marker position={[formData.latitude, formData.longitude]} icon={DefaultIcon} />
-                                </MapContainer>
-                            ) : (
-                                <div className="w-full h-full bg-slate-900/50 flex flex-col items-center justify-center text-slate-500 p-10 text-center">
-                                    <MapPin size={48} className="mb-4 opacity-20" />
-                                    <p className="text-sm font-medium">O mapa aparecerá aqui após a captura.</p>
-                                </div>
-                            )}
-
-                            {locationStatus === 'fetching' && (
-                                <div className="absolute inset-0 bg-black/60 backdrop-blur-sm z-[1000] flex flex-col items-center justify-center text-white">
-                                    <Loader2 className="w-10 h-10 animate-spin text-blue-400 mb-4" />
-                                    <p className="font-bold">Aguardando GPS...</p>
-                                </div>
-                            )}
-                        </Card>
-
-                        <div className="space-y-4">
-                            <Button 
-                                onClick={handleGetLocation}
-                                disabled={locationStatus === 'fetching'}
-                                className={`w-full py-6 rounded-3xl font-black text-xl flex items-center justify-center gap-3 shadow-2xl transition-all ${locationStatus === 'success' ? 'bg-emerald-600' : 'bg-blue-600'}`}
-                            >
-                                {locationStatus === 'fetching' ? <Loader2 className="animate-spin" /> : <Navigation size={24} />}
-                                {locationStatus === 'success' ? 'Posição Atualizada' : 'Capturar Meu GPS'}
-                            </Button>
-
-                            {locationStatus === 'success' && (
-                                <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl">
-                                    <p className="text-[10px] uppercase font-black text-emerald-500 mb-1">Local Detectado</p>
-                                    <p className="text-sm font-bold text-slate-200">{formData.bairro || 'Localização capturada com sucesso!'}</p>
-                                </div>
-                            )}
-
-                            <Button 
-                                disabled={!formData.latitude}
-                                onClick={() => setStep(2)}
-                                className="w-full py-5 rounded-3xl bg-slate-800 hover:bg-slate-700 text-white font-black text-lg flex items-center justify-center gap-2"
-                            >
-                                Próximo Passo <ChevronRight size={20} />
-                            </Button>
-                        </div>
-                    </div>
-                ) : (
-                    <form onSubmit={handleSubmit} className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
-                        <button 
-                            type="button"
-                            onClick={() => setStep(1)}
-                            className="flex items-center gap-2 text-slate-500 font-bold text-sm mb-4"
-                        >
-                            <ChevronLeft size={16} /> Voltar para o Mapa
-                        </button>
-
-                        <div className="text-center mb-6">
-                            <h2 className="text-3xl font-black mb-2">Conte o que viu</h2>
-                            <p className="text-slate-400">Preencha os detalhes para a central.</p>
-                        </div>
-
-                        {/* Detalhes Form */}
-                        <Card className="!bg-[#161b22] !border-slate-800 space-y-6">
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-widest">O que está acontecendo?</label>
-                                <input 
-                                    type="text"
-                                    placeholder="Ex: Buraco na rua, Falta de luz..."
-                                    className="w-full bg-black/40 border border-slate-700 rounded-2xl p-4 text-white outline-none focus:border-blue-500 transition-all font-bold"
-                                    value={formData.title}
-                                    onChange={e => setFormData({...formData, title: e.target.value})}
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-widest">Sentimento nas Ruas</label>
-                                <div className="grid grid-cols-3 gap-2">
-                                    {[
-                                        { id: 'Positivo', label: 'Ótimo', icon: Smile, color: 'green' },
-                                        { id: 'Neutro', label: 'Normal', icon: Meh, color: 'yellow' },
-                                        { id: 'Negativo', label: 'Ruim', icon: Frown, color: 'red' }
-                                    ].map(opt => (
-                                        <button
-                                            key={opt.id}
-                                            type="button"
-                                            onClick={() => setFormData({...formData, clima: opt.id as any})}
-                                            className={`flex flex-col items-center p-3 rounded-2xl border transition-all ${formData.clima === opt.id ? `bg-${opt.color}-500/20 border-${opt.color}-500 text-${opt.color}-400` : 'bg-black/20 border-slate-700 text-slate-500'}`}
-                                        >
-                                            <opt.icon className="w-8 h-8 mb-1" />
-                                            <span className="text-[10px] font-bold">{opt.label}</span>
-                                        </button>
+                                    Fazer Novo Relato
+                                </Button>
+                            </motion.div>
+                        ) : (
+                            <div className="space-y-6">
+                                {/* Indicador de Step */}
+                                <div className="flex items-center gap-2 px-2">
+                                    {[1, 2, 3].map(s => (
+                                        <div 
+                                            key={s} 
+                                            className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${s <= step ? 'bg-blue-500 shadow-sm shadow-blue-500/50' : 'bg-slate-800'}`} 
+                                        />
                                     ))}
                                 </div>
-                            </div>
 
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-widest">Descrição detalhada</label>
-                                <textarea 
-                                    placeholder="Descreva a situação com mais detalhes..."
-                                    className="w-full bg-black/40 border border-slate-700 rounded-2xl p-4 text-white outline-none focus:border-blue-500 h-32 resize-none transition-all"
-                                    value={formData.reclamacao}
-                                    onChange={e => setFormData({...formData, reclamacao: e.target.value})}
-                                />
-                            </div>
-
-                            {/* Media Section */}
-                            <div className="space-y-4">
-                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest">
-                                    Mídia do Local
-                                </label>
-                                
-                                <div className="bg-blue-600/10 border border-blue-500/20 rounded-2xl p-4 mb-4">
-                                    <p className="text-xs font-bold text-blue-400 mb-1">Destaque Importante:</p>
-                                    <p className="text-[10px] text-blue-300 opacity-80">Você pode enviar até <span className="font-black underline">10 FOTOS</span> ou <span className="font-black underline">1 VÍDEO de até 30s</span>.</p>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-3">
-                                    <label className={`flex flex-col items-center justify-center p-4 border border-dashed rounded-2xl cursor-pointer transition-all ${formData.videoFile ? 'opacity-30 pointer-events-none' : 'bg-black/40 border-slate-700 hover:bg-black/60'}`}>
-                                        <Camera className="w-6 h-6 text-blue-400 mb-1" />
-                                        <span className="text-[10px] font-bold text-slate-400">Adicionar Fotos</span>
-                                        <input 
-                                            type="file" 
-                                            accept="image/*" 
-                                            multiple 
-                                            className="hidden" 
-                                            onChange={handleAddPhotos}
-                                            disabled={!!formData.videoFile}
-                                        />
-                                    </label>
-                                    <label className={`flex flex-col items-center justify-center p-4 border border-dashed rounded-2xl cursor-pointer transition-all ${formData.mediaFiles.length > 0 ? 'opacity-30 pointer-events-none' : 'bg-black/40 border-slate-700 hover:bg-black/60'}`}>
-                                        <Video className="w-6 h-6 text-red-400 mb-1" />
-                                        <span className="text-[10px] font-bold text-slate-400">Gravar Vídeo</span>
-                                        <input 
-                                            type="file" 
-                                            accept="video/*" 
-                                            className="hidden" 
-                                            onChange={handleAddVideo}
-                                            disabled={formData.mediaFiles.length > 0}
-                                        />
-                                    </label>
-                                </div>
-
-                                {/* Media Previews */}
-                                {formData.mediaFiles.length > 0 && (
-                                    <div className="grid grid-cols-2 gap-3 mt-4">
-                                        {formData.mediaFiles.map((file, idx) => (
-                                            <div key={idx} className="relative aspect-video rounded-xl bg-slate-800 overflow-hidden border border-slate-700 group">
-                                                <img src={URL.createObjectURL(file)} className="w-full h-full object-cover" alt="Preview" />
-                                                <div className="absolute inset-0 bg-black/60 flex items-center justify-center gap-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <button type="button" onClick={() => movePhoto(idx, 'up')} disabled={idx === 0} className="p-2 bg-slate-800 rounded-lg text-white disabled:opacity-30"><ArrowUp size={16} /></button>
-                                                    <button type="button" onClick={() => movePhoto(idx, 'down')} disabled={idx === formData.mediaFiles.length - 1} className="p-2 bg-slate-800 rounded-lg text-white disabled:opacity-30"><ArrowDown size={16} /></button>
-                                                    <button type="button" onClick={() => removePhoto(idx)} className="p-2 bg-red-500 rounded-lg text-white"><Trash2 size={16} /></button>
-                                                </div>
-                                                <div className="absolute bottom-2 left-2 bg-black/60 px-2 py-0.5 rounded text-[8px] font-bold">{idx + 1}</div>
-                                            </div>
-                                        ))}
-                                        {formData.mediaFiles.length < 10 && (
-                                            <label className="flex items-center justify-center border-2 border-dashed border-slate-800 rounded-xl aspect-video cursor-pointer hover:bg-white/5">
-                                                <Plus className="text-slate-700" />
-                                                <input type="file" accept="image/*" multiple className="hidden" onChange={handleAddPhotos} />
-                                            </label>
-                                        )}
-                                    </div>
-                                )}
-
-                                {formData.videoFile && (
-                                    <div className="mt-4 relative aspect-video rounded-2xl bg-black overflow-hidden border border-slate-700 group">
-                                        <video src={URL.createObjectURL(formData.videoFile)} className="w-full h-full object-cover" />
-                                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <Play size={40} className="text-white opacity-50" />
+                                {step === 1 ? (
+                                    <motion.div 
+                                        key="step1"
+                                        initial={{ opacity: 0, x: -10 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        exit={{ opacity: 0, x: 10 }}
+                                        className="space-y-6"
+                                    >
+                                        <div className="text-center px-4">
+                                            <h2 className="text-3xl font-black text-white mb-2 tracking-tighter">Onde você está?</h2>
+                                            <p className="text-slate-400 text-sm">Precisamos do seu GPS para localizar a demanda.</p>
                                         </div>
-                                        <button 
-                                            type="button"
-                                            onClick={() => setFormData(prev => ({ ...prev, videoFile: null }))}
-                                            className="absolute top-3 right-3 p-2 bg-red-500 rounded-xl text-white shadow-xl"
-                                        >
-                                            <Trash2 size={20} />
-                                        </button>
-                                        <div className="absolute bottom-3 left-3 bg-red-500 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">Vídeo Selecionado</div>
-                                    </div>
+
+                                        <div className="relative group">
+                                            <Card className="!p-0 overflow-hidden !bg-[#161b22] border-slate-700 h-[220px] relative shadow-2xl rounded-[28px] border-2">
+                                                {formData.latitude && formData.longitude ? (
+                                                    <MapContainer 
+                                                        center={[formData.latitude, formData.longitude]} 
+                                                        zoom={16} 
+                                                        style={{ height: '100%', width: '100%' }}
+                                                        zoomControl={false}
+                                                    >
+                                                        <ChangeView center={[formData.latitude, formData.longitude]} zoom={16} />
+                                                        <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
+                                                        <Marker position={[formData.latitude, formData.longitude]} icon={DefaultIcon} />
+                                                    </MapContainer>
+                                                ) : (
+                                                    <div className="w-full h-full bg-slate-900/50 flex flex-col items-center justify-center text-slate-500 p-6 text-center">
+                                                        <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mb-4 border border-slate-700">
+                                                            <MapPin size={32} className="text-slate-600" />
+                                                        </div>
+                                                        <p className="text-[10px] font-black uppercase tracking-widest opacity-50">Aguardando GPS</p>
+                                                    </div>
+                                                )}
+
+                                                {locationStatus === 'fetching' && (
+                                                    <div className="absolute inset-0 bg-blue-900/40 backdrop-blur-md z-[1000] flex flex-col items-center justify-center text-white">
+                                                        <Loader2 className="w-10 h-10 animate-spin text-white mb-2" />
+                                                        <p className="font-black text-[10px] uppercase tracking-widest">Sincronizando...</p>
+                                                    </div>
+                                                )}
+                                            </Card>
+                                        </div>
+
+                                        <div className="space-y-4">
+                                            <Button 
+                                                onClick={handleGetLocation}
+                                                disabled={locationStatus === 'fetching'}
+                                                className={`w-full py-6 rounded-[24px] font-black text-lg flex items-center justify-center gap-4 shadow-xl transition-all active:scale-95 ${locationStatus === 'success' ? 'bg-emerald-600 shadow-emerald-900/20' : 'bg-gradient-to-r from-blue-600 to-indigo-600 shadow-blue-900/20'}`}
+                                            >
+                                                {locationStatus === 'fetching' ? <Loader2 className="animate-spin w-6 h-6" /> : <Navigation size={22} />}
+                                                {locationStatus === 'success' ? 'Localização Fixada' : 'Ativar Meu GPS'}
+                                            </Button>
+
+                                            {locationStatus === 'success' && (
+                                                <motion.div 
+                                                    initial={{ opacity: 0, y: 10 }} 
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    className="p-4 bg-[#161b22] border border-emerald-500/30 rounded-2xl flex items-center gap-4"
+                                                >
+                                                    <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-400">
+                                                        <MapPin size={20} />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-[9px] uppercase font-black text-emerald-500 tracking-widest">Bairro Detectado</p>
+                                                        <p className="text-sm font-bold text-white truncate">{formData.bairro || 'Coordenadas capturadas!'}</p>
+                                                    </div>
+                                                </motion.div>
+                                            )}
+
+                                            <Button 
+                                                disabled={!formData.latitude}
+                                                onClick={() => setStep(2)}
+                                                className="w-full py-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-black text-sm flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-30"
+                                            >
+                                                Próximo Passo <ChevronRight size={18} />
+                                            </Button>
+                                        </div>
+                                    </motion.div>
+                                ) : step === 2 ? (
+                                    <motion.div 
+                                        key="step2"
+                                        initial={{ opacity: 0, x: 10 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        exit={{ opacity: 0, x: -10 }}
+                                        className="space-y-6"
+                                    >
+                                        <div className="text-center px-4">
+                                            <h2 className="text-3xl font-black text-white mb-2 tracking-tighter leading-none">O que está havendo?</h2>
+                                            <p className="text-slate-400 text-sm">Conte-nos sobre a situação.</p>
+                                        </div>
+
+                                        <div className="bg-[#161b22] border border-slate-800 p-5 rounded-[32px] space-y-6 shadow-2xl">
+                                            <div className="space-y-2">
+                                                <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest px-1">Título do Alerta</label>
+                                                <input 
+                                                    type="text"
+                                                    placeholder="Ex: Rua sem luz, Buraco..."
+                                                    className="w-full bg-black/40 border border-slate-700 rounded-2xl py-4 px-5 text-white outline-none focus:border-blue-500 transition-all font-bold text-base"
+                                                    value={formData.title}
+                                                    onChange={e => setFormData({...formData, title: e.target.value})}
+                                                />
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest px-1">Clima nas Ruas</label>
+                                                <div className="grid grid-cols-3 gap-2">
+                                                    {[
+                                                        { id: 'Positivo', label: 'Ótimo', icon: Smile, color: 'emerald' },
+                                                        { id: 'Neutro', label: 'Normal', icon: Meh, color: 'yellow' },
+                                                        { id: 'Negativo', label: 'Crítico', icon: Frown, color: 'red' }
+                                                    ].map(opt => (
+                                                        <button
+                                                            key={opt.id}
+                                                            type="button"
+                                                            onClick={() => setFormData({...formData, clima: opt.id as any})}
+                                                            className={`flex flex-col items-center p-3 rounded-2xl border-2 transition-all active:scale-90 ${formData.clima === opt.id ? `bg-${opt.color}-500/10 border-${opt.color}-500/50 text-${opt.color}-400` : 'bg-black/20 border-slate-800 text-slate-600'}`}
+                                                        >
+                                                            <opt.icon className="w-8 h-8 mb-1" />
+                                                            <span className="text-[9px] font-black uppercase">{opt.label}</span>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest px-1">Descrição</label>
+                                                <textarea 
+                                                    placeholder="Descreva aqui..."
+                                                    className="w-full bg-black/40 border border-slate-700 rounded-2xl py-4 px-5 text-white outline-none focus:border-blue-500 h-28 resize-none transition-all font-medium text-sm"
+                                                    value={formData.reclamacao}
+                                                    onChange={e => setFormData({...formData, reclamacao: e.target.value})}
+                                                />
+                                            </div>
+
+                                            <div className="flex gap-2">
+                                                <Button 
+                                                    onClick={() => setStep(1)}
+                                                    className="flex-1 py-4 rounded-xl bg-slate-800 text-white font-bold text-xs"
+                                                >
+                                                    Voltar
+                                                </Button>
+                                                <Button 
+                                                    disabled={!formData.title || !formData.clima}
+                                                    onClick={() => setStep(3)}
+                                                    className="flex-[2] py-4 rounded-xl bg-blue-600 text-white font-black text-sm disabled:opacity-30"
+                                                >
+                                                    Continuar
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                ) : (
+                                    <motion.div 
+                                        key="step3"
+                                        initial={{ opacity: 0, x: 10 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        exit={{ opacity: 0, x: -10 }}
+                                        className="space-y-6"
+                                    >
+                                        <div className="text-center px-4">
+                                            <h2 className="text-3xl font-black text-white mb-2 tracking-tighter leading-none">Anexar Mídia</h2>
+                                            <p className="text-slate-400 text-sm">Fotos ou vídeo comprovam a situação.</p>
+                                        </div>
+
+                                        <Card className="!bg-[#161b22] !border-slate-800 rounded-[32px] p-5 space-y-6 shadow-2xl">
+                                            <div className="flex items-center justify-between px-1">
+                                                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Evidências</span>
+                                                <span className="text-[9px] text-blue-500 font-black px-2 py-0.5 bg-blue-500/10 rounded-full border border-blue-500/20">
+                                                    {formData.videoFile ? '1 VÍDEO' : `${formData.mediaFiles.length}/10 FOTOS`}
+                                                </span>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <label className={`flex flex-col items-center justify-center p-4 border-2 border-dashed rounded-2xl cursor-pointer transition-all active:scale-95 ${formData.videoFile ? 'opacity-20 pointer-events-none' : 'bg-blue-600/5 border-blue-500/20'}`}>
+                                                    <Camera className="w-6 h-6 text-blue-400 mb-1" />
+                                                    <span className="text-[9px] font-black text-blue-400 uppercase">Fotos</span>
+                                                    <input type="file" accept="image/*" multiple className="hidden" onChange={handleAddPhotos} disabled={!!formData.videoFile} />
+                                                </label>
+                                                <label className={`flex flex-col items-center justify-center p-4 border-2 border-dashed rounded-2xl cursor-pointer transition-all active:scale-95 ${formData.mediaFiles.length > 0 ? 'opacity-20 pointer-events-none' : 'bg-red-600/5 border-red-500/20'}`}>
+                                                    <Video className="w-6 h-6 text-red-400 mb-1" />
+                                                    <span className="text-[9px] font-black text-red-400 uppercase">Vídeo</span>
+                                                    <input type="file" accept="video/*" className="hidden" onChange={handleAddVideo} disabled={formData.mediaFiles.length > 0} />
+                                                </label>
+                                            </div>
+
+                                            {/* Previews */}
+                                            <div className="grid grid-cols-2 gap-2">
+                                                {formData.mediaFiles.map((file, idx) => (
+                                                    <div key={idx} className="relative aspect-square rounded-xl bg-slate-800 overflow-hidden border border-slate-700">
+                                                        <img src={URL.createObjectURL(file)} className="w-full h-full object-cover" alt="Preview" />
+                                                        <button onClick={() => removePhoto(idx)} className="absolute top-1 right-1 w-6 h-6 bg-red-500 rounded-lg text-white flex items-center justify-center"><Trash2 size={14} /></button>
+                                                    </div>
+                                                ))}
+                                                {formData.videoFile && (
+                                                    <div className="col-span-2 relative aspect-video rounded-xl bg-black overflow-hidden border border-slate-700">
+                                                        <video src={URL.createObjectURL(formData.videoFile)} className="w-full h-full object-cover" />
+                                                        <button onClick={() => setFormData(prev => ({ ...prev, videoFile: null }))} className="absolute top-2 right-2 w-8 h-8 bg-red-500 rounded-xl text-white flex items-center justify-center"><Trash2 size={18} /></button>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div className="flex gap-2">
+                                                <Button onClick={() => setStep(2)} className="flex-1 py-4 rounded-xl bg-slate-800 text-white font-bold text-xs">Voltar</Button>
+                                                <Button 
+                                                    onClick={handleSubmit} 
+                                                    disabled={submitting} 
+                                                    className="flex-[2] py-4 rounded-xl bg-emerald-600 text-white font-black text-sm shadow-lg shadow-emerald-900/20 disabled:opacity-50"
+                                                >
+                                                    {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                                                    {submitting ? 'ENVIANDO...' : 'PUBLICAR ALERTA'}
+                                                </Button>
+                                            </div>
+                                        </Card>
+                                    </motion.div>
                                 )}
                             </div>
-                        </Card>
-
-                        <Button 
-                            type="submit" 
-                            disabled={submitting}
-                            className="w-full py-6 rounded-3xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black text-xl flex items-center justify-center gap-3 shadow-2xl shadow-blue-900/40 mt-8"
-                        >
-                            {submitting ? <Loader2 className="w-6 h-6 animate-spin" /> : <Send className="w-6 h-6" />}
-                            {submitting ? 'Publicando...' : 'Publicar Alerta'}
-                        </Button>
-                    </form>
-                )}
+                        )}
+                    </AnimatePresence>
+                </div>
             </main>
 
-            {/* Tutorial Overlay */}
-            {showTutorial && (
-                <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-500">
-                    <div className="max-w-md w-full bg-[#161b22] border border-slate-800 rounded-[40px] p-8 shadow-2xl relative">
-                        <div className="w-20 h-20 bg-blue-600/20 rounded-full flex items-center justify-center mx-auto mb-6 border border-blue-500/30">
-                            <Navigation className="w-10 h-10 text-blue-400" />
-                        </div>
-                        <h2 className="text-2xl font-black text-center mb-4">Bem-vindo ao Campo!</h2>
-                        
-                        <div className="space-y-4 mb-8 text-left">
-                            <div className="flex gap-4">
-                                <div className="w-10 h-10 shrink-0 bg-white/5 rounded-2xl flex items-center justify-center font-black text-blue-400 border border-slate-700">1</div>
-                                <p className="text-sm text-slate-400 leading-relaxed"><span className="text-white font-bold">Mapa Primeiro:</span> Comece capturando sua posição. Você verá o mapa mudar na hora.</p>
-                            </div>
-                            <div className="flex gap-4">
-                                <div className="w-10 h-10 shrink-0 bg-white/5 rounded-2xl flex items-center justify-center font-black text-blue-400 border border-slate-700">2</div>
-                                <p className="text-sm text-slate-400 leading-relaxed"><span className="text-white font-bold">Relatório Completo:</span> No próximo passo, conte os detalhes e anexe fotos (até 10) ou um vídeo.</p>
-                            </div>
-                            <div className="flex gap-4">
-                                <div className="w-10 h-10 shrink-0 bg-white/5 rounded-2xl flex items-center justify-center font-black text-blue-400 border border-slate-700">3</div>
-                                <p className="text-sm text-slate-400 leading-relaxed"><span className="text-white font-bold">Organize as Fotos:</span> Você pode mover as fotos para escolher qual aparece primeiro no painel.</p>
-                            </div>
-                        </div>
-
-                        <Button 
-                            className="w-full py-5 rounded-3xl bg-blue-600 hover:bg-blue-500 text-white font-black text-lg shadow-xl shadow-blue-900/40"
-                            onClick={() => {
-                                setShowTutorial(false);
-                                localStorage.setItem('collaborator_tutorial_seen', 'true');
-                            }}
-                        >
-                            Começar Agora
-                        </Button>
-                    </div>
+            {/* Nav PWA Bar */}
+            <nav className="fixed bottom-4 left-4 right-4 z-[100] max-w-[440px] mx-auto">
+                <div className="bg-[#161b22]/90 backdrop-blur-xl border border-white/10 rounded-[28px] p-2 flex items-center justify-around shadow-2xl">
+                    <button onClick={() => setStep(1)} className={`flex flex-col items-center gap-1 px-5 py-2 rounded-2xl transition-all ${step === 1 ? 'bg-blue-600 text-white' : 'text-slate-500'}`}>
+                        <MapIcon size={20} />
+                        <span className="text-[9px] font-black uppercase">Mapa</span>
+                    </button>
+                    <button onClick={() => formData.latitude && setStep(2)} disabled={!formData.latitude} className={`flex flex-col items-center gap-1 px-5 py-2 rounded-2xl transition-all ${step === 2 ? 'bg-blue-600 text-white' : 'text-slate-500'}`}>
+                        <ClipboardList size={20} />
+                        <span className="text-[9px] font-black uppercase">Relato</span>
+                    </button>
+                    <button onClick={() => formData.title && setStep(3)} disabled={!formData.title} className={`flex flex-col items-center gap-1 px-5 py-2 rounded-2xl transition-all ${step === 3 ? 'bg-blue-600 text-white' : 'text-slate-500'}`}>
+                        <Camera size={20} />
+                        <span className="text-[9px] font-black uppercase">Mídia</span>
+                    </button>
                 </div>
-            )}
+            </nav>
+
+            {/* Tutorial */}
+            <AnimatePresence>
+                {showTutorial && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-xl flex items-center justify-center p-6 text-center">
+                        <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="max-w-xs w-full space-y-6">
+                            <div className="w-16 h-16 bg-blue-600/20 rounded-2xl flex items-center justify-center mx-auto border border-blue-500/20"><Info size={32} className="text-blue-400" /></div>
+                            <h2 className="text-2xl font-black">Guia Rápido</h2>
+                            <p className="text-slate-400 text-sm">Capture o GPS, anexe fotos e publique seu relato em poucos segundos.</p>
+                            <Button className="w-full py-4 rounded-xl bg-blue-600 font-black text-sm" onClick={() => { setShowTutorial(false); localStorage.setItem('collaborator_tutorial_seen', 'true'); }}>Entendi!</Button>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };

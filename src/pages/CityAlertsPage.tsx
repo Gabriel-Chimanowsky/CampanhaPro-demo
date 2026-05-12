@@ -69,20 +69,13 @@ const CityAlertsPage: React.FC = () => {
     useEffect(() => {
         fetchAlerts();
         
-        const channel = supabase
-            .channel('city_alerts_realtime')
-            .on('postgres_changes', { 
-                event: '*', 
-                schema: 'public', 
-                table: 'street_reports'
-            }, () => {
-                fetchAlerts();
-            })
-            .subscribe();
+        // Como estamos usando MySQL local, o Realtime do Supabase não funciona.
+        // Usamos um polling de 10 segundos para manter os dados atualizados.
+        const interval = setInterval(() => {
+            fetchAlerts();
+        }, 10000);
 
-        return () => {
-            supabase.removeChannel(channel);
-        };
+        return () => clearInterval(interval);
     }, [campaignId]);
 
     const fetchAlerts = async () => {
@@ -217,7 +210,7 @@ const CityAlertsPage: React.FC = () => {
                                     <div className="flex items-center justify-between mt-auto">
                                         <div className="flex items-center gap-2 text-[10px] text-slate-500">
                                             <User size={12} className="text-slate-600" />
-                                            <span className="font-bold">{alert.users?.name || 'Colaborador'}</span>
+                                            <span className="font-bold">{alert.userName || 'Colaborador'}</span>
                                             <span className="w-1 h-1 rounded-full bg-slate-700" />
                                             <MapPin size={12} className="text-slate-600" />
                                             <span>{alert.bairro}</span>
@@ -244,12 +237,13 @@ const CityAlertsPage: React.FC = () => {
                         <div className="flex gap-2">
                             <input 
                                 readOnly
-                                value={`${window.location.origin}/colaborador`}
+                                value={`${window.location.origin}/registro-colaborador?campaign_id=${campaignId}`}
                                 className="flex-1 bg-black/40 border border-slate-700 rounded-lg px-3 py-2 text-[10px] text-slate-300 font-mono"
                             />
                             <Button 
                                 onClick={() => {
-                                    navigator.clipboard.writeText(`${window.location.origin}/colaborador`);
+                                    const link = `${window.location.origin}/registro-colaborador?campaign_id=${campaignId}`;
+                                    navigator.clipboard.writeText(link);
                                     setCopied(true);
                                     setTimeout(() => setCopied(false), 2000);
                                 }}
@@ -300,7 +294,7 @@ const CityAlertsPage: React.FC = () => {
                                                 <h3 className="font-bold text-slate-800 text-sm mb-1">{alert.title || 'Alerta de Rua'}</h3>
                                                 <p className="text-xs text-slate-600 mb-2">{alert.reclamacao}</p>
                                                 <div className="flex items-center gap-1 text-[10px] text-slate-500">
-                                                    <User size={12} /> <span className="font-bold">{alert.users?.name}</span>
+                                                    <User size={12} /> <span className="font-bold">{alert.userName || 'Colaborador'}</span>
                                                 </div>
                                             </div>
                                         </Popup>
@@ -330,7 +324,7 @@ const CityAlertsPage: React.FC = () => {
                                                 </div>
                                                 <div>
                                                     <p className="text-[10px] text-slate-500 uppercase font-black">Enviado por</p>
-                                                    <p className="text-xs font-bold text-slate-200">{selectedAlert.users?.name || 'Colaborador'}</p>
+                                                    <p className="text-xs font-bold text-slate-200">{selectedAlert.userName || 'Colaborador'}</p>
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-2">

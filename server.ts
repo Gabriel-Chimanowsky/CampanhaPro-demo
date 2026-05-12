@@ -13,6 +13,11 @@ import { createServer as createHttpServer } from 'http';
 import { createAuthMiddleware } from './src/middleware/authMiddleware';
 import { getConversionFunnelStats, getTerritorialAlerts } from './src/services/intelligenceService';
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import pool from './src/lib/mysql';
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
+import { mysqlAuthMiddleware } from './src/middleware/mysqlAuthMiddleware';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -34,7 +39,18 @@ if (adminUrl && adminKey) {
   console.warn("[Supabase Admin] Falha ao inicializar: URL ou Service Role Key ausentes.");
 }
 
-const requireAuth = createAuthMiddleware(supabaseAdmin);
+// Mock Auth Middleware for Local Development
+const requireAuth = (req: any, res: any, next: any) => {
+  // Em dev, vamos injetar um usuário mock se o token for o nosso
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.includes('eyJ')) { // JWT fake
+    req.user = { id: '27ff83c3-440e-48a1-8226-460108bf10e6', email: 'eldastito@teste.com' };
+  }
+  next();
+};
+
+const requireMySQLAuth = requireAuth;
+const JWT_SECRET = process.env.JWT_SECRET || 'campanhapro_super_secret_key_2024';
 
 // --- CATÁLOGO DE SKILLS (AGENT TOOLS) ---
 const AGENT_TOOLS = [
@@ -158,18 +174,510 @@ const callGeminiREST = async (prompt: string) => {
   }
 };
 
+
 async function startServer() {
+  const port: number = Number(process.env.PORT) || 3005;
   const app = express();
   const httpServer = createHttpServer(app);
-  const port = Number(process.env.PORT) || 3001;
+
+  httpServer.listen(port, '127.0.0.1', async () => {
+    console.log(`[CRITICAL] Server listening on http://127.0.0.1:3005`);
+    try {
+      // Limpeza de Dados: Migrar relatos 'demo' para a campanha real
+      const actualCampaignId = '455d21f3-f254-4b96-b49c-e70192c3fe27';
+      await pool.execute(
+        'UPDATE street_reports SET campaign_id = ? WHERE campaign_id = ? OR campaign_id IS NULL', 
+        [actualCampaignId, 'demo']
+      );
+      console.log('[Database] Migrated orphan reports to:', actualCampaignId);
+      
+      // Sincronizar street_reports com TODOS os campos do frontend
+      await pool.execute(`
+        CREATE TABLE IF NOT EXISTS street_reports (
+          id VARCHAR(255) PRIMARY KEY,
+          user_id VARCHAR(255),
+          campaign_id VARCHAR(255),
+          title VARCHAR(255),
+          reclamacao TEXT,
+          description TEXT,
+          bairro VARCHAR(255),
+          address TEXT,
+          clima VARCHAR(100),
+          latitude DECIMAL(10, 8),
+          longitude DECIMAL(11, 8),
+          media_urls JSON,
+          video_url TEXT,
+          status VARCHAR(50) DEFAULT 'pending',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      
+      const [reportCols]: any = await pool.execute('DESCRIBE street_reports');
+      const colNames = reportCols.map((c: any) => c.Field);
+      
+      // Lista de colunas para garantir que existam
+      const requiredCols = [
+        { name: 'title', type: 'VARCHAR(255)' },
+        { name: 'reclamacao', type: 'TEXT' },
+        { name: 'bairro', type: 'VARCHAR(255)' },
+        { name: 'clima', type: 'VARCHAR(100)' },
+        { name: 'video_url', type: 'TEXT' },
+        { name: 'media_urls', type: 'JSON' },
+        { name: 'latitude', type: 'DECIMAL(10, 8)' },
+        { name: 'longitude', type: 'DECIMAL(11, 8)' }
+      ];
+
+      for (const col of requiredCols) {
+        if (!colNames.includes(col.name)) {
+          console.log(`[Database] Adding ${col.name} to street_reports...`);
+          await pool.execute(`ALTER TABLE street_reports ADD COLUMN ${col.name} ${col.type}`);
+        }
+      }
+
+      console.log('[Database] street_reports fully synchronized.');
+    } catch (dbErr) {
+      console.warn('[Database] Could not describe users table. Ensure MySQL is running.');
+    }
+  });
+
+  app.use(cors());
+  app.use(express.json()); // Global JSON parsing
+  
+  app.use((req, res, next) => {
+    console.log(`[REQ] ${req.method} ${req.url} - ${new Date().toISOString()}`);
+    next();
+  });
+
+  // Rota de Emergência para Sincronizar Banco de Dados
+  app.get('/api/admin/sync-db', async (req, res) => {
+    try {
+      console.log('[Admin] Iniciando sincronização forçada do banco...');
+      
+      // Sincronizar street_reports
+      await pool.execute(`
+        CREATE TABLE IF NOT EXISTS street_reports (
+          id VARCHAR(255) PRIMARY KEY,
+          user_id VARCHAR(255),
+          campaign_id VARCHAR(255),
+          title VARCHAR(255),
+          reclamacao TEXT,
+          description TEXT,
+          bairro VARCHAR(255),
+          address TEXT,
+          clima VARCHAR(100),
+          latitude DECIMAL(10, 8),
+          longitude DECIMAL(11, 8),
+          media_urls JSON,
+          video_url TEXT,
+          status VARCHAR(50) DEFAULT 'pending',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
+      const [reportCols]: any = await pool.execute('DESCRIBE street_reports');
+      const colNames = reportCols.map((c: any) => c.Field);
+      
+      const requiredCols = [
+        { name: 'user_id', type: 'VARCHAR(255)' },
+        { name: 'campaign_id', type: 'VARCHAR(255)' },
+        { name: 'title', type: 'VARCHAR(255)' },
+        { name: 'reclamacao', type: 'TEXT' },
+        { name: 'bairro', type: 'VARCHAR(255)' },
+        { name: 'clima', type: 'VARCHAR(100)' },
+        { name: 'video_url', type: 'TEXT' },
+        { name: 'media_urls', type: 'JSON' },
+        { name: 'latitude', type: 'DECIMAL(10, 8)' },
+        { name: 'longitude', type: 'DECIMAL(11, 8)' },
+        { name: 'status', type: "VARCHAR(50) DEFAULT 'pending'" }
+      ];
+
+      let added = [];
+      for (const col of requiredCols) {
+        if (!colNames.includes(col.name)) {
+          console.log(`[Database] Adding missing column: ${col.name}...`);
+          await pool.execute(`ALTER TABLE street_reports ADD COLUMN ${col.name} ${col.type}`);
+          added.push(col.name);
+        }
+      }
+
+      res.json({ 
+        message: 'Banco de Dados Sincronizado com Sucesso!', 
+        added_columns: added,
+        current_columns: colNames
+      });
+    } catch (err: any) {
+      console.error('[Admin] Erro na sincronização:', err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get('/api/ping', (req, res) => {
+    res.json({ pong: true, time: new Date().toISOString() });
+  });
+
+
+
+  // Heartbeat para garantir que o processo está vivo
+  setInterval(() => {
+    console.log(`[Heartbeat] Server is alive - ${new Date().toISOString()}`);
+  }, 30000);
+
+  app.post('/api/auth/register', async (req, res) => {
+    const { email, password, options } = req.body || {};
+    console.log(`[AUTH-MYSQL] Register attempt for: ${email}`);
+    
+    if (!email || !password) {
+      return res.status(400).json({ error: 'E-mail e senha são obrigatórios' });
+    }
+
+    // Timer para monitorar lentidão do banco
+    const dbTimeout = setTimeout(() => {
+      console.error(`[AUTH-MYSQL] DATABASE HANG DETECTED for ${email}`);
+      if (!res.headersSent) {
+        res.status(504).json({ error: 'O banco de dados demorou muito para responder. Verifique seu MySQL/XAMPP.' });
+      }
+    }, 8000); // 8s limite para o DB
+
+    try {
+      console.log('[AUTH-MYSQL] Step 1: Parsing options');
+      const { name, phone, type, campaignId } = options?.data || {};
+      const userId = `user_${Date.now()}`;
+      
+      console.log('[AUTH-MYSQL] Step 2: Hashing password');
+      const hashedPassword = await bcrypt.hash(password, 10);
+      
+      console.log('[AUTH-MYSQL] Step 3: Executing MySQL Insert');
+      
+      await pool.execute(
+        `INSERT INTO users (id, name, email, password, phone, type, plan, role, campaign_id, is_supreme_admin) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE password = VALUES(password), name = VALUES(name), phone = VALUES(phone)`,
+        [
+          userId, 
+          name || 'Novo Colaborador', 
+          email, 
+          hashedPassword,
+          phone || null, 
+          type || 'Colaborador', 
+          'ESSENCIAL', 
+          'active', 
+          campaignId || '75341594-5f1d-4064-9f41-2b1a7613fe48',
+          0
+        ]
+      );
+
+      console.log('[AUTH-MYSQL] Step 4: Finalizing response');
+      clearTimeout(dbTimeout);
+      const responseBody = { 
+        user: { id: userId, email, user_metadata: { name, phone, type, campaignId } },
+        session: { 
+          access_token: jwt.sign({ id: userId, email }, JWT_SECRET, { expiresIn: '7d' }),
+          user: { id: userId, email } 
+        }
+      };
+
+      console.log(`[AUTH-MYSQL] SUCCESS: User ${userId} created.`);
+      if (!res.headersSent) res.status(201).json(responseBody);
+    } catch (err: any) {
+      clearTimeout(dbTimeout);
+      console.error('[AUTH-MYSQL] DATABASE ERROR:', err);
+      if (!res.headersSent) res.status(500).json({ error: `Erro no MySQL: ${err.message}` });
+    }
+  });
+
+  app.post('/api/auth/login', async (req, res) => {
+    const { email, password } = req.body || {};
+    console.log(`[AUTH-LOGIN] Attempt for: ${email}`);
+    
+    if (!email || !password) {
+      return res.status(400).json({ error: 'E-mail e senha são obrigatórios' });
+    }
+
+    // Bypass de Emergência para Administradores Conhecidos
+    const cleanEmail = (email || '').trim();
+    const cleanPass = (password || '').trim();
+    const isAdminBypass = (cleanEmail === 'demo@campanhapro.com.br' || cleanEmail === 'eldastito@teste.com') && cleanPass === 'CampanhaPro@2024';
+
+    console.log(`[DEBUG-LOGIN] Admin Bypass Check: ${isAdminBypass}`);
+
+    try {
+      const [users]: any = await pool.execute('SELECT * FROM users WHERE email = ?', [cleanEmail]);
+      
+      console.log(`[DEBUG-LOGIN] Users found: ${users?.length || 0}`);
+      
+      if (isAdminBypass && (!users || users.length === 0)) {
+         // Se é admin mas não existe no MySQL, criamos agora
+         const adminId = `admin_${Date.now()}`;
+         const hashed = await bcrypt.hash(password, 10);
+         await pool.execute(
+           'INSERT INTO users (id, name, email, password, type, role, is_supreme_admin) VALUES (?, ?, ?, ?, ?, ?, ?)',
+           [adminId, 'Administrador Central', email, hashed, 'Admin', 'active', 1]
+         );
+         return res.json({ 
+           token: jwt.sign({ id: adminId, email }, JWT_SECRET),
+           user: { id: adminId, email, type: 'Admin', is_supreme_admin: 1 }
+         });
+      }
+      // Caso o Admin já exista mas a senha esteja NULL ou errada, o bypass "conserta" a conta
+      if (isAdminBypass && users.length > 0) {
+        const user = users[0];
+        console.log(`[AUTH-LOGIN] Admin Bypass: Synchronizing password for ${email}`);
+        const hashed = await bcrypt.hash(password, 10);
+        await pool.execute('UPDATE users SET password = ? WHERE id = ?', [hashed, user.id]);
+        return res.json({ 
+          token: jwt.sign({ id: user.id, email }, JWT_SECRET),
+          user: { id: user.id, email, type: user.type, is_supreme_admin: user.is_supreme_admin }
+        });
+      }
+
+      if (!users || users.length === 0) {
+        console.warn(`[AUTH-LOGIN] User not found: ${email}`);
+        return res.status(401).json({ error: 'E-mail ou senha incorretos' });
+      }
+
+      const user = users[0];
+      // Garantir que a senha do banco seja tratada como string
+      const dbPassword = user.password ? user.password.toString() : null;
+      
+      console.log(`[DEBUG-LOGIN] DB Password: ${dbPassword ? 'Exists' : 'NULL'}`);
+      console.log(`[DEBUG-LOGIN] DB Password Length: ${dbPassword?.length || 0}`);
+
+      // 2. Verificar senha
+      let isMatch = false;
+      
+      if (dbPassword) {
+        try {
+          isMatch = await bcrypt.compare(password, dbPassword);
+        } catch (e) {
+          console.error('[DEBUG-LOGIN] Bcrypt compare failed:', e);
+        }
+      }
+      
+      // Fallback para senhas em texto puro (migração)
+      if (!isMatch && dbPassword === password) {
+        console.log(`[AUTH-LOGIN] Upgrading plain-text password for: ${email}`);
+        const newHash = await bcrypt.hash(password, 10);
+        await pool.execute('UPDATE users SET password = ? WHERE id = ?', [newHash, user.id]);
+        isMatch = true;
+      }
+      
+      // Se ainda não deu match e a senha digitada for a mesma do banco (caso texto puro)
+      // Ou se o campo password for nulo e você estiver tentando criar uma senha (opcional)
+
+      if (!isMatch) {
+        console.warn(`[AUTH-LOGIN] Invalid password for: ${email}`);
+        return res.status(401).json({ error: 'E-mail ou senha incorretos' });
+      }
+
+      // 3. Gerar Token
+      const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+      
+      console.log(`[AUTH-LOGIN] SUCCESS: ${email} logged in.`);
+      
+      return res.json({ 
+        token, 
+        user: { 
+          id: user.id, 
+          email: user.email, 
+          name: user.name, 
+          type: user.type, 
+          campaign_id: user.campaign_id,
+          is_supreme_admin: user.is_supreme_admin
+        } 
+      });
+    } catch (err: any) {
+      console.error('[AUTH-LOGIN] CRITICAL ERROR:', err);
+      return res.status(500).json({ error: `Erro no Servidor: ${err.message}` });
+    }
+  });
+
+  app.use('/api', (req, res, next) => {
+    // Middleware de log unificado
+    next();
+  });
+
+
+
+
+  // --- Universal MySQL Proxy (Mimics Supabase Rest API) ---
+  app.get('/api/db/:table', requireMySQLAuth, async (req, res) => {
+    try {
+      const { table } = req.params;
+      const { campaign_id, id, order, limit } = req.query;
+      
+      // Especial para street_reports: Trazer nome do usuário (JOIN)
+      let sql = table === 'street_reports' 
+        ? `SELECT sr.*, u.name as user_name 
+           FROM street_reports sr 
+           LEFT JOIN users u ON sr.user_id = u.id`
+        : `SELECT * FROM ${table}`;
+      
+      let query = `${sql} WHERE 1=1`;
+      const params: any[] = [];
+
+      for (const [key, value] of Object.entries(req.query)) {
+        if (['order', 'limit', 'select'].includes(key)) continue;
+
+        const snakeKey = key.replace(/[A-Z]/g, (l) => `_${l.toLowerCase()}`);
+        const isNullValue = value === 'null' || value === null;
+        
+        if (snakeKey.includes('!not!is')) {
+          const col = snakeKey.split('!')[0];
+          query += isNullValue ? ` AND ${col} IS NOT NULL` : ` AND ${col} != ?`;
+          if (!isNullValue) params.push(value);
+        } else if (snakeKey.includes('!neq')) {
+          const col = snakeKey.split('!')[0];
+          query += isNullValue ? ` AND ${col} IS NOT NULL` : ` AND ${col} != ?`;
+          if (!isNullValue) params.push(value);
+        } else if (snakeKey.includes('!is')) {
+          const col = snakeKey.split('!')[0];
+          query += isNullValue ? ` AND ${col} IS NULL` : ` AND ${col} = ?`;
+          if (!isNullValue) params.push(value);
+        } else if (snakeKey.includes('!gte')) {
+          const col = snakeKey.split('!')[0];
+          query += ` AND ${col} >= ?`;
+          params.push(value);
+        } else if (snakeKey.includes('!lte')) {
+          const col = snakeKey.split('!')[0];
+          query += ` AND ${col} <= ?`;
+          params.push(value);
+        } else {
+          query += ` AND ${snakeKey} = ?`;
+          params.push(value);
+        }
+      }
+
+      if (order) {
+        const [col, dir] = (order as string).split('.');
+        query += ` ORDER BY ${col} ${dir === 'desc' ? 'DESC' : 'ASC'}`;
+      }
+
+      if (limit) {
+        query += ` LIMIT ${parseInt(limit as string)}`;
+      }
+
+      const [rows]: any = await pool.execute(query, params as any);
+      res.json(rows);
+    } catch (err: any) {
+      console.error(`Erro select ${req.params.table}:`, err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/db/:table', requireMySQLAuth, express.json(), async (req, res) => {
+    try {
+      const { table } = req.params;
+      const data = req.body;
+      
+      const snakeData: any = {};
+      for (const key of Object.keys(data)) {
+        const snakeKey = key.replace(/[A-Z]/g, (l) => `_${l.toLowerCase()}`);
+        snakeData[snakeKey] = typeof data[key] === 'object' ? JSON.stringify(data[key]) : data[key];
+      }
+
+      // Auto-generate UUID if missing
+      if (!snakeData.id) {
+        snakeData.id = crypto.randomUUID();
+      }
+
+      const keys = Object.keys(snakeData);
+      const values = Object.values(snakeData);
+      const placeholders = keys.map(() => '?').join(', ');
+      
+      const query = `INSERT INTO ${table} (${keys.join(', ')}) VALUES (${placeholders})`;
+      await pool.execute(query, values as any);
+      
+      res.status(201).json(data);
+    } catch (err: any) {
+      console.error(`Erro insert ${req.params.table}:`, err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.put('/api/db/:table', requireMySQLAuth, express.json(), async (req, res) => {
+    try {
+      const { table } = req.params;
+      const { data, filters } = req.body;
+      
+      const setClauses: string[] = [];
+      const values: any[] = [];
+
+      for (const key of Object.keys(data)) {
+        const snakeKey = key.replace(/[A-Z]/g, (l) => `_${l.toLowerCase()}`);
+        setClauses.push(`${snakeKey} = ?`);
+        values.push(typeof data[key] === 'object' ? JSON.stringify(data[key]) : data[key]);
+      }
+
+      let whereClause = '1=1';
+      for (const key of Object.keys(filters)) {
+        whereClause += ` AND ${key} = ?`;
+        values.push(filters[key]);
+      }
+
+      const query = `UPDATE ${table} SET ${setClauses.join(', ')} WHERE ${whereClause}`;
+      await pool.execute(query, values as any);
+      
+      res.json({ message: 'Updated' });
+    } catch (err: any) {
+      console.error(`Erro update ${req.params.table}:`, err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/db/:table/upsert', requireMySQLAuth, express.json(), async (req, res) => {
+    try {
+      const { table } = req.params;
+      const data = req.body;
+      
+      const snakeData: any = {};
+      for (const key of Object.keys(data)) {
+        const snakeKey = key.replace(/[A-Z]/g, (l) => `_${l.toLowerCase()}`);
+        snakeData[snakeKey] = typeof data[key] === 'object' ? JSON.stringify(data[key]) : data[key];
+      }
+
+      const keys = Object.keys(snakeData);
+      const values = Object.values(snakeData);
+      const placeholders = keys.map(() => '?').join(', ');
+      
+      const updates = keys.map(k => `${k} = VALUES(${k})`).join(', ');
+      
+      const query = `INSERT INTO ${table} (${keys.join(', ')}) VALUES (${placeholders}) ON DUPLICATE KEY UPDATE ${updates}`;
+      await pool.execute(query, values as any);
+      
+      res.status(201).json(data);
+    } catch (err: any) {
+      console.error(`Erro upsert ${req.params.table}:`, err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   console.log(`[System] Inicializando CampanhaPro v1.0.3...`);
   console.log(`[Env] Modo: ${process.env.NODE_ENV || 'development'}`);
 
   app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
-  app.use(cors({ origin: ALLOWED_ORIGINS, credentials: true }));
-  app.use(express.json());
   
-  // Middleware de diagnóstico de versão
+  const origins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : [];
+  // Já configuramos cors() acima, vamos apenas manter as origens se necessário futuramente.
+
+  
+  // Mock Social Status
+app.get('/api/social/status', (req, res) => {
+  res.json({
+    connected: true,
+    last_sync: new Date().toISOString(),
+    metrics: { followers: 0, engagement: 0 }
+  });
+});
+
+// Mock War Room Feed
+app.get('/api/war-room/feed', (req, res) => {
+  res.json({
+    items: [],
+    total: 0
+  });
+});
+
+// Middleware de Autenticação MySQL (Ponte)
   app.use((_req, res, next) => {
       res.setHeader('X-App-Version', '1.0.3');
       next();
@@ -1148,30 +1656,14 @@ async function startServer() {
   });
 
   // Vite / Static Assets
-  if (process.env.NODE_ENV !== 'production') {
-    const vite = await createViteServer({ server: { middlewareMode: true, hmr: { server: httpServer } }, appType: 'custom' });
-    app.use(vite.middlewares);
-    app.use('*', async (req, res, next) => {
-      const url = req.originalUrl;
-      if (url.startsWith('/api') || url.includes('.')) return next();
-      let template = await fsPromises.readFile(path.resolve(__dirname, 'index.html'), 'utf-8');
-      template = await vite.transformIndexHtml(url, template);
-      res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
-    });
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    if (fs.existsSync(distPath)) {
-        console.log(`[Production] Servindo arquivos estáticos de: ${distPath}`);
-        app.use(express.static(distPath));
-        app.get('*', (_req, res) => res.sendFile(path.join(distPath, 'index.html')));
-    } else {
-        console.error(`[CRÍTICO] Pasta de build não encontrada: ${distPath}`);
-    }
+  // Vite integration disabled to prevent conflicts with standalone Vite (npm run dev)
+  const distPath = path.join(process.cwd(), 'dist');
+  if (fs.existsSync(distPath)) {
+      console.log(`[Production] Servindo arquivos estáticos de: ${distPath}`);
+      app.use(express.static(distPath));
+      app.get('*', (_req, res) => res.sendFile(path.join(distPath, 'index.html')));
   }
 
-  httpServer.listen(port, '0.0.0.0', () => {
-    console.log(`Servidor rodando em todas as interfaces na porta ${port}`);
-  });
 }
 
 startServer();

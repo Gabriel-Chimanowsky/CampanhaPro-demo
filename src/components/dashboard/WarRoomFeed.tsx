@@ -68,9 +68,10 @@ const WarRoomFeed: React.FC = () => {
     }
   };
 
-  const getAgentIcon = (agent: string) => {
+  const getAgentIcon = (agent: string | undefined) => {
+    if (!agent) return <Bot className="w-4 h-4" />;
     if (agent.includes('CRM')) return <MessageSquare className="w-4 h-4" />;
-    if (agent.includes('Strategist')) return <Zap className="w-4 h-4" />;
+    if (agent.includes('Strategist') || agent.includes('Estrategista')) return <Zap className="w-4 h-4" />;
     return <Bot className="w-4 h-4" />;
   };
 
@@ -94,35 +95,43 @@ const WarRoomFeed: React.FC = () => {
             Nenhum insight compartilhado nas últimas 48h.
           </div>
         ) : (
-          insights.map((item) => (
-            <div key={item.id} className={`p-4 rounded-2xl border-l-4 ${getPriorityColor(item.priority)} bg-white/[0.02] hover:bg-white/[0.04] transition-all group`}>
-              <div className="flex justify-between items-start mb-2">
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 bg-black/40 rounded-lg text-slate-50/70">
-                    {getAgentIcon(item.sourceAgent)}
+          insights.map((item: any) => {
+            // Suporte para snake_case vindo do banco (Supabase)
+            const agent = item.sourceAgent || item.source_agent || 'IA';
+            const text = item.insightText || item.insight_text || '';
+            const date = item.createdAt || item.created_at || new Date().toISOString();
+            const priority = item.priority || 'Media';
+            
+            return (
+              <div key={item.id} className={`p-4 rounded-2xl border-l-4 ${getPriorityColor(priority)} bg-white/[0.02] hover:bg-white/[0.04] transition-all group`}>
+                <div className="flex justify-between items-start mb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 bg-black/40 rounded-lg text-slate-50/70">
+                      {getAgentIcon(agent)}
+                    </div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-50/50">{agent}</span>
                   </div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-50/50">{item.sourceAgent}</span>
+                  <span className="text-[10px] text-slate-600">{new Date(date).toLocaleTimeString()}</span>
                 </div>
-                <span className="text-[10px] text-slate-600">{new Date(item.createdAt).toLocaleTimeString()}</span>
-              </div>
-              
-              <p className="text-xs text-slate-300 leading-relaxed mb-3">
-                {item.insightText}
-              </p>
+                
+                <p className="text-xs text-slate-300 leading-relaxed mb-3">
+                  {text}
+                </p>
 
-              {item.metadata?.neighborhood && (
-                <div className="flex items-center gap-1 text-[10px] text-slate-500 mb-2">
-                  <MapPin className="w-3 h-3" /> {item.metadata.neighborhood}
+                {item.metadata?.neighborhood && (
+                  <div className="flex items-center gap-1 text-[10px] text-slate-500 mb-2">
+                    <MapPin className="w-3 h-3" /> {item.metadata.neighborhood}
+                  </div>
+                )}
+
+                <div className="flex justify-end">
+                  <button className="text-[10px] font-bold flex items-center gap-1 text-blue-400 group-hover:underline">
+                    Ver Estratégia <ChevronRight className="w-3 h-3" />
+                  </button>
                 </div>
-              )}
-
-              <div className="flex justify-end">
-                <button className="text-[10px] font-bold flex items-center gap-1 text-blue-400 group-hover:underline">
-                  Ver Estratégia <ChevronRight className="w-3 h-3" />
-                </button>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 

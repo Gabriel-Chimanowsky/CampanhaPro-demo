@@ -33,26 +33,37 @@ export const AuthProvider = ({ children }: { children?: React.ReactNode }) => {
       .single();
 
     if (userError && userError.code === 'PGRST116') {
-      const autoCampaignId = crypto.randomUUID();
+      const metadata = session.user.user_metadata || {};
+      const userType = metadata.type || 'Admin';
+      const campaignId = metadata.campaignId || crypto.randomUUID();
+      
       const isVip = VIP_EMAILS.includes(session.user.email || '');
       const initialPlan: Plan = isVip ? Plan.TOTAL : Plan.ESSENCIAL;
+      
+      console.log(`[AuthContext] Auto-creating profile for ${session.user.email} as ${userType}`);
+      
       const { data: newUser, error: insertError } = await supabase.from('users').insert({
         id: session.user.id,
-        name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'Novo Usuário',
+        name: metadata.full_name || metadata.name || session.user.email?.split('@')[0] || 'Novo Usuário',
         email: session.user.email,
-        type: 'Admin',
+        phone: metadata.phone || null,
+        type: userType,
         plan: initialPlan,
         role: 'active',
-        campaign_id: autoCampaignId,
+        campaign_id: campaignId,
         is_supreme_admin: false,
       }).select().single();
 
-      if (insertError) return null;
+      if (insertError) {
+        console.error('[AuthContext] Error auto-creating user:', insertError);
+        return null;
+      }
       userData = newUser;
 
       // Cria registro correspondente em campaign_configs com features/limits corretas
       try {
-        await ensureCampaignConfig(supabase, autoCampaignId, initialPlan);
+        console.log(`[AuthContext] Ensuring campaign config for: ${campaignId}`);
+        await ensureCampaignConfig(supabase, campaignId, initialPlan);
       } catch (err) {
         console.warn('Falha ao criar campaign_configs inicial:', err);
       }

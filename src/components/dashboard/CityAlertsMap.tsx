@@ -50,9 +50,16 @@ const CityAlertsMap: React.FC<{ campaignId: string }> = ({ campaignId }) => {
                 event: 'INSERT', 
                 schema: 'public', 
                 table: 'street_reports',
-                filter: `campaignId=eq.${campaignId}`
+                filter: `campaign_id=eq.${campaignId}`
             }, (payload: any) => {
-                setAlerts(prev => [payload.new, ...prev]);
+                // Normalizar para camelCase pois o payload do canal vem bruto do Postgres
+                const normalized = {
+                    ...payload.new,
+                    campaignId: payload.new.campaign_id,
+                    createdAt: payload.new.created_at,
+                    photoUrl: payload.new.photo_url
+                };
+                setAlerts(prev => [normalized, ...prev]);
             })
             .subscribe();
 
@@ -111,7 +118,7 @@ const CityAlertsMap: React.FC<{ campaignId: string }> = ({ campaignId }) => {
                                             {alert.clima}
                                         </span>
                                         <span className="text-[10px] text-slate-600 font-mono">
-                                            {new Date(alert.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            {new Date(alert.createdAt || alert.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                         </span>
                                     </div>
                                     <h4 className="font-bold text-sm text-slate-200 group-hover:text-blue-400 transition-colors">
@@ -156,7 +163,7 @@ const CityAlertsMap: React.FC<{ campaignId: string }> = ({ campaignId }) => {
                                                 {alert.clima}
                                             </span>
                                             <span className="text-[10px] text-slate-400">
-                                                {new Date(alert.createdAt).toLocaleDateString()}
+                                                {new Date(alert.createdAt || alert.created_at).toLocaleDateString()}
                                             </span>
                                         </div>
                                         <h3 className="font-bold text-slate-800 text-sm mb-1">{alert.title || 'Alerta de Rua'}</h3>
@@ -202,7 +209,7 @@ const CityAlertsMap: React.FC<{ campaignId: string }> = ({ campaignId }) => {
                                                 {selectedAlert.clima}
                                             </span>
                                             <span className="text-[10px] text-slate-500 font-mono">
-                                                {new Date(selectedAlert.createdAt).toLocaleString('pt-BR')}
+                                                {new Date(selectedAlert.createdAt || selectedAlert.created_at).toLocaleString('pt-BR')}
                                             </span>
                                         </div>
                                         <h4 className="font-bold text-slate-100 text-sm">{selectedAlert.title || selectedAlert.bairro}</h4>
