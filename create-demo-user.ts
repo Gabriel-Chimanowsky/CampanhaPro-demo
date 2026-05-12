@@ -60,8 +60,8 @@ async function main() {
     type: DEMO_USER.type,
     plan: DEMO_USER.plan,
     role: 'active',
-    campaignId: campaignId,
-    isSupremeAdmin: false,
+    campaign_id: campaignId,
+    is_supreme_admin: false,
   }, { onConflict: 'id' });
 
   if (upsertErr) throw new Error(`Falha ao salvar perfil: ${upsertErr.message}`);

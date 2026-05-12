@@ -1,30 +1,25 @@
 import 'dotenv/config';
 import { createClient } from '@supabase/supabase-js';
-import express, { Request, Response } from 'express';
+import express from 'express';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import axios from 'axios';
 import cors from 'cors';
 import helmet from 'helmet';
 import fs from 'fs';
-import fsPromises from 'fs/promises';
-import { createServer as createViteServer } from 'vite';
 import { createServer as createHttpServer } from 'http';
-import { createAuthMiddleware } from './src/middleware/authMiddleware';
 import { getConversionFunnelStats, getTerritorialAlerts } from './src/services/intelligenceService';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import pool from './src/lib/mysql';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import { mysqlAuthMiddleware } from './src/middleware/mysqlAuthMiddleware';
+import multer from 'multer';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+
+// __dirname is not needed as we use process.cwd() for path resolution
 
 // Configuração centralizada
 const AI_MODEL = "gpt-4o-mini"; 
-const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000', 'http://localhost:5173'];
 const GEMINI_MODEL_NAME = "gemini-1.5-flash"; 
 
 let supabaseAdmin: any = null;
@@ -40,7 +35,7 @@ if (adminUrl && adminKey) {
 }
 
 // Mock Auth Middleware for Local Development
-const requireAuth = (req: any, res: any, next: any) => {
+const requireAuth = (req: any, _res: any, next: any) => {
   // Em dev, vamos injetar um usuário mock se o token for o nosso
   const authHeader = req.headers.authorization;
   if (authHeader && authHeader.includes('eyJ')) { // JWT fake
@@ -180,76 +175,35 @@ async function startServer() {
   const app = express();
   const httpServer = createHttpServer(app);
 
-  httpServer.listen(port, '127.0.0.1', async () => {
-    console.log(`[CRITICAL] Server listening on http://127.0.0.1:3005`);
-    try {
-      // Limpeza de Dados: Migrar relatos 'demo' para a campanha real
-      const actualCampaignId = '455d21f3-f254-4b96-b49c-e70192c3fe27';
-      await pool.execute(
-        'UPDATE street_reports SET campaign_id = ? WHERE campaign_id = ? OR campaign_id IS NULL', 
-        [actualCampaignId, 'demo']
-      );
-      console.log('[Database] Migrated orphan reports to:', actualCampaignId);
-      
-      // Sincronizar street_reports com TODOS os campos do frontend
-      await pool.execute(`
-        CREATE TABLE IF NOT EXISTS street_reports (
-          id VARCHAR(255) PRIMARY KEY,
-          user_id VARCHAR(255),
-          campaign_id VARCHAR(255),
-          title VARCHAR(255),
-          reclamacao TEXT,
-          description TEXT,
-          bairro VARCHAR(255),
-          address TEXT,
-          clima VARCHAR(100),
-          latitude DECIMAL(10, 8),
-          longitude DECIMAL(11, 8),
-          media_urls JSON,
-          video_url TEXT,
-          status VARCHAR(50) DEFAULT 'pending',
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
-      
-      const [reportCols]: any = await pool.execute('DESCRIBE street_reports');
-      const colNames = reportCols.map((c: any) => c.Field);
-      
-      // Lista de colunas para garantir que existam
-      const requiredCols = [
-        { name: 'title', type: 'VARCHAR(255)' },
-        { name: 'reclamacao', type: 'TEXT' },
-        { name: 'bairro', type: 'VARCHAR(255)' },
-        { name: 'clima', type: 'VARCHAR(100)' },
-        { name: 'video_url', type: 'TEXT' },
-        { name: 'media_urls', type: 'JSON' },
-        { name: 'latitude', type: 'DECIMAL(10, 8)' },
-        { name: 'longitude', type: 'DECIMAL(11, 8)' }
-      ];
+  // Core Middlewares
+  app.use(cors());
+  app.use(express.json({ limit: '50mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+  
+  // Serve static files from uploads folder
+  if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
+  app.use('/uploads', express.static('uploads'));
 
-      for (const col of requiredCols) {
-        if (!colNames.includes(col.name)) {
-          console.log(`[Database] Adding ${col.name} to street_reports...`);
-          await pool.execute(`ALTER TABLE street_reports ADD COLUMN ${col.name} ${col.type}`);
-        }
-      }
-
-      console.log('[Database] street_reports fully synchronized.');
-    } catch (dbErr) {
-      console.warn('[Database] Could not describe users table. Ensure MySQL is running.');
+  // Configure Multer for local storage
+  const storage = multer.diskStorage({
+    destination: (_req, _file, cb) => {
+      cb(null, 'uploads/');
+    },
+    filename: (_req, file, cb) => {
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      cb(null, uniqueSuffix + path.extname(file.originalname));
     }
   });
+  const upload = multer({ storage: storage });
 
-  app.use(cors());
-  app.use(express.json()); // Global JSON parsing
-  
-  app.use((req, res, next) => {
+  app.use((req, _res, next) => {
     console.log(`[REQ] ${req.method} ${req.url} - ${new Date().toISOString()}`);
     next();
   });
 
+
   // Rota de Emergência para Sincronizar Banco de Dados
-  app.get('/api/admin/sync-db', async (req, res) => {
+  app.get('/api/admin/sync-db', async (_req, res) => {
     try {
       console.log('[Admin] Iniciando sincronização forçada do banco...');
       
@@ -311,7 +265,7 @@ async function startServer() {
     }
   });
 
-  app.get('/api/ping', (req, res) => {
+  app.get('/api/ping', (_req, res) => {
     res.json({ pong: true, time: new Date().toISOString() });
   });
 
@@ -491,7 +445,7 @@ async function startServer() {
     }
   });
 
-  app.use('/api', (req, res, next) => {
+  app.use('/api', (_req, _res, next) => {
     // Middleware de log unificado
     next();
   });
@@ -503,7 +457,7 @@ async function startServer() {
   app.get('/api/db/:table', requireMySQLAuth, async (req, res) => {
     try {
       const { table } = req.params;
-      const { campaign_id, id, order, limit } = req.query;
+      const { campaign_id: _cid, id: _id, order, limit } = req.query;
       
       // Especial para street_reports: Trazer nome do usuário (JOIN)
       let sql = table === 'street_reports' 
@@ -518,38 +472,42 @@ async function startServer() {
       for (const [key, value] of Object.entries(req.query)) {
         if (['order', 'limit', 'select'].includes(key)) continue;
 
+        const isStreetReport = table === 'street_reports';
         const snakeKey = key.replace(/[A-Z]/g, (l) => `_${l.toLowerCase()}`);
         const isNullValue = value === 'null' || value === null;
+        const prefix = isStreetReport ? 'sr.' : '';
         
         if (snakeKey.includes('!not!is')) {
-          const col = snakeKey.split('!')[0];
-          query += isNullValue ? ` AND ${col} IS NOT NULL` : ` AND ${col} != ?`;
-          if (!isNullValue) params.push(value);
-        } else if (snakeKey.includes('!neq')) {
-          const col = snakeKey.split('!')[0];
-          query += isNullValue ? ` AND ${col} IS NOT NULL` : ` AND ${col} != ?`;
+          const rawCol = snakeKey.split('!')[0];
+          query += isNullValue ? ` AND ${prefix}${rawCol} IS NOT NULL` : ` AND ${prefix}${rawCol} != ?`;
           if (!isNullValue) params.push(value);
         } else if (snakeKey.includes('!is')) {
-          const col = snakeKey.split('!')[0];
-          query += isNullValue ? ` AND ${col} IS NULL` : ` AND ${col} = ?`;
+          const rawCol = snakeKey.split('!')[0];
+          query += isNullValue ? ` AND ${prefix}${rawCol} IS NULL` : ` AND ${prefix}${rawCol} = ?`;
           if (!isNullValue) params.push(value);
         } else if (snakeKey.includes('!gte')) {
-          const col = snakeKey.split('!')[0];
-          query += ` AND ${col} >= ?`;
+          const rawCol = snakeKey.split('!')[0];
+          query += ` AND ${prefix}${rawCol} >= ?`;
           params.push(value);
         } else if (snakeKey.includes('!lte')) {
-          const col = snakeKey.split('!')[0];
-          query += ` AND ${col} <= ?`;
+          const rawCol = snakeKey.split('!')[0];
+          query += ` AND ${prefix}${rawCol} <= ?`;
           params.push(value);
+        } else if (snakeKey.includes('!neq')) {
+          const rawCol = snakeKey.split('!')[0];
+          query += isNullValue ? ` AND ${prefix}${rawCol} IS NOT NULL` : ` AND ${prefix}${rawCol} != ?`;
+          if (!isNullValue) params.push(value);
         } else {
-          query += ` AND ${snakeKey} = ?`;
-          params.push(value);
+          // Standard equality check
+          query += isNullValue ? ` AND ${prefix}${snakeKey} IS NULL` : ` AND ${prefix}${snakeKey} = ?`;
+          if (!isNullValue) params.push(value);
         }
       }
 
       if (order) {
         const [col, dir] = (order as string).split('.');
-        query += ` ORDER BY ${col} ${dir === 'desc' ? 'DESC' : 'ASC'}`;
+        const prefix = table === 'street_reports' ? 'sr.' : '';
+        query += ` ORDER BY ${prefix}${col} ${dir === 'desc' ? 'DESC' : 'ASC'}`;
       }
 
       if (limit) {
@@ -617,9 +575,47 @@ async function startServer() {
       const query = `UPDATE ${table} SET ${setClauses.join(', ')} WHERE ${whereClause}`;
       await pool.execute(query, values as any);
       
-      res.json({ message: 'Updated' });
+      res.json({ success: true });
     } catch (err: any) {
       console.error(`Erro update ${req.params.table}:`, err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // --- DELETE Route with Cascading for Users ---
+  app.delete('/api/db/:table', requireMySQLAuth, async (req, res) => {
+    try {
+      const { table } = req.params;
+      const { id } = req.query;
+
+      if (!id) return res.status(400).json({ error: 'ID is required' });
+
+      // Cascading logic for users
+      if (table === 'users') {
+        console.log(`[Cascading Delete] Removing reports for user: ${id}`);
+        await pool.execute('DELETE FROM street_reports WHERE user_id = ?', [id as string]);
+      }
+
+      const query = `DELETE FROM ${table} WHERE id = ?`;
+      await pool.execute(query, [id as string]);
+      
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error(`Erro delete ${req.params.table}:`, err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // --- Real File Upload Endpoint ---
+  app.post('/api/upload', upload.single('file'), (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+      
+      // Use local server URL for the public path
+      const publicUrl = `http://localhost:3005/uploads/${req.file.filename}`;
+      res.json({ publicUrl, path: req.file.path });
+    } catch (err: any) {
+      console.error('Upload Error:', err);
       res.status(500).json({ error: err.message });
     }
   });
@@ -656,12 +652,11 @@ async function startServer() {
 
   app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
   
-  const origins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : [];
-  // Já configuramos cors() acima, vamos apenas manter as origens se necessário futuramente.
+  // Já configuramos cors() no middleware global.
 
   
   // Mock Social Status
-app.get('/api/social/status', (req, res) => {
+app.get('/api/social/status', (_req, res) => {
   res.json({
     connected: true,
     last_sync: new Date().toISOString(),
@@ -670,7 +665,7 @@ app.get('/api/social/status', (req, res) => {
 });
 
 // Mock War Room Feed
-app.get('/api/war-room/feed', (req, res) => {
+app.get('/api/war-room/feed', (_req, res) => {
   res.json({
     items: [],
     total: 0
@@ -921,7 +916,7 @@ app.get('/api/war-room/feed', (req, res) => {
                 source_agent: agentId,
                 category: 'Oportunidade',
                 priority: 'Media',
-                insight_text: `Análise de Funil solicitada: ${stats.map(s => `${s.stage}: ${s.count}`).join(', ')}`,
+                insight_text: `Análise de Funil solicitada: ${stats.map((s: any) => `${s.stage}: ${s.count}`).join(', ')}`,
                 created_at: new Date().toISOString()
               });
             }
@@ -1033,7 +1028,7 @@ app.get('/api/war-room/feed', (req, res) => {
     }
   });
 
-  app.get('/api/agents/history/:agentId', requireAuth, async (req: Request, res: Response) => {
+  app.get('/api/agents/history/:agentId', requireAuth, async (req: any, res: any) => {
     try {
         const { agentId } = req.params;
         const { campaignId } = req.query;
@@ -1047,7 +1042,7 @@ app.get('/api/war-room/feed', (req, res) => {
     }
   });
 
-  app.post('/api/agents/generate-image', requireAuth, async (req: Request, res: Response) => {
+  app.post('/api/agents/generate-image', requireAuth, async (req: any, res: any) => {
     try {
       const { prompt, campaignId, agentId } = req.body;
       const ptPrompt = `ESTRITAMENTE EM PORTUGUÊS DO BRASIL: Qualquer texto na imagem deve ser em português brasileiro. Tema: ${prompt}.`;
@@ -1664,6 +1659,38 @@ app.get('/api/war-room/feed', (req, res) => {
       app.get('*', (_req, res) => res.sendFile(path.join(distPath, 'index.html')));
   }
 
+  // Final step: Start listening
+  httpServer.listen(port, '0.0.0.0', async () => {
+    console.log(`[CRITICAL] Server listening on http://0.0.0.0:${port}`);
+    try {
+      const actualCampaignId = '455d21f3-f254-4b96-b49c-e70192c3fe27';
+      await pool.execute(
+        'UPDATE street_reports SET campaign_id = ? WHERE campaign_id = ? OR campaign_id IS NULL', 
+        [actualCampaignId, 'demo']
+      );
+      
+      await pool.execute(`
+        CREATE TABLE IF NOT EXISTS street_reports (
+          id VARCHAR(255) PRIMARY KEY,
+          user_id VARCHAR(255),
+          campaign_id VARCHAR(255),
+          title VARCHAR(255),
+          reclamacao TEXT,
+          bairro VARCHAR(255),
+          clima VARCHAR(100),
+          latitude DECIMAL(10, 8),
+          longitude DECIMAL(11, 8),
+          media_urls JSON,
+          video_url TEXT,
+          status VARCHAR(50) DEFAULT 'pending',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      console.log('[Database] System Tables Ready.');
+    } catch (dbErr) {
+      console.warn('[Database] Startup sync failed.');
+    }
+  });
 }
 
-startServer();
+startServer();

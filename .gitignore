@@ -25,3 +25,7 @@ npm-debug.log*
 
 # MCP config (contém tokens sensíveis)
 .mcp.json
+
+# Local Storage and Scripts
+uploads/
+scratch/

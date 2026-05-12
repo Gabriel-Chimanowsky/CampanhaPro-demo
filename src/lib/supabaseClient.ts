@@ -89,6 +89,26 @@ class MySQLQueryBuilder {
     return this;
   }
 
+  async delete() {
+    console.log(`[MySQL Bridge] Deleting from ${this.table}...`, this.filters);
+    try {
+      const token = localStorage.getItem('campanhapro-mysql-token');
+      const id = this.filters.id;
+      if (!id) throw new Error("Delete requires an ID filter");
+
+      const response = await fetch(`${baseUrl}/api/db/${this.table}?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (!response.ok) throw new Error(`Erro ao deletar: ${response.status}`);
+      return { error: null };
+    } catch (err: any) {
+      console.error(`[MySQL Bridge Error] delete ${this.table}:`, err);
+      return { error: { message: err.message } };
+    }
+  }
+
   async then(onFulfilled?: (value: any) => any, onRejected?: (reason: any) => any) {
     console.log(`[MySQL Bridge] Querying ${this.table}...`, this.filters);
     const controller = new AbortController();
@@ -204,11 +224,9 @@ const mysqlAuth = {
   },
   signUp: async (payload: any) => {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 60000); // 60s timeout for register
+    const timeout = setTimeout(() => controller.abort(), 60000);
 
     try {
-      console.log(`[MySQL Bridge] Requesting register at: ${baseUrl || 'Proxy Origin'} ...`);
-      const fetchStart = Date.now();
       const response = await fetch(`${baseUrl}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -216,15 +234,12 @@ const mysqlAuth = {
         signal: controller.signal
       });
       
-      console.log(`[MySQL Bridge] Response received in ${Date.now() - fetchStart}ms. Status: ${response.status}`);
-      
       clearTimeout(timeout);
       const text = await response.text();
       let result;
       try {
         result = JSON.parse(text);
       } catch (e) {
-        console.error('[MySQL Bridge] Server returned non-JSON:', text);
         return { data: null, error: { message: 'Erro interno do servidor (Resposta inválida)' } };
       }
 
@@ -239,21 +254,10 @@ const mysqlAuth = {
       return { data: result, error: null };
     } catch (err: any) {
       clearTimeout(timeout);
-      console.error('[MySQL Bridge] Register error:', err);
-      return { data: null, error: { message: err.name === 'AbortError' ? 'Tempo de resposta esgotado (Timeout)' : err.message } };
+      return { data: null, error: { message: err.name === 'AbortError' ? 'Timeout' : err.message } };
     }
   },
   signInWithPassword: async ({ email, password }: any) => {
-    console.log(`[MySQL Bridge] Testing connectivity to /api/ping ...`);
-    
-    try {
-      const ping = await fetch(`/api/ping`).then(r => r.json());
-      console.log('[MySQL Bridge] Server Ping OK:', ping);
-    } catch (e: any) {
-      console.warn('[MySQL Bridge] Server Ping FAILED. Server might be down or unreachable.', e.message);
-    }
-
-    console.log('[MySQL Bridge] Login attempt for:', email);
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
 
@@ -268,10 +272,7 @@ const mysqlAuth = {
       clearTimeout(timeout);
       const result = await response.json();
       
-      if (!response.ok) {
-        console.error('[MySQL Bridge] Login failed:', result.error);
-        return { data: null, error: result };
-      }
+      if (!response.ok) return { data: null, error: result };
       
       localStorage.setItem('campanhapro-mysql-token', result.token);
       localStorage.setItem('campanhapro-user', JSON.stringify(result.user));
@@ -279,11 +280,9 @@ const mysqlAuth = {
       const session = { access_token: result.token, user: result.user };
       authListeners.forEach(cb => cb('SIGNED_IN', session));
       
-      console.log('[MySQL Bridge] Login success!');
       return { data: { user: result.user, session }, error: null };
     } catch (err: any) {
       clearTimeout(timeout);
-      console.error('[MySQL Bridge] Login error:', err.message);
       return { data: null, error: { message: err.name === 'AbortError' ? 'Timeout' : err.message } };
     }
   },
@@ -307,8 +306,22 @@ export const supabase: any = {
   auth: mysqlAuth,
   storage: {
     from: () => ({
-      upload: async () => ({ data: { path: 'mock-path' }, error: null }),
-      getPublicUrl: () => ({ data: { publicUrl: 'https://via.placeholder.com/400' } })
+      upload: async (path: string, file: File) => {
+        try {
+          const formData = new FormData();
+          formData.append('file', file);
+          const response = await fetch(`${baseUrl}/api/upload`, {
+            method: 'POST',
+            body: formData
+          });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.error);
+          return { data: { path: result.publicUrl }, error: null };
+        } catch (err: any) {
+          return { data: null, error: err };
+        }
+      },
+      getPublicUrl: (path: string) => ({ data: { publicUrl: path } })
     })
   },
   channel: () => {

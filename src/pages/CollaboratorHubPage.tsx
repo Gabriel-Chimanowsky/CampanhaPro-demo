@@ -171,6 +171,8 @@ const CollaboratorHubPage: React.FC = () => {
                 videoUrl = publicUrl;
             }
 
+            const actualCampaignId = user.user_metadata?.campaignId || user.user_metadata?.campaign_id || '455d21f3-f254-4b96-b49c-e70192c3fe27';
+            
             // Save Report
             const { error: insertError } = await supabase.from('street_reports').insert({
                 title: formData.title,
@@ -183,7 +185,7 @@ const CollaboratorHubPage: React.FC = () => {
                 videoUrl: videoUrl,
                 status: 'Pendente',
                 userId: user.id,
-                campaignId: user.user_metadata?.campaignId || 'demo'
+                campaignId: actualCampaignId
             });
 
             if (insertError) throw insertError;
