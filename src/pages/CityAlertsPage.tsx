@@ -71,12 +71,19 @@ const CityAlertsPage: React.FC = () => {
     const [activeImageIndex, setActiveImageIndex] = useState(0);
 
     // Stats for the header
-    const stats = useMemo(() => ({
-        total: alerts.length,
-        positive: alerts.filter(a => a.clima === 'Positivo').length,
-        neutral: alerts.filter(a => a.clima === 'Neutro').length,
-        negative: alerts.filter(a => a.clima === 'Negativo').length
-    }), [alerts]);
+    const stats = useMemo(() => {
+        const tabAlerts = alerts.filter(alert => {
+            const isCompleted = alert.status === 'Concluído';
+            return activeTab === 'alerts' ? !isCompleted : (activeTab === 'history' ? isCompleted : true);
+        });
+        
+        return {
+            total: tabAlerts.length,
+            positive: tabAlerts.filter(a => a.clima === 'Positivo').length,
+            neutral: tabAlerts.filter(a => a.clima === 'Neutro').length,
+            negative: tabAlerts.filter(a => a.clima === 'Negativo').length
+        };
+    }, [alerts, activeTab]);
 
     const fetchAlerts = async () => {
         if (!campaignId) return;
