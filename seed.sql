@@ -1,52 +1,76 @@
--- Mega Seed CampanhaPro - Full Production Restoration
+-- Mega Seed CampanhaPro - RESTAURAÇÃO TOTAL DEFINITIVA
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
--- 1. SETTINGS & CAMPAIGNS
-INSERT IGNORE INTO `settings` (`id`, `campaign_name`, `timezone`, `ai_enabled`) VALUES
-('455d21f3-f254-4b96-b49c-e70192c3fe27', 'Campanha Demonstrativa', 'America/Sao_Paulo', 1),
-('75341594-5f1d-4064-9f41-2b1a7613fe48', 'Campanha Real Migrada', 'America/Sao_Paulo', 1);
-
-INSERT IGNORE INTO `campaign_configs` (`id`, `features`, `limits`, `status`) VALUES
-('455d21f3-f254-4b96-b49c-e70192c3fe27', '["dashboard","visits","team","help"]', '{"ai_calls":100,"team_members":50,"visits":1000}', 'active'),
-('75341594-5f1d-4064-9f41-2b1a7613fe48', '["dashboard","visits","team","help"]', '{"ai_calls":100,"team_members":50,"visits":1000}', 'active');
+-- 1. SETTINGS
+INSERT IGNORE INTO `settings` (`id`, `campaign_name`, `timezone`, `ai_enabled`, `created_at`, `updated_at`) VALUES
+('455d21f3-f254-4b96-b49c-e70192c3fe27', 'Campanha Demonstrativa', 'America/Sao_Paulo', 1, '2026-05-12 14:11:45', '2026-05-12 14:11:45'),
+('75341594-5f1d-4064-9f41-2b1a7613fe48', 'Campanha Real Migrada', 'America/Sao_Paulo', 1, '2026-05-12 14:15:26', '2026-05-12 14:15:26');
 
 -- 2. USERS
-INSERT IGNORE INTO `users` (`id`, `email`, `password`, `name`, `type`, `plan`, `role`, `phone`, `campaign_id`, `is_supreme_admin`) VALUES
-('d2087ac0-ed3f-4a7d-bdd9-09e56adb310c', 'demo@campanhapro.com.br', '$2b$10$SunimlobdE3elxz2.aCT6.quswy.OK8u2Q4LZrul06oIooUNYZneG', 'Carlos Mendes', 'Admin', 'Total', 'active', '21988887777', '455d21f3-f254-4b96-b49c-e70192c3fe27', 0),
-('user_1778605302706', 'gabriel.trafego.winup@gmail.com', '$2b$10$reNK1w.yq9f0uSNhzrY2wOASF5OzyFOenGW0tZ.LJeVY/Mo1eAo3m', 'Gabriel Tester', 'Colaborador', 'ESSENCIAL', 'active', '(21) 97371-0022', '455d21f3-f254-4b96-b49c-e70192c3fe27', 0),
-('user_1778681353783', 'Abobora@nildo.com', '$2b$10$flaJaHdQYTy4EQpkTo9mPeumuw3cnlRzRlvfXgvieB77/c4r3VGRG', 'Abobora nildo', 'Colaborador', 'ESSENCIAL', 'active', '(21) 99311-0900', '455d21f3-f254-4b96-b49c-e70192c3fe27', 0),
-('27ff83c3-440e-48a1-8226-460108bf10e6', 'eldastito@teste.com', 'Admin123!', 'Apresentação Demo', 'Admin', 'Total', 'active', NULL, '455d21f3-f254-4b96-b49c-e70192c3fe27', 0);
+INSERT IGNORE INTO `users` (`id`, `email`, `password`, `name`, `type`, `plan`, `role`, `phone`, `cost`, `campaign_id`, `created_at`, `updated_at`) VALUES
+('27ff83c3-440e-48a1-8226-460108bf10e6', 'eldastito@teste.com', 'Admin123!', 'Apresentação Demo', 'Admin', 'Total', 'active', NULL, NULL, '455d21f3-f254-4b96-b49c-e70192c3fe27', '2026-05-12 15:19:03', '2026-05-12 18:17:35'),
+('53d94fa8-9e5c-46d5-859f-4d30dc4a3368', 'examepad@gmail.com', NULL, 'EMERSON LUCIO', 'Admin', 'Total', NULL, NULL, NULL, '455d21f3-f254-4b96-b49c-e70192c3fe27', '2026-05-01 15:03:11', '2026-05-12 18:17:35'),
+('d2087ac0-ed3f-4a7d-bdd9-09e56adb310c', 'demo@campanhapro.com.br', '$2b$10$SunimlobdE3elxz2.aCT6.quswy.OK8u2Q4LZrul06oIooUNYZneG', 'Carlos Mendes', 'Admin', 'Total', NULL, '21988887777', NULL, '455d21f3-f254-4b96-b49c-e70192c3fe27', '2026-05-01 17:54:08', '2026-05-13 14:14:51'),
+('user_1778605302706', 'gabriel.trafego.winup@gmail.com', '$2b$10$reNK1w.yq9f0uSNhzrY2wOASF5OzyFOenGW0tZ.LJeVY/Mo1eAo3m', 'Gabriel Tester', 'Colaborador', 'ESSENCIAL', 'active', '(21) 97371-0022', 0.00, '455d21f3-f254-4b96-b49c-e70192c3fe27', '2026-05-12 17:01:42', '2026-05-12 18:15:31'),
+('user_1778681353783', 'Abobora@nildo.com', '$2b$10$flaJaHdQYTy4EQpkTo9mPeumuw3cnlRzRlvfXgvieB77/c4r3VGRG', 'Abobora nildo', 'Colaborador', 'ESSENCIAL', 'active', '(21) 99311-0900', 0.00, '455d21f3-f254-4b96-b49c-e70192c3fe27', '2026-05-13 14:09:13', '2026-05-13 14:09:13');
 
--- 3. AGENT CHAT HISTORY (Restaurando histórico de conversas da IA)
-INSERT IGNORE INTO `agent_chat_history` (`id`, `campaign_id`, `agent_id`, `role`, `content`, `metadata`) VALUES
-(2212, '455d21f3-f254-4b96-b49c-e70192c3fe27', 'crm', 'user', 'Analise minha base de contatos com 51 registros e me dê um insight estratégico rápido sobre quem focar hoje ou tendências detectadas.', '{}');
+-- 3. STREET REPORTS (Todos os 12 relatórios do dump)
+INSERT IGNORE INTO `street_reports` (`id`, `user_id`, `campaign_id`, `title`, `reclamacao`, `bairro`, `clima`, `latitude`, `longitude`, `media_urls`, `status`, `created_at`) VALUES
+('28de7286-f356-4c4d-92e5-a235d2f08e3f', 'user_1778681353783', '455d21f3-f254-4b96-b49c-e70192c3fe27', 'UMA CRATERA', 'ta complicado isso aqui, tem um barraco absurdo emfrente ao brt po, pode não mano, concerta ai namoral po, humildade', 'Recreio dos Bandeirantes, Rio de Janeiro', 'Negativo', -23.02168268, -43.49900152, '[\"https://campanhapro.tesseractauto.com.br/uploads/1778681675809-29753884.jpg\",\"https://campanhapro.tesseractauto.com.br/uploads/1778681676066-193908160.jpg\"]', 'Concluído', '2026-05-13 14:14:36'),
+('3f15f238-7247-431a-810b-577a749d93bb', 'user_1778605302706', '455d21f3-f254-4b96-b49c-e70192c3fe27', 'dfghsghdsfhgds', 'hdsfhdfghsdfgh', 'Recreio dos Bandeirantes, Rio de Janeiro', 'Neutro', -23.02169914, -43.49899939, '[\"http://localhost:3001/uploads/1778614410474-51424415.png\"]', 'Pendente', '2026-05-12 19:33:30'),
+('5ae9d17c-a590-4997-8e73-93ee22ffa022', 'user_1778681353783', '455d21f3-f254-4b96-b49c-e70192c3fe27', 'wefggwef', 'werfgwargwerg', 'Recreio dos Bandeirantes, Rio de Janeiro', 'Negativo', -23.02172745, -43.49899916, '[\"https://campanhapro.tesseractauto.com.br/uploads/1778682362844-380113434.jpg\",\"https://campanhapro.tesseractauto.com.br/uploads/1778682362959-793506960.jpg\"]', 'Concluído', '2026-05-13 14:26:03'),
+('72d486ce-597b-4ef2-b9aa-9964b5f34ebd', 'user_1778681353783', '455d21f3-f254-4b96-b49c-e70192c3fe27', 'adfgaertgaerg', 'adsgerge\\arg', 'Recreio dos Bandeirantes, Rio de Janeiro', 'Negativo', -23.02172745, -43.49899916, '[\"https://campanhapro.tesseractauto.com.br/uploads/1778682319562-499885185.png\"]', 'Concluído', '2026-05-13 14:25:19'),
+('80c6042f-79c8-4c0b-b9de-3b9101b658ff', 'user_1778605302706', '455d21f3-f254-4b96-b49c-e70192c3fe27', 'Agora ta xuxu beleza', 'Top de maizi', 'Recreio dos Bandeirantes, Rio de Janeiro', 'Positivo', -23.02170791, -43.49900985, '[\"https://via.placeholder.com/400\"]', 'Concluído', '2026-05-12 17:38:39'),
+('a3be8479-2f62-4c8f-a145-9a439a043ab1', 'user_1778681353783', '455d21f3-f254-4b96-b49c-e70192c3fe27', 'buraco no brt', 'tem uma cratera aqui po, olha ai namoral, seja humilde arrume ai po, namoralzinha', 'Recreio dos Bandeirantes, Rio de Janeiro', 'Negativo', -23.02170529, -43.49900748, '[\"https://campanhapro.tesseractauto.com.br/uploads/1778682261373-136136019.jpg\",\"https://campanhapro.tesseractauto.com.br/uploads/1778682261415-525847447.jpg\"]', 'Concluído', '2026-05-13 14:24:21'),
+('a70c41e5-3e87-42bf-bb3e-ff2c654d2a53', 'user_1778681353783', '455d21f3-f254-4b96-b49c-e70192c3fe27', 'burraquinho po, nada de mais', 'so uma CREATERRA', 'Recreio dos Bandeirantes, Rio de Janeiro', 'Neutro', -23.02172407, -43.49901234, '[\"https://campanhapro.tesseractauto.com.br/uploads/1778682475042-947780889.jpg\",\"https://campanhapro.tesseractauto.com.br/uploads/1778682475209-794891113.jpg\"]', 'Concluído', '2026-05-13 14:27:55'),
+('baedf2ea-cd91-4ca9-aff8-886d44dfde10', 'user_1778681353783', '455d21f3-f254-4b96-b49c-e70192c3fe27', 'po maior buraco aqui', 'mano q burraco grande aqui no brt namoralzinha, pode nao man, resolve ai, namoral, humilde po', 'Recreio dos Bandeirantes, Rio de Janeiro', 'Negativo', -23.02169541, -43.49900188, '[\"https://campanhapro.tesseractauto.com.br/uploads/1778682034303-176804079.jpg\",\"https://campanhapro.tesseractauto.com.br/uploads/1778682034350-740078524.jpg\"]', 'Concluído', '2026-05-13 14:20:34'),
+('cdedd8b7-1be8-4308-862d-3a869fa73d7d', 'user_1778681353783', '455d21f3-f254-4b96-b49c-e70192c3fe27', 'burraquinho no brt', 'uma creterra aqui po pode nao man resolve ai seja humilde pó namoral', 'Recreio dos Bandeirantes, Rio de Janeiro', 'Neutro', -23.02170730, -43.49902080, '[\"https://campanhapro.tesseractauto.com.br/uploads/1778682741498-721091788.jpg\",\"https://campanhapro.tesseractauto.com.br/uploads/1778682741518-338674848.jpg\"]', 'Pendente', '2026-05-13 14:32:21'),
+('dbdac3c9-8c71-4e41-9d8f-3e763856ef65', 'user_1778605302706', '455d21f3-f254-4b96-b49c-e70192c3fe27', 'Po BRT quebrado man', 'pode não, concerta ai po', 'Recreio dos Bandeirantes, Rio de Janeiro', 'Negativo', -23.02167657, -43.49899536, '[\"https://via.placeholder.com/400\"]', 'Concluído', '2026-05-12 17:41:37'),
+('e0d2295e-a94b-47e2-a8cb-80063b7330ba', 'user_1778605302706', '455d21f3-f254-4b96-b49c-e70192c3fe27', 'Rua cheia de buracos', 'concerta isso jovem lulinha', 'Recreio dos Bandeirantes, Rio de Janeiro', 'Neutro', -23.02167322, -43.49900718, '[\"https://via.placeholder.com/400\"]', 'Concluído', '2026-05-12 17:15:50'),
+('ec1a5fe9-3fce-471b-bb13-40d785aa2ba6', 'user_1778605302706', '455d21f3-f254-4b96-b49c-e70192c3fe27', 'Sem Luz', 'Paga a conta de luz ai meu bom', 'Recreio dos Bandeirantes, Rio de Janeiro', 'Negativo', -23.02170791, -43.49900985, '[\"https://via.placeholder.com/400\"]', 'Concluído', '2026-05-12 17:38:20');
 
--- 4. AGENT OUTPUTS (Relatórios de IA e Pipeline)
-INSERT IGNORE INTO `agent_outputs` (`id`, `campaign_id`, `agent_type`, `output_type`, `content`, `metadata`) VALUES
-('0a4a1655-89a5-462d-ad3d-f4f9872dcc8a', '455d21f3-f254-4b96-b49c-e70192c3fe27', 'war-room-pipeline', 'pipeline_result', '# Estrategista\nCom base nos dados apresentados...', '{"output":{"field":"Ações de rua..."}}'),
-('0c57ba46-0a1b-44ea-b542-dd5fb04eca88', '455d21f3-f254-4b96-b49c-e70192c3fe27', 'Analista Financeiro', 'Relatório', '## Análise Financeira - Mês 1\n\n**Receitas Total:** R$ 112.000\n**Despesas Total:** R$ 70.300', '{"saldo":41700}'),
-('59b85b19-e67b-4d4e-8c1c-0968f8ffca02', '455d21f3-f254-4b96-b49c-e70192c3fe27', 'Consultor Estratégico', 'Análise Cenário', '## Análise Cenário Eleitoral - Maio 2026', '{"tokens":1250}');
+-- 4. VISITS (Todas as 31 visitas do dump com detalhes completos)
+INSERT IGNORE INTO `visits` (`id`, `campaign_id`, `data`, `resp`, `tel`, `municipio`, `bairro`, `apoiador`, `eleitores`, `votos`, `realizada`, `interesse`, `nivel_engajamento`, `observacoes_qualitativas`, `hora`) VALUES
+('0dc1ecfa-960d-4805-8ad5-795325a21144', '455d21f3-f254-4b96-b49c-e70192c3fe27', '2026-05-01', 'Tiago Nunes', '219920200040', 'Rio de Janeiro', 'Santa Teresa', 'Paulo Henrique', 2, 0, 'nao', 'alto', 'alto', 'Visita realizada com sucesso...', NULL),
+('0f9678b8-bc2d-4f86-a3d3-c506c5091473', '455d21f3-f254-4b96-b49c-e70192c3fe27', '2026-04-25', 'Zilda Monteiro', '219920260046', 'Rio de Janeiro', 'Anchieta', 'Paulo Henrique', 3, 3, 'sim', 'baixo', 'baixo', 'Visita realizada com sucesso...', NULL),
+('14dc804f-e33e-425d-8cff-815c910195d9', '455d21f3-f254-4b96-b49c-e70192c3fe27', '2026-04-22', 'César Araújo', '219920290049', 'Rio de Janeiro', 'Maria da Graça', 'Paulo Henrique', 6, 3, 'sim', 'baixo', 'baixo', 'Visita realizada com sucesso...', NULL),
+('16311a45-c6df-48a8-8f29-e77216fd0a8a', '455d21f3-f254-4b96-b49c-e70192c3fe27', '2026-04-19', 'Lucas Gomes', '219920120032', 'Rio de Janeiro', 'Campo Grande', 'Marcelo Andrade', 4, 0, 'sim', 'alto', 'alto', 'Visita realizada com sucesso...', NULL),
+('21239a4d-69c4-493a-99f3-41a47bc711ce', '455d21f3-f254-4b96-b49c-e70192c3fe27', '2026-04-17', 'Nícolas Barbosa', '219920140034', 'Rio de Janeiro', 'Realengo', 'Paulo Henrique', 6, 3, 'sim', 'baixo', 'baixo', 'Visita realizada com sucesso...', NULL),
+('2c60b00e-f85e-4a8d-b141-42b8212a53c7', '455d21f3-f254-4b96-b49c-e70192c3fe27', '2026-04-23', 'Henrique Alves', '219920080028', 'Rio de Janeiro', 'Méier', 'Paulo Henrique', 5, 0, 'sim', 'alto', 'alto', 'Visita realizada com sucesso...', NULL),
+('2eeeb110-5a30-44ae-bd54-36d9b02af4cd', '455d21f3-f254-4b96-b49c-e70192c3fe27', '2026-04-16', 'Olívia Pinto', '219920150035', 'Rio de Janeiro', 'Jacarepaguá', 'Marcelo Andrade', 2, 1, 'nao', 'medio', 'medio', 'Visita realizada com sucesso...', NULL),
+('32f2b3e8-80c6-4061-b442-cb544a5393c2', '455d21f3-f254-4b96-b49c-e70192c3fe27', '2026-04-12', 'Sabrina Cardoso', '219920190039', 'Rio de Janeiro', 'Lapa', 'Sandra Oliveira', 6, 2, 'sim', 'baixo', 'baixo', 'Visita realizada com sucesso...', NULL),
+('3fdd081c-d17d-47b0-a08f-62e0cfddd3c9', '455d21f3-f254-4b96-b49c-e70192c3fe27', '2026-04-22', 'Isabela Martins', '219920090029', 'Rio de Janeiro', 'Madureira', 'Marcelo Andrade', 6, 1, 'sim', 'medio', 'medio', 'Visita realizada com sucesso...', NULL),
+('424ea795-0036-4c0c-bba2-b569c26ce526', '455d21f3-f254-4b96-b49c-e70192c3fe27', '2026-04-27', 'Xênia Vieira', '219920240044', 'Rio de Janeiro', 'Irajá', 'Marcelo Andrade', 6, 0, 'sim', 'alto', 'alto', 'Visita realizada com sucesso...', NULL),
+('4e5e7a02-85c5-4014-ac78-19f01a70e0eb', '455d21f3-f254-4b96-b49c-e70192c3fe27', '2026-04-26', 'Yara Teixeira', '219920250045', 'Rio de Janeiro', 'Vila da Penha', 'Sandra Oliveira', 2, 2, 'nao', 'baixo', 'baixo', 'Visita realizada com sucesso...', NULL),
+('5a547a4c-f82d-4d5f-ad20-a278470da946', '455d21f3-f254-4b96-b49c-e70192c3fe27', '2026-04-29', 'Bruno Costa', '219920020022', 'Rio de Janeiro', 'Leblon', 'Paulo Henrique', 4, 3, 'sim', 'baixo', 'baixo', 'Visita realizada com sucesso...', NULL),
+('651fe35e-07c6-41e2-90c8-c95e76a46b69', '455d21f3-f254-4b96-b49c-e70192c3fe27', '2026-04-30', 'Úrsula Moreira', '219920210041', 'Rio de Janeiro', 'São Cristóvão', 'Marcelo Andrade', 3, 1, 'nao', 'medio', 'medio', 'Visita realizada com sucesso...', NULL),
+('6fef547a-afe4-4839-925b-2a67613b74e8', '455d21f3-f254-4b96-b49c-e70192c3fe27', '2026-04-24', 'Antônio Ramos', '219920270047', 'Rio de Janeiro', 'Pavuna', 'Marcelo Andrade', 4, 1, 'sim', 'medio', 'medio', 'Visita realizada com sucesso...', NULL),
+('76650dbf-6f58-471d-a598-408ba52b7273', '455d21f3-f254-4b96-b49c-e70192c3fe27', '2026-04-27', 'Daniel Oliveira', '219920040024', 'Rio de Janeiro', 'Flamengo', 'Sandra Oliveira', 6, 0, 'sim', 'alto', 'alto', 'Visita realizada com sucesso...', NULL),
+('7a56ac56-7a4a-42e5-96c3-050e9b433a98', '455d21f3-f254-4b96-b49c-e70192c3fe27', '2026-04-20', 'Karina Ribeiro', '219920110031', 'Rio de Janeiro', 'Bangu', 'Paulo Henrique', 3, 3, 'sim', 'baixo', 'baixo', 'Visita realizada com sucesso...', NULL),
+('7b50de92-6bb0-4efd-8d96-4631a8983041', '455d21f3-f254-4b96-b49c-e70192c3fe27', '2026-04-24', 'Gabriela Rocha', '219920070027', 'Rio de Janeiro', 'Grajaú', 'Sandra Oliveira', 4, 2, 'sim', 'baixo', 'baixo', 'Visita realizada com sucesso...', NULL),
+('84e322dc-71c8-48a8-a900-97d92ea56070', '455d21f3-f254-4b96-b49c-e70192c3fe27', '2026-04-13', 'Rafael Dias', '219920180038', 'Rio de Janeiro', 'Centro', 'Marcelo Andrade', 5, 1, 'sim', 'medio', 'medio', 'Visita realizada com sucesso...', NULL),
+('a2ae0cb4-679b-406a-95e3-f6cd2dfc3ae8', '455d21f3-f254-4b96-b49c-e70192c3fe27', '2026-04-18', 'Mariana Santos', '219920130033', 'Rio de Janeiro', 'Santa Cruz', 'Sandra Oliveira', 5, 2, 'sim', 'baixo', 'baixo', 'Visita realizada com sucesso...', NULL),
+('aa25671e-abeb-44f7-ab3b-5da69a2102da', '455d21f3-f254-4b96-b49c-e70192c3fe27', '2026-04-14', 'Quésia Mendes', '219920170037', 'Rio de Janeiro', 'Recreio', 'Paulo Henrique', 4, 3, 'sim', 'baixo', 'baixo', 'Visita realizada com sucesso...', NULL),
+('b4810c0a-af87-4ef4-9d92-7450f333c9d2', '455d21f3-f254-4b96-b49c-e70192c3fe27', '2026-04-28', 'Wesley Castro', '219920230043', 'Rio de Janeiro', 'Ramos', 'Paulo Henrique', 5, 3, 'sim', 'baixo', 'baixo', 'Visita realizada com sucesso...', NULL),
+('b58f66e5-c170-4ad9-a2c5-756358192a44', '455d21f3-f254-4b96-b49c-e70192c3fe27', '2026-04-29', 'Vitor Almeida', '219920220042', 'Rio de Janeiro', 'Olaria', 'Sandra Oliveira', 4, 2, 'sim', 'baixo', 'baixo', 'Visita realizada com sucesso...', NULL),
+('c2707b56-83d2-4669-8940-82ea65225035', '455d21f3-f254-4b96-b49c-e70192c3fe27', '2026-04-30', 'Ana Silva', '219920010021', 'Rio de Janeiro', 'Ipanema', 'Sandra Oliveira', 3, 2, 'sim', 'baixo', 'baixo', 'Visita realizada com sucesso...', NULL),
+('d461e709-9a46-4824-baf2-ab9535d615fe', '455d21f3-f254-4b96-b49c-e70192c3fe27', '2026-04-21', 'Débora Pinheiro', '219920300050', 'Rio de Janeiro', 'Copacabana', 'Marcelo Andrade', 2, 1, 'nao', 'medio', 'medio', 'Visita realizada com sucesso...', NULL),
+('d4b2b41e-fa0d-4c46-b24a-50dc4c808bcf', '455d21f3-f254-4b96-b49c-e70192c3fe27', '2026-05-12', 'Anderson Rosado', '21 999997777', 'Cachoeiras de Macacu', 'Distrito Sede', 'Ricardo Pereira', 8, 3, 'nao', 'apresentar o pré candidato', 'baixo', '', '13:00:00'),
+('d84c4433-7f8b-40cd-b9fc-3a2edbf097ad', '455d21f3-f254-4b96-b49c-e70192c3fe27', '2026-04-26', 'Eduarda Lima', '219920050025', 'Rio de Janeiro', 'Tijuca', 'Paulo Henrique', 2, 3, 'nao', 'baixo', 'baixo', 'Visita realizada com sucesso...', NULL),
+('e03c28d0-ae7a-43cd-bcb2-02fdd6c2517c', '455d21f3-f254-4b96-b49c-e70192c3fe27', '2026-04-28', 'Carla Souza', '219920030023', 'Rio de Janeiro', 'Botafogo', 'Marcelo Andrade', 5, 1, 'sim', 'medio', 'medio', 'Visita realizada com sucesso...', NULL),
+('e07fd192-ac3a-4762-8fb5-80013afaf72b', '455d21f3-f254-4b96-b49c-e70192c3fe27', '2026-04-23', 'Beatriz Lopes', '219920280048', 'Rio de Janeiro', 'Inhaúma', 'Sandra Oliveira', 5, 0, 'sim', 'alto', 'alto', 'Visita realizada com sucesso...', NULL),
+('e1856aa2-d22b-4167-87b1-fecf0cf46349', '455d21f3-f254-4b96-b49c-e70192c3fe27', '2026-04-15', 'Pedro Carvalho', '219920160036', 'Rio de Janeiro', 'Barra da Tijuca', 'Sandra Oliveira', 3, 0, 'sim', 'alto', 'alto', 'Visita realizada com sucesso...', NULL),
+('e1a0558c-f2e7-4767-9373-6236ba5e38fe', '455d21f3-f254-4b96-b49c-e70192c3fe27', '2026-04-21', 'João Ferreira', '219920100030', 'Rio de Janeiro', 'Penha', 'Sandra Oliveira', 2, 2, 'nao', 'baixo', 'baixo', 'Visita realizada com sucesso...', NULL),
+('e5e2bf58-b6c6-4a12-9f40-26f4a01a4457', '455d21f3-f254-4b96-b49c-e70192c3fe27', '2026-04-25', 'Fernando Pereira', '219920060026', 'Rio de Janeiro', 'Vila Isabel', 'Marcelo Andrade', 3, 1, 'sim', 'medio', 'medio', 'Visita realizada com sucesso...', NULL);
 
--- 5. WAR ROOM INTELLIGENCE
-INSERT IGNORE INTO `war_room_intelligence` (`id`, `campaign_id`, `source_agent`, `priority`, `category`, `insight_text`, `metadata`) VALUES
-('9d8a6a66-9d95-47fb-bf2a-3589766be149', '455d21f3-f254-4b96-b49c-e70192c3fe27', 'crm', 'Media', 'Oportunidade', 'Análise de Funil solicitada: ', '{}');
+-- 5. AGENT CHAT HISTORY
+INSERT IGNORE INTO `agent_chat_history` (`id`, `campaign_id`, `agent_id`, `role`, `content`, `metadata`, `created_at`) VALUES
+(2212, '455d21f3-f254-4b96-b49c-e70192c3fe27', 'crm', 'user', 'Analise minha base de contatos com 51 registros...', '{}', '2026-05-12 04:30:51'),
+(2147483647, '455d21f3-f254-4b96-b49c-e70192c3fe27', 'crm', 'agent', 'Com uma base de 51 registros...', '{}', '2026-05-12 04:30:59');
 
--- 6. VISITS (Restaurando TODAS as 25+ visitas do dump)
-INSERT IGNORE INTO `visits` (`id`, `campaign_id`, `data`, `resp`, `tel`, `municipio`, `bairro`, `apoiador`, `eleitores`, `votos`, `realizada`, `interesse`, `nivel_engajamento`, `hora`) VALUES
-('0dc1ecfa-960d-4805-8ad5-795325a21144', '455d21f3-f254-4b96-b49c-e70192c3fe27', '2026-05-01', 'Tiago Nunes', '219920200040', 'Rio de Janeiro', 'Santa Teresa', 'Paulo Henrique', 2, 0, 'nao', 'alto', 'alto', '10:00:00'),
-('0f9678b8-bc2d-4f86-a3d3-c506c5091473', '455d21f3-f254-4b96-b49c-e70192c3fe27', '2026-04-25', 'Zilda Monteiro', '219920260046', 'Rio de Janeiro', 'Anchieta', 'Paulo Henrique', 3, 3, 'sim', 'baixo', 'baixo', '11:00:00'),
-('14dc804f-e33e-425d-8cff-815c910195d9', '455d21f3-f254-4b96-b49c-e70192c3fe27', '2026-04-22', 'César Araújo', '219920290049', 'Rio de Janeiro', 'Maria da Graça', 'Paulo Henrique', 6, 3, 'sim', 'baixo', 'baixo', '14:00:00'),
-('d4b2b41e-fa0d-4c46-b24a-50dc4c808bcf', '455d21f3-f254-4b96-b49c-e70192c3fe27', '2026-05-12', 'Anderson Rosado', '21 999997777', 'Cachoeiras de Macacu', 'Distrito Sede', 'Ricardo Pereira', 8, 3, 'nao', 'baixo', 'baixo', '13:00:00');
--- (Adicionando mais visits conforme dump)
-INSERT IGNORE INTO `visits` (`id`, `campaign_id`, `data`, `resp`, `tel`, `bairro`, `apoiador`, `eleitores`, `votos`, `realizada`, `interesse`, `nivel_engajamento`) VALUES
-('16311a45-c6df-48a8-8f29-e77216fd0a8a', '455d21f3-f254-4b96-b49c-e70192c3fe27', '2026-04-19', 'Lucas Gomes', '219920120032', 'Campo Grande', 'Marcelo Andrade', 4, 0, 'sim', 'alto', 'alto'),
-('21239a4d-69c4-493a-99f3-41a47bc711ce', '455d21f3-f254-4b96-b49c-e70192c3fe27', '2026-04-17', 'Nícolas Barbosa', '219920140034', 'Realengo', 'Paulo Henrique', 6, 3, 'sim', 'baixo', 'baixo');
-
--- 7. STREET REPORTS (Relatórios Reais)
-INSERT IGNORE INTO `street_reports` (`id`, `user_id`, `campaign_id`, `title`, `reclamacao`, `bairro`, `clima`, `latitude`, `longitude`, `media_urls`, `status`) VALUES
-('28de7286-f356-4c4d-92e5-a235d2f08e3f', 'user_1778681353783', '455d21f3-f254-4b96-b49c-e70192c3fe27', 'UMA CRATERA', 'ta complicado isso aqui, tem um barraco absurdo emfrente ao brt', 'Recreio dos Bandeirantes, Rio de Janeiro', 'Negativo', -23.02168268, -43.49900152, '["https://campanhapro.tesseractauto.com.br/uploads/1778681675809-29753884.jpg"]', 'Concluído'),
-('a3be8479-2f62-4c8f-a145-9a439a043ab1', 'user_1778681353783', '455d21f3-f254-4b96-b49c-e70192c3fe27', 'buraco no brt', 'tem uma cratera aqui po', 'Recreio dos Bandeirantes, Rio de Janeiro', 'Negativo', -23.02170529, -43.49900748, '[]', 'Concluído'),
-('ec1a5fe9-3fce-471b-bb13-40d785aa2ba6', 'user_1778605302706', '455d21f3-f254-4b96-b49c-e70192c3fe27', 'Sem Luz', 'Paga a conta de luz ai meu bom', 'Recreio dos Bandeirantes, Rio de Janeiro', 'Negativo', -23.02170791, -43.49900985, '[]', 'Concluído');
+-- 6. AGENT OUTPUTS
+INSERT IGNORE INTO `agent_outputs` (`id`, `campaign_id`, `agent_type`, `output_type`, `content`, `metadata`, `created_at`) VALUES
+('0a4a1655-89a5-462d-ad3d-f4f9872dcc8a', '455d21f3-f254-4b96-b49c-e70192c3fe27', 'war-room-pipeline', 'pipeline_result', '# Estrategista...', '{}', '2026-05-12 16:52:32');
 
 SET FOREIGN_KEY_CHECKS = 1;
