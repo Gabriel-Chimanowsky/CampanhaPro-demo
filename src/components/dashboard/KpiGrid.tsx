@@ -18,7 +18,7 @@ interface KpiGridProps {
   isLoading?: boolean;
 }
 
-const KpiCard = ({ title, value, description, valueClassName = '', isLoading = false, isScenario = false }: { title: string; value: React.ReactNode; description?: string, valueClassName?: string, isLoading?: boolean, isScenario?: boolean }) => (
+const KpiCard = ({ title, value, description, valueClassName = '', isLoading = false }: { title: string; value: React.ReactNode; description?: string, valueClassName?: string, isLoading?: boolean }) => (
   <div className="bg-slate-700/60 p-4 rounded-xl border border-white/10 flex flex-col h-[130px] shadow-lg">
     <div className="h-5 overflow-hidden">
       <p className="text-[12px] text-slate-400 font-bold uppercase tracking-wider">{title}</p>

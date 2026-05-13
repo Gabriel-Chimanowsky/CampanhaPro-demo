@@ -51,7 +51,16 @@ const VisitRow = ({ visit, onEdit, onDelete }: VisitRowProps) => {
   return (
     <React.Fragment>
       <tr className="bg-slate-800 border-b border-slate-700 hover:bg-slate-700/50">
-          <td className="px-4 py-3">{visit.data}</td>
+          <td className="px-4 py-3">
+            {visit.data ? (() => {
+              try {
+                const date = new Date(visit.data);
+                return isNaN(date.getTime()) ? visit.data : date.toLocaleDateString('pt-BR');
+              } catch {
+                return visit.data;
+              }
+            })() : 'N/A'}
+          </td>
           <td className="px-4 py-3 font-medium">{visit.resp}</td>
           <td className="px-4 py-3">
             <span className="block">{visit.bairro}</span>
@@ -96,7 +105,17 @@ const VisitRow = ({ visit, onEdit, onDelete }: VisitRowProps) => {
                   <div className="bg-slate-700 p-4 rounded-lg space-y-3">
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
                           <div><strong className="block text-slate-400">Telefone:</strong> {visit.tel || 'N/A'}</div>
-                          <div><strong className="block text-slate-400">Nascimento:</strong> {visit.nasc || 'N/A'}</div>
+                          <div>
+                            <strong className="block text-slate-400">Nascimento:</strong> 
+                            {visit.nasc ? (() => {
+                              try {
+                                const date = new Date(visit.nasc);
+                                return isNaN(date.getTime()) ? visit.nasc : date.toLocaleDateString('pt-BR');
+                              } catch {
+                                return visit.nasc;
+                              }
+                            })() : 'N/A'}
+                          </div>
                           <div><strong className="block text-slate-400">Eleitores:</strong> {visit.eleitores}</div>
                           <div><strong className="block text-slate-400">Participantes:</strong> {visit.participantes}</div>
                           <div><strong className="block text-slate-400">Tem Pet:</strong> {visit.pet} ({visit.tipo_pet || 'N/A'})</div>
