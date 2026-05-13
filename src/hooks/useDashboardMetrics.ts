@@ -138,36 +138,6 @@ export const useDashboardMetrics = ({
 
   const completedVisits = React.useMemo(() => visibleVisits.filter(v => v.realizada === 'sim'), [visibleVisits]);
 
-  const [streetReportsCount, setStreetReportsCount] = React.useState(0);
-
-  React.useEffect(() => {
-    const campaignId = user?.campaign_id || user?.campaignId;
-    if (!campaignId) return;
-    const fetchReportsCount = async () => {
-      const { count, error } = await supabase
-        .from('street_reports')
-        .select('*', { count: 'exact', head: true })
-        .eq('campaign_id', campaignId);
-      
-      if (!error && count !== null) {
-        setStreetReportsCount(count);
-      }
-    };
-    fetchReportsCount();
-  }, [user]);
-
-  const kpis = React.useMemo(() => {
-    const realizadas = completedVisits.length;
-    const votos = completedVisits.reduce((sum, v) => sum + v.votos, 0);
-    const avgVotos = realizadas > 0 ? parseFloat((votos / realizadas).toFixed(2)) : 0;
-    
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const activeSupporters = new Set(
-        completedVisits.filter(v => new Date(v.data) >= sevenDaysAgo).map(v => v.apoiador)
-    ).size;
-    
-    const totalAbordagens = visibleEngagements.filter(a => a.tipo === 'Abordagem Rápida').length;
     const totalMateriais = visibleEngagements.reduce((sum, a) => sum + (a.materialDistribuido || 0), 0);
 
     return { 
@@ -178,10 +148,9 @@ export const useDashboardMetrics = ({
       avgVotos, 
       apoiadoresAtivos: activeSupporters, 
       totalAbordagens, 
-      totalMateriais,
-      alertasCampo: streetReportsCount
+      totalMateriais
     };
-  }, [visibleVisits, completedVisits, visibleEngagements, streetReportsCount]);
+  }, [visibleVisits, completedVisits, visibleEngagements]);
 
   const dailyGoal = React.useMemo(() => {
     if (!idealScenario) return { meta: 0, realizadasHoje: 0, color: 'text-slate-400', status: 'N/A' };
