@@ -40,16 +40,16 @@ const UserMenu = () => {
                 </div>
             </button>
             {isOpen && (
-                <div className="absolute right-0 mt-2 w-56 bg-slate-800 rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-20">
+                <div className="absolute right-0 mt-2 w-56 bg-[#161b22] border border-white/10 rounded-xl shadow-2xl backdrop-blur-3xl z-20 overflow-hidden">
                     <div className="py-1">
-                        <div className="px-4 py-2 border-b border-slate-700">
+                        <div className="px-4 py-3 border-b border-white/5 bg-white/[0.02]">
                             <p className="text-sm font-semibold text-slate-200">{user.name}</p>
                             <p className="text-xs text-slate-400 truncate">{user.email}</p>
                             <p className="text-xs font-bold text-[#4ac7f0] mt-1">{user.type}</p>
                         </div>
                         <button 
                             onClick={logout}
-                            className="w-full text-left flex items-center gap-2 px-4 py-2 text-sm text-red-400 hover:bg-slate-700 transition-colors"
+                            className="w-full text-left flex items-center gap-2 px-4 py-3 text-sm text-rose-400 hover:bg-white/5 transition-colors"
                         >
                             <LogoutIcon /> Sair da Plataforma
                         </button>
@@ -66,7 +66,7 @@ const Header = ({ logoUrl }: HeaderProps) => {
   const { user } = useAuth();
   
     return (
-        <header className="bg-slate-900/50 backdrop-blur-sm sticky top-0 z-10 no-print">
+        <header className="bg-[#0d1117]/80 backdrop-blur-xl sticky top-0 z-50 no-print border-b border-white/5">
             <div className="container mx-auto px-4 sm:px-6 md:px-8 py-3 flex justify-between items-center">
                 <div className="flex items-center gap-3">
                     <Link to="/">

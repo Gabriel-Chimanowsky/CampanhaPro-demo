@@ -298,7 +298,9 @@ const CityAlertsPage: React.FC = () => {
                                                 <div className={`px-2 py-0.5 rounded-md text-[7px] font-black uppercase border ${sentimentColors[alert.clima as keyof typeof sentimentColors] || 'border-white/10'}`}>
                                                     {alert.clima || 'Alerta'}
                                                 </div>
-                                                <span className="text-[8px] text-slate-600 font-bold">{new Date(alert.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                                                <span className="text-[8px] text-slate-600 font-bold">
+                                                    {new Date(alert.createdAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                                                </span>
                                             </div>
                                             <h3 className="text-xs font-black text-white truncate uppercase mb-1">{alert.title}</h3>
                                             <div className="flex items-center justify-between gap-2">
@@ -608,10 +610,6 @@ const CityAlertsPage: React.FC = () => {
             </AnimatePresence>
 
             <style>{`
-                .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-                .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-                .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.08); border-radius: 20px; }
-                .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.15); }
                 .leaflet-container { background: #0f172a !important; }
                 .custom-div-icon { background: transparent !important; border: none !important; }
             `}</style>
