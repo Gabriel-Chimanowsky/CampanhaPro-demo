@@ -56,7 +56,9 @@ const KpiGrid = ({ kpis, currentScenarioStatus, isLoading = false }: KpiGridProp
         kpis.total === 0 && !isLoading ? '---' : (
           <div className="flex flex-col">
             <span className="text-2xl font-black opacity-80">{`(<${currentScenarioStatus.avg.toFixed(1)})`}</span>
-            <span className={`text-sm font-bold mt-1 ${currentScenarioStatus.color}`}>{currentScenarioStatus.name}</span>
+            <span className={`text-sm font-bold mt-1 ${currentScenarioStatus.color}`}>
+              {currentScenarioStatus.name.split(' (')[0]}
+            </span>
           </div>
         )
       } 

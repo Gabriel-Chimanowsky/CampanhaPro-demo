@@ -20,7 +20,7 @@ const AnimatedBarChart = ({ data }: { data: { date: string; visits: number; vote
     const [hoveredIndex, setHoveredIndex] = React.useState<number | null>(null);
     const [tooltipPos, setTooltipPos] = React.useState({ x: 0, y: 0 });
     
-    const chartHeight = 240;
+    const chartHeight = 220;
     const chartWidth = 800;
     const padding = { top: 20, right: 30, bottom: 40, left: 40 };
     
@@ -46,7 +46,7 @@ const AnimatedBarChart = ({ data }: { data: { date: string; visits: number; vote
 
     return (
         <div className="relative w-full overflow-hidden">
-            <div className="h-[240px] w-full overflow-x-auto custom-scrollbar">
+            <div className="h-[225px] w-full overflow-x-auto overflow-y-hidden custom-scrollbar">
                 <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} preserveAspectRatio="xMidYMid meet" className="min-w-[800px] select-none">
                     <defs>
                         <linearGradient id="gradVisits" x1="0%" y1="0%" x2="0%" y2="100%">
