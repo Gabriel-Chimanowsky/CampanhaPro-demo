@@ -58,7 +58,7 @@ const KpiGrid = ({ kpis, currentScenarioStatus, isLoading = false }: KpiGridProp
           const name = currentScenarioStatus.name.split(' (')[0];
           return (
             <div className="flex flex-col">
-              <span className="text-2xl font-black opacity-80">{`(${threshold})`}</span>
+              <span className={`text-2xl font-black opacity-90 ${currentScenarioStatus.color}`}>{`(${threshold})`}</span>
               <span className={`text-sm font-bold mt-1 ${currentScenarioStatus.color}`}>{name}</span>
             </div>
           );
