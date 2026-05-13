@@ -94,7 +94,7 @@ const CityAlertsMap: React.FC<{ campaignId: string }> = ({ campaignId }) => {
 
     return (
         <Card className="h-[500px] flex flex-col p-0 overflow-hidden border-slate-700/50 shadow-2xl">
-            <div className="p-4 border-b border-slate-800 bg-slate-800/80 backdrop-blur-md flex flex-wrap justify-between items-center gap-4">
+            <div className="p-4 border-b border-slate-800 bg-slate-800/80 backdrop-blur-md flex flex-wrap justify-between items-center gap-4 no-print">
                 <div className="flex items-center gap-3">
                     <div className="p-2 bg-orange-500/20 rounded-lg">
                         <AlertCircle className="text-orange-400 w-5 h-5" />
@@ -124,86 +124,85 @@ const CityAlertsMap: React.FC<{ campaignId: string }> = ({ campaignId }) => {
                 <MapContainer 
                     center={alerts.length > 0 && alerts[0].latitude ? [alerts[0].latitude, alerts[0].longitude] : [-22.9068, -43.1729]} 
                     zoom={13} 
-                        style={{ height: '100%', width: '100%' }}
-                        scrollWheelZoom={false}
-                    >
-                        <TileLayer
-                            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-                        />
-                        {alerts.filter(a => a.latitude && a.longitude).map(alert => (
-                            <Marker 
-                                key={alert.id} 
-                                position={[alert.latitude, alert.longitude]}
-                                icon={(icons as any)[alert.clima] || DefaultIcon}
-                                eventHandlers={{
-                                    click: () => setSelectedAlert(alert)
-                                }}
-                            >
-                                <Popup className="custom-popup">
-                                    <div className="p-1 min-w-[200px]">
-                                        <div className="flex justify-between mb-2">
-                                            <span className={`text-[10px] font-bold uppercase ${getStatusColor(alert.clima)}`}>
-                                                {alert.clima}
-                                            </span>
-                                            <span className="text-[10px] text-slate-400">
-                                                {new Date(alert.createdAt || alert.created_at).toLocaleDateString()}
-                                            </span>
-                                        </div>
-                                        <h3 className="font-bold text-slate-800 text-sm mb-1">{alert.title || 'Alerta de Rua'}</h3>
-                                        <p className="text-xs text-slate-600 mb-3">{alert.reclamacao}</p>
-                                        
-                                        {alert.photoUrl && (
-                                            <img src={alert.photoUrl} alt="Alerta" className="w-full h-24 object-cover rounded-md mb-3" />
-                                        )}
-
-                                        <div className="border-t pt-2 flex flex-col gap-1">
-                                            <div className="flex items-center gap-1 text-[10px] text-slate-500">
-                                                <User size={12} /> <span className="font-bold">{alert.users?.name || 'Colaborador'}</span>
-                                            </div>
-                                            <div className="flex items-center gap-1 text-[10px] text-slate-500">
-                                                <MapPin size={12} /> <span>{alert.bairro}</span>
-                                            </div>
-                                        </div>
+                    style={{ height: '100%', width: '100%' }}
+                    scrollWheelZoom={false}
+                >
+                    <TileLayer
+                        url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+                    />
+                    {alerts.filter(a => a.latitude && a.longitude).map(alert => (
+                        <Marker 
+                            key={alert.id} 
+                            position={[alert.latitude, alert.longitude]}
+                            icon={(icons as any)[alert.clima] || DefaultIcon}
+                            eventHandlers={{
+                                click: () => setSelectedAlert(alert)
+                            }}
+                        >
+                            <Popup className="custom-popup">
+                                <div className="p-1 min-w-[200px]">
+                                    <div className="flex justify-between mb-2">
+                                        <span className={`text-[10px] font-bold uppercase ${getStatusColor(alert.clima)}`}>
+                                            {alert.clima}
+                                        </span>
+                                        <span className="text-[10px] text-slate-400">
+                                            {new Date(alert.createdAt || alert.created_at).toLocaleDateString()}
+                                        </span>
                                     </div>
-                                </Popup>
-                            </Marker>
-                        ))}
-                    </MapContainer>
-
-                    {/* Floating Detail Card if selected */}
-                    {selectedAlert && (
-                        <div className="absolute bottom-4 left-4 right-4 z-[1000] animate-in slide-in-from-bottom-2 duration-300">
-                            <Card className="!bg-[#161b22]/95 backdrop-blur-md border-slate-700 p-4 shadow-2xl relative">
-                                <button 
-                                    onClick={() => setSelectedAlert(null)}
-                                    className="absolute top-2 right-2 text-slate-500 hover:text-white"
-                                >
-                                    <X size={16} />
-                                </button>
-                                <div className="flex gap-4">
-                                    {selectedAlert.photoUrl && (
-                                        <div className="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0 border border-slate-800">
-                                            <img src={selectedAlert.photoUrl} className="w-full h-full object-cover" alt="Alerta" />
-                                        </div>
+                                    <h3 className="font-bold text-slate-800 text-sm mb-1">{alert.title || 'Alerta de Rua'}</h3>
+                                    <p className="text-xs text-slate-600 mb-3">{alert.reclamacao}</p>
+                                    
+                                    {alert.photoUrl && (
+                                        <img src={alert.photoUrl} alt="Alerta" className="w-full h-24 object-cover rounded-md mb-3" />
                                     )}
-                                    <div>
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${icons[selectedAlert.clima as keyof typeof icons] ? 'bg-slate-800' : ''}`}>
-                                                {selectedAlert.clima}
-                                            </span>
-                                            <span className="text-[10px] text-slate-500 font-mono">
-                                                {new Date(selectedAlert.createdAt || selectedAlert.created_at).toLocaleString('pt-BR')}
-                                            </span>
+
+                                    <div className="border-t pt-2 flex flex-col gap-1">
+                                        <div className="flex items-center gap-1 text-[10px] text-slate-500">
+                                            <User size={12} /> <span className="font-bold">{alert.users?.name || 'Colaborador'}</span>
                                         </div>
-                                        <h4 className="font-bold text-slate-100 text-sm">{selectedAlert.title || selectedAlert.bairro}</h4>
-                                        <p className="text-[10px] text-slate-400 line-clamp-2">{selectedAlert.reclamacao}</p>
+                                        <div className="flex items-center gap-1 text-[10px] text-slate-500">
+                                            <MapPin size={12} /> <span>{alert.bairro}</span>
+                                        </div>
                                     </div>
                                 </div>
-                            </Card>
-                        </div>
-                    )}
-                </div>
+                            </Popup>
+                        </Marker>
+                    ))}
+                </MapContainer>
+
+                {/* Floating Detail Card if selected */}
+                {selectedAlert && (
+                    <div className="absolute bottom-4 left-4 right-4 z-[1000] animate-in slide-in-from-bottom-2 duration-300">
+                        <Card className="!bg-[#161b22]/95 backdrop-blur-md border-slate-700 p-4 shadow-2xl relative">
+                            <button 
+                                onClick={() => setSelectedAlert(null)}
+                                className="absolute top-2 right-2 text-slate-500 hover:text-white"
+                            >
+                                <X size={16} />
+                            </button>
+                            <div className="flex gap-4">
+                                {selectedAlert.photoUrl && (
+                                    <div className="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0 border border-slate-800">
+                                        <img src={selectedAlert.photoUrl} className="w-full h-full object-cover" alt="Alerta" />
+                                    </div>
+                                )}
+                                <div>
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${icons[selectedAlert.clima as keyof typeof icons] ? 'bg-slate-800' : ''}`}>
+                                            {selectedAlert.clima}
+                                        </span>
+                                        <span className="text-[10px] text-slate-500 font-mono">
+                                            {new Date(selectedAlert.createdAt || selectedAlert.created_at).toLocaleString('pt-BR')}
+                                        </span>
+                                    </div>
+                                    <h4 className="font-bold text-slate-100 text-sm">{selectedAlert.title || selectedAlert.bairro}</h4>
+                                    <p className="text-[10px] text-slate-400 line-clamp-2">{selectedAlert.reclamacao}</p>
+                                </div>
+                            </div>
+                        </Card>
+                    </div>
+                )}
             </div>
         </Card>
     );
