@@ -249,9 +249,7 @@ const CollaboratorHubPage: React.FC = () => {
             {/* Header Compacto */}
             <header className="sticky top-0 z-50 bg-[#0d1117]/80 backdrop-blur-xl border-b border-slate-800 px-4 py-3 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-blue-600/10 border border-blue-500/20 flex items-center justify-center text-blue-500 font-black shadow-lg shadow-blue-500/5">
-                        <MapPin size={22} />
-                    </div>
+                    <img src="/logo.png?v=1" alt="Logo" className="w-10 h-10 object-contain" />
                     <div>
                         <h1 className="text-sm font-black text-white leading-none tracking-tight">CampanhaPró</h1>
                         <p className="text-[10px] text-blue-400 font-bold uppercase tracking-wider">Colaborador</p>

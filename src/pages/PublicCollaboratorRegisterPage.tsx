@@ -149,9 +149,7 @@ const PublicCollaboratorRegisterPage: React.FC = () => {
             </div>
             <div className="w-full max-w-[420px] mx-auto">
                 <div className="text-center mb-8 px-2">
-                    <div className="w-16 h-16 bg-blue-600/10 border border-blue-500/20 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-blue-900/10">
-                        <ShieldCheck className="w-8 h-8 text-blue-500" />
-                    </div>
+                    <img src="/logo.png?v=1" alt="Logo" className="w-16 h-16 mx-auto mb-6 object-contain" />
                     <h1 className="text-3xl font-black text-white mb-2 tracking-tighter">Seja um <span className="text-blue-500">Colaborador</span></h1>
                     <p className="text-slate-400 text-sm font-medium leading-relaxed px-4">Cadastre-se para começar a enviar relatos e ajudar sua cidade.</p>
                 </div>
