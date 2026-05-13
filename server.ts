@@ -1197,13 +1197,12 @@ app.get('/api/war-room/feed', (_req, res) => {
       const tokenData = tokens[0];
 
       if (!tokenData || !tokenData.access_token) {
-        console.warn(`[Instagram Ranking] Token não encontrado para campanha: ${campaign_id}`);
         return res.json({ ranking: [], connected: false, error: 'Instagram não conectado' });
       }
 
       const accessToken = tokenData.access_token;
 
-      // Se for um token simulado (ambiente de teste/desenvolvimento)
+      // Se for um token simulado
       if (accessToken.startsWith('SIMULATED_TOKEN')) {
         return res.json({
           ranking: [
@@ -1216,27 +1215,40 @@ app.get('/api/war-room/feed', (_req, res) => {
         });
       }
 
-      // 2. FETCH MEDIA (Recent Posts) from Instagram Graph API
-      const mediaResponse = await axios.get(`https://graph.facebook.com/v19.0/me/media?fields=id,caption,timestamp,comments_count&access_token=${accessToken}`);
-      const mediaData = mediaResponse.data;
-
-      if (mediaData.error) {
-        throw new Error(mediaData.error.message);
+      // 2. DISCOVER Instagram Business ID (Needed for real accounts)
+      // Primeiro tentamos pegar as páginas do usuário para achar o ID do Instagram
+      let instagramId = 'me'; // Fallback
+      try {
+        const pagesRes = await axios.get(`https://graph.facebook.com/v19.0/me/accounts?fields=instagram_business_account&access_token=${accessToken}`);
+        if (pagesRes.data.data && pagesRes.data.data.length > 0) {
+          // Pega o primeiro IG Business ID que encontrar
+          const pageWithIg = pagesRes.data.data.find((p: any) => p.instagram_business_account);
+          if (pageWithIg) {
+            instagramId = pageWithIg.instagram_business_account.id;
+            console.log(`[Instagram Ranking] Usando IG Business Account: ${instagramId}`);
+          }
+        }
+      } catch (err: any) {
+        console.warn('[Instagram Ranking] Não foi possível descobrir IG Business ID, tentando /me/media');
       }
 
-      const posts = mediaData.data || [];
+      // 3. FETCH MEDIA
+      const mediaResponse = await axios.get(`https://graph.facebook.com/v19.0/${instagramId}/media?fields=id,caption,timestamp,comments_count&access_token=${accessToken}`);
+      const posts = mediaResponse.data.data || [];
       const rankingMap: Record<string, { count: number, lastComment: string }> = {};
 
-      // 3. Fetch Comments for each post
-      for (const post of posts.slice(0, 10)) {
+      if (posts.length === 0) {
+        console.warn(`[Instagram Ranking] Nenhuma mídia encontrada para ID: ${instagramId}`);
+      }
+
+      // 4. Fetch Comments for each post
+      for (const post of posts.slice(0, 15)) {
         if (post.comments_count > 0) {
           try {
             const commentsResponse = await axios.get(`https://graph.facebook.com/v19.0/${post.id}/comments?fields=from,text,timestamp&access_token=${accessToken}`);
-            const commentsData = commentsResponse.data;
-            
-            if (commentsData.data) {
-              for (const comment of commentsData.data) {
-                const username = comment.from?.username || 'usuario_privado';
+            if (commentsResponse.data.data) {
+              for (const comment of commentsResponse.data.data) {
+                const username = comment.from?.username || 'usuario_secreto';
                 if (!rankingMap[username]) {
                   rankingMap[username] = { count: 0, lastComment: '' };
                 }
@@ -1245,21 +1257,22 @@ app.get('/api/war-room/feed', (_req, res) => {
               }
             }
           } catch (cErr: any) {
-            console.warn(`[Instagram Ranking] Erro ao buscar comentários do post ${post.id}:`, cErr.message);
+            console.warn(`[Instagram Ranking] Erro no post ${post.id}:`, cErr.message);
           }
         }
       }
 
-      // 4. Format and Sort Ranking
+      // 5. Format and Sort Ranking
       const formattedRanking = Object.entries(rankingMap)
         .map(([username, data]) => ({
-          username,
+          username: username.startsWith('@') ? username : `@${username}`,
           count: data.count,
           lastComment: data.lastComment
         }))
         .sort((a, b) => b.count - a.count)
         .slice(0, 50);
 
+      console.log(`[Instagram Ranking] Ranking gerado com ${formattedRanking.length} perfis.`);
       res.json({ ranking: formattedRanking });
     } catch (error: any) {
       console.error('[Instagram API Error]', error.response?.data || error.message);
