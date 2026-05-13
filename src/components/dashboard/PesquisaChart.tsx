@@ -15,10 +15,11 @@ const SimpleDoughnutChart = ({ data }: { data: { label: string; value: number; c
         return (
             <div className="relative flex items-center justify-center">
                 <svg viewBox="0 0 100 100" className="w-44 h-44 -rotate-90">
-                    <circle cx="50" cy="50" r="38" fill="transparent" stroke="#1e293b" strokeWidth="12" />
+                    <circle cx="50" cy="50" r="38" fill="transparent" stroke="#334155" strokeWidth="12" strokeDasharray="2,2" />
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                    <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest">Sem Dados</span>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sem Registros</span>
+                    <span className="text-[8px] text-slate-500 font-bold uppercase mt-1">Aguardando Pesquisas</span>
                 </div>
             </div>
         );

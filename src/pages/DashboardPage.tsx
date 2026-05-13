@@ -229,12 +229,12 @@ const DashboardPage: React.FC = () => {
                     <div className="space-y-3">
                         <input 
                             readOnly
-                            value={`${window.location.origin}/colaborador`}
+                            value={`${window.location.origin}/registro-colaborador?campaign_id=${user?.campaign_id || user?.campaignId}`}
                             className="w-full bg-black/40 border border-slate-700 rounded-xl px-4 py-3 text-xs text-slate-300 font-mono"
                         />
                         <Button 
                             onClick={() => {
-                                navigator.clipboard.writeText(`${window.location.origin}/colaborador`);
+                                navigator.clipboard.writeText(`${window.location.origin}/registro-colaborador?campaign_id=${user?.campaign_id || user?.campaignId}`);
                                 setCopied(true);
                                 setTimeout(() => setCopied(false), 2000);
                             }}
