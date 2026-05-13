@@ -20,9 +20,9 @@ const AnimatedBarChart = ({ data }: { data: { date: string; visits: number; vote
     const [hoveredIndex, setHoveredIndex] = React.useState<number | null>(null);
     const [tooltipPos, setTooltipPos] = React.useState({ x: 0, y: 0 });
     
-    const chartHeight = 350;
+    const chartHeight = 280;
     const chartWidth = 800;
-    const padding = { top: 60, right: 30, bottom: 50, left: 50 };
+    const padding = { top: 40, right: 30, bottom: 40, left: 50 };
     
     const maxVisits = Math.max(...data.map(d => d.visits), 0);
     const maxVotes = Math.max(...data.map(d => d.votes), 0);
@@ -46,7 +46,7 @@ const AnimatedBarChart = ({ data }: { data: { date: string; visits: number; vote
 
     return (
         <div className="relative w-full overflow-hidden">
-            <div className="h-[350px] w-full overflow-x-auto custom-scrollbar">
+            <div className="h-[280px] w-full overflow-x-auto custom-scrollbar">
                 <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} preserveAspectRatio="xMidYMid meet" className="min-w-[800px] select-none">
                     <defs>
                         <linearGradient id="gradVisits" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -124,7 +124,22 @@ const AnimatedBarChart = ({ data }: { data: { date: string; visits: number; vote
                                 </rect>
 
                                  <text x={x} y={chartHeight - padding.bottom + 25} textAnchor="middle" fill={isHovered ? "#f8fafc" : "#64748b"} fontSize="11" fontWeight={isHovered ? "bold" : "600"} className="transition-colors">
-                                    {new Date(d.date + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                                    {(() => {
+                                        try {
+                                            const baseDate = d.date.includes('T') ? d.date.split('T')[0] : d.date;
+                                            const parts = baseDate.split(/[-/]/);
+                                            // Handle YYYY-MM-DD or DD-MM-YYYY
+                                            let dateObj;
+                                            if (parts[0].length === 4) {
+                                                dateObj = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+                                            } else {
+                                                dateObj = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+                                            }
+                                            return isNaN(dateObj.getTime()) ? d.date : dateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+                                        } catch (e) {
+                                            return d.date;
+                                        }
+                                    })()}
                                 </text>
                             </g>
                         )
@@ -145,7 +160,21 @@ const AnimatedBarChart = ({ data }: { data: { date: string; visits: number; vote
                         }}
                     >
                         <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">
-                            {new Date(data[hoveredIndex].date + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })}
+                            {(() => {
+                                try {
+                                    const baseDate = data[hoveredIndex].date.includes('T') ? data[hoveredIndex].date.split('T')[0] : data[hoveredIndex].date;
+                                    const parts = baseDate.split(/[-/]/);
+                                    let dateObj;
+                                    if (parts[0].length === 4) {
+                                        dateObj = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+                                    } else {
+                                        dateObj = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+                                    }
+                                    return isNaN(dateObj.getTime()) ? data[hoveredIndex].date : dateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' });
+                                } catch (e) {
+                                    return data[hoveredIndex].date;
+                                }
+                            })()}
                         </p>
                         <div className="space-y-1">
                             <div className="flex justify-between items-center gap-4">

@@ -166,7 +166,7 @@ const AdminApp: React.FC = () => {
     }
 
     return (
-        <div className="min-h-screen bg-[#0d1117] text-slate-50 font-sans">
+        <div className="min-h-screen bg-slate-800 text-slate-50 font-sans">
             <Header logoUrl={headerLogo} />
             <main className="container mx-auto p-4 sm:p-6 md:p-8">
                 <Tabs tabs={tabs} iconMap={iconMap}>
