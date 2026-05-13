@@ -30,12 +30,14 @@ const TeamTasksWidget: React.FC = () => {
 
   return (
     <Card className="border-l-4 border-l-blue-500 bg-blue-500/5">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-2 mb-4">
         <div className="flex items-center gap-2">
-          <CheckSquare className="w-5 h-5 text-blue-500" />
-          <h3 className="text-sm font-bold text-blue-400 uppercase tracking-widest">Tarefas de Engajamento (IA)</h3>
+          <div className="p-1.5 bg-blue-500/20 rounded-lg shrink-0">
+            <CheckSquare className="w-4 h-4 text-blue-400" />
+          </div>
+          <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-tight">Tarefas de Engajamento (IA)</h3>
         </div>
-        <span className="text-[10px] bg-blue-500 text-slate-50 px-2 py-0.5 rounded-full font-bold">
+        <span className="shrink-0 text-[9px] bg-blue-600 text-white px-2 py-1 rounded-full font-black whitespace-nowrap shadow-lg shadow-blue-500/20">
           {tasks.length} PENDENTES
         </span>
       </div>
