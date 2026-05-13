@@ -1871,6 +1871,9 @@ app.get('/api/war-room/feed', (_req, res) => {
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [adminId, 'demo@campanhapro.com.br', hashedPass, 'Administrador Central', 'Admin', 'Total', 'active', '455d21f3-f254-4b96-b49c-e70192c3fe27', 0]
         );
+      } else {
+        // Garantir que o demo@campanhapro.com.br NÃO seja supreme admin se ele já existir
+        await pool.execute('UPDATE users SET is_supreme_admin = 0 WHERE email = "demo@campanhapro.com.br"');
       }
 
       console.log('[Database] System Tables Ready.');
