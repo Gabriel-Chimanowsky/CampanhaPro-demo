@@ -19,9 +19,9 @@ const AnimatedBarChart = ({ data }: { data: { date: string; visits: number; vote
     const [hoveredIndex, setHoveredIndex] = React.useState<number | null>(null);
     const [tooltipPos, setTooltipPos] = React.useState({ x: 0, y: 0 });
     
-    const chartHeight = 300;
+    const chartHeight = 350;
     const chartWidth = 800;
-    const padding = { top: 20, right: 30, bottom: 40, left: 40 };
+    const padding = { top: 20, right: 30, bottom: 60, left: 50 };
     
     const maxVisits = Math.max(...data.map(d => d.visits), 0);
     const maxVotes = Math.max(...data.map(d => d.votes), 0);
@@ -29,7 +29,7 @@ const AnimatedBarChart = ({ data }: { data: { date: string; visits: number; vote
     
     const yScale = (value: number) => chartHeight - padding.bottom - (value / yMax) * (chartHeight - padding.top - padding.bottom);
     const spacing = (chartWidth - padding.left - padding.right) / data.length;
-    const barWidth = Math.max(Math.min(spacing * 0.45, 30), 10);
+    const barWidth = Math.max(Math.min(spacing * 0.45, 30), 12);
 
     const handleMouseMove = (e: React.MouseEvent, index: number) => {
         const svg = e.currentTarget.closest('svg');
@@ -45,8 +45,8 @@ const AnimatedBarChart = ({ data }: { data: { date: string; visits: number; vote
 
     return (
         <div className="relative w-full overflow-hidden">
-            <div className="h-[305px] w-full overflow-x-auto overflow-y-hidden custom-scrollbar">
-                <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} preserveAspectRatio="xMidYMid meet" className="min-w-[800px] select-none">
+            <div className="h-[350px] w-full overflow-x-auto overflow-y-hidden custom-scrollbar">
+                <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="min-w-[800px] h-full select-none">
                     <defs>
                         <linearGradient id="gradVisits" x1="0%" y1="0%" x2="0%" y2="100%">
                             <stop offset="0%" stopColor="#4ac7f0" />
@@ -86,7 +86,7 @@ const AnimatedBarChart = ({ data }: { data: { date: string; visits: number; vote
                                 <rect x={x - barWidth - 1} y={visitY} width={barWidth} height={Math.max(base - visitY, 2)} fill="url(#gradVisits)" rx="3" className="transition-all duration-300" style={{ filter: isHovered ? 'url(#glow)' : 'none' }} />
                                 <rect x={x + 1} y={voteY} width={barWidth} height={Math.max(base - voteY, 2)} fill="url(#gradVotes)" rx="3" className="transition-all duration-300" style={{ filter: isHovered ? 'url(#glow)' : 'none' }} />
                                 {i % (Math.ceil(data.length / 10)) === 0 && (
-                                    <text x={x} y={chartHeight - 5} textAnchor="middle" className="text-[9px] fill-slate-500 font-bold">
+                                    <text x={x} y={chartHeight - 30} textAnchor="middle" className="text-[10px] fill-slate-400 font-black">
                                         {(() => {
                                             const p = d.date.split('-');
                                             return `${p[2]}/${p[1]}`;
