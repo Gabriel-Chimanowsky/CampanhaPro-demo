@@ -20,9 +20,9 @@ const AnimatedBarChart = ({ data }: { data: { date: string; visits: number; vote
     const [hoveredIndex, setHoveredIndex] = React.useState<number | null>(null);
     const [tooltipPos, setTooltipPos] = React.useState({ x: 0, y: 0 });
     
-    const chartHeight = 200;
+    const chartHeight = 240;
     const chartWidth = 800;
-    const padding = { top: 20, right: 30, bottom: 30, left: 40 };
+    const padding = { top: 20, right: 30, bottom: 40, left: 40 };
     
     const maxVisits = Math.max(...data.map(d => d.visits), 0);
     const maxVotes = Math.max(...data.map(d => d.votes), 0);
@@ -30,7 +30,7 @@ const AnimatedBarChart = ({ data }: { data: { date: string; visits: number; vote
     
     const yScale = (value: number) => chartHeight - padding.bottom - (value / yMax) * (chartHeight - padding.top - padding.bottom);
     const spacing = (chartWidth - padding.left - padding.right) / data.length;
-    const barWidth = Math.min(spacing * 0.35, 25);
+    const barWidth = Math.min(spacing * 0.35, 30);
 
     const handleMouseMove = (e: React.MouseEvent, index: number) => {
         const svg = e.currentTarget.closest('svg');
@@ -46,7 +46,7 @@ const AnimatedBarChart = ({ data }: { data: { date: string; visits: number; vote
 
     return (
         <div className="relative w-full overflow-hidden">
-            <div className="h-[200px] w-full overflow-x-auto custom-scrollbar">
+            <div className="h-[240px] w-full overflow-x-auto custom-scrollbar">
                 <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} preserveAspectRatio="xMidYMid meet" className="min-w-[800px] select-none">
                     <defs>
                         <linearGradient id="gradVisits" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -228,7 +228,7 @@ const ProgressChart = ({
 
     return (
         <Card className="p-3 sm:p-4 print-break-inside-avoid">
-            <h3 className="font-bold text-sm text-slate-300 mb-2">Progresso (Visitas e Votos / Dia)</h3>
+            <h3 className="font-bold text-base text-slate-300 mb-2">Progresso (Visitas e Votos / Dia)</h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-2 no-print">
                 <select value={municipioFilter} onChange={e => { setMunicipioFilter(e.target.value); setBairroFilter(''); }} className="w-full bg-slate-700/50 text-xs border border-slate-600 rounded-md py-1 px-2">
                     <option value="">Todos os Municípios</option>
