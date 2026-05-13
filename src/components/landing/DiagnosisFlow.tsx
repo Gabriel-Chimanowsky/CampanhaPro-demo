@@ -126,7 +126,7 @@ const DiagnosisFlow: React.FC = () => {
       let message = '';
       if (score <= 2) {
           title = "Parabéns! Sua Campanha Parece Organizada";
-          message = "Seu nível de organização está acima da média. O Campanha Pró pode te ajudar a otimizar ainda mais seus resultados e escalar suas operações com segurança.";
+          message = "Seu nível de organização está acima da média. O Campanha Pro pode te ajudar a otimizar ainda mais seus resultados e escalar suas operações com segurança.";
       } else if (score <= 6) {
           title = "Atenção: Pontos de Melhoria Identificados";
           message = "Sua campanha possui alguns pontos de desorganização que podem estar custando votos e eficiência. Estruturar seus processos pode trazer um grande impacto.";
@@ -239,7 +239,7 @@ const DiagnosisFlow: React.FC = () => {
                         )}
 
                         <div className="bg-slate-700/50 p-4 rounded-lg">
-                            <p className="font-semibold text-slate-100">Com o Campanha Pró, você transforma dados em estratégia com nossos Agentes de IA e ferramentas de pesquisa.</p>
+                            <p className="font-semibold text-slate-100">Com o Campanha Pro, você transforma dados em estratégia com nossos Agentes de IA e ferramentas de pesquisa.</p>
                             <div className="flex flex-col sm:flex-row justify-center gap-4 mt-4">
                                 <Button variant="secondary" onClick={() => { closeAllModals(); document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' }); }}>Ver Funcionalidades</Button>
                                 <Link to="/register">

@@ -11,7 +11,7 @@ interface AppState {
 }
 
 /**
- * Store global para estado da aplicação Campanha Pró.
+ * Store global para estado da aplicação Campanha Pro.
  * Gerencia UI, erros globais e estados de carregamento.
  */
 export const useCampaignStore = create<AppState>((set) => ({

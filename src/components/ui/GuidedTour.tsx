@@ -15,7 +15,7 @@ interface GuidedTourProps {
 const tourSteps = [
     {
         icon: <RocketLaunchIcon className="h-12 w-12 text-sky-400" />,
-        title: "Bem-vindo(a) ao Campanha Pró!",
+        title: "Bem-vindo(a) ao Campanha Pro!",
         content: "Vamos fazer um tour rápido para você conhecer os primeiros passos e começar sua campanha com o pé direito. São apenas algumas etapas para entender o fluxo principal."
     },
     {

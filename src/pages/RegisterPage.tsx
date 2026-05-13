@@ -49,7 +49,7 @@ const RegisterPage = () => {
     <div className="min-h-screen bg-slate-900 flex flex-col justify-center items-center p-4">
       <div className="text-center mb-8">
         <Link to="/">
-          <img src={LOGO_MONO_BASE64} alt="Logo Campanha Pró" className="h-12 w-12 mx-auto" />
+          <img src={LOGO_MONO_BASE64} alt="Logo Campanha Pro" className="h-12 w-12 mx-auto" />
         </Link>
       </div>
       <Card className="w-full max-w-md">

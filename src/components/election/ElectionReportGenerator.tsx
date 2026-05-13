@@ -927,7 +927,7 @@ const ReportFooter: React.FC<{ campaignName: string | undefined }> = ({ campaign
   <div className="pt-12 mt-12 border-t border-slate-200 text-center">
     <p className="text-xs text-slate-400 italic">
       Este relatório é confidencial e de uso exclusivo da coordenação da campanha{' '}
-      {campaignName || 'Campanha'}. As informações são baseadas nos dados inseridos na plataforma Campanha Pró.
+      {campaignName || 'Campanha'}. As informações são baseadas nos dados inseridos na plataforma Campanha Pro.
     </p>
     <div className="mt-8 flex justify-center gap-20">
       <div className="w-48 border-t border-slate-400 pt-2 text-xs text-slate-500">Coordenação de Campanha</div>

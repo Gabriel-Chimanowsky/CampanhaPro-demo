@@ -10,7 +10,7 @@ import SupremeAdminPage from './pages/SupremeAdminPage';
 import LoadingScreen from './components/ui/LoadingScreen';
 
 /**
- * Componente principal autenticado da plataforma Campanha Pró.
+ * Componente principal autenticado da plataforma Campanha Pro.
  * Roteia o usuário para o layout específico baseado no seu tipo (Admin, Candidato, Pesquisador, etc).
  */
 const App: React.FC = () => {

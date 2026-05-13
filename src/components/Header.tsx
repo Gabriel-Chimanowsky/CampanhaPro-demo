@@ -70,7 +70,7 @@ const Header = ({ logoUrl }: HeaderProps) => {
             <div className="container mx-auto px-4 sm:px-6 md:px-8 py-3 flex justify-between items-center">
                 <div className="flex items-center gap-3">
                     <Link to="/">
-                        <img src={logoUrl || LOGO_COLOR_BASE64} alt="Campanha Pró Logo" className="h-10" />
+                        <img src={logoUrl || LOGO_COLOR_BASE64} alt="Campanha Pro Logo" className="h-10" />
                     </Link>
                 </div>
                 <nav className="flex items-center gap-2">

@@ -30,7 +30,7 @@ const ForgotPasswordPage = ({ onNavigateToLogin }: ForgotPasswordPageProps) => {
   return (
     <div className="min-h-screen bg-slate-900 flex flex-col justify-center items-center p-4">
       <div className="text-center mb-8">
-        <img src={LOGO_MONO_BASE64} alt="Logo Campanha Pró" className="h-12 w-12 mx-auto" />
+        <img src={LOGO_MONO_BASE64} alt="Logo Campanha Pro" className="h-12 w-12 mx-auto" />
       </div>
       <Card className="w-full max-w-md">
         <h2 className="text-2xl font-bold text-center text-slate-200 mb-2">Recuperar Senha</h2>

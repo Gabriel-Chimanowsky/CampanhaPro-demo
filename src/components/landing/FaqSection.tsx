@@ -7,7 +7,7 @@ const faqData = [
     },
     {
       question: "Preciso instalar algum programa no meu computador?",
-      answer: "Não. O Campanha Pró é um web app, o que significa que você e sua equipe podem acessá-lo de qualquer navegador moderno (Chrome, Firefox, Safari) em computadores, tablets ou celulares, sem necessidade de instalação.",
+      answer: "Não. O Campanha Pro é um web app, o que significa que você e sua equipe podem acessá-lo de qualquer navegador moderno (Chrome, Firefox, Safari) em computadores, tablets ou celulares, sem necessidade de instalação.",
     },
     {
       question: "O sistema funciona bem no celular?",
@@ -19,7 +19,7 @@ const faqData = [
     },
     {
       question: "O que acontece se eu precisar de mais usuários do que o meu plano oferece?",
-      answer: "Você pode fazer o upgrade do seu plano a qualquer momento, de forma simples e rápida. Sua campanha cresce, e o Campanha Pró cresce com você.",
+      answer: "Você pode fazer o upgrade do seu plano a qualquer momento, de forma simples e rápida. Sua campanha cresce, e o Campanha Pro cresce com você.",
     },
 ];
 

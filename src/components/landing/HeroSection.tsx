@@ -30,7 +30,7 @@ const HeroSection: React.FC = () => {
                 <div className="relative aspect-video rounded-lg overflow-hidden">
                     <iframe
                         src="/comercial/index.html"
-                        title="Vídeo Comercial Campanha Pró"
+                        title="Vídeo Comercial Campanha Pro"
                         loading="lazy"
                         allow="autoplay; fullscreen"
                         className="absolute inset-0 w-full h-full border-0"

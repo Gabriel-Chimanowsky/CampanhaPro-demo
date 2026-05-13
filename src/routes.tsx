@@ -16,7 +16,7 @@ import PublicCollaboratorRegisterPage from './pages/PublicCollaboratorRegisterPa
 import CollaboratorHubPage from './pages/CollaboratorHubPage';
 
 /**
- * Definição centralizada de rotas para a plataforma Campanha Pró.
+ * Definição centralizada de rotas para a plataforma Campanha Pro.
  * Gerencia a navegação profissional e proteção de rotas.
  */
 export const AppRoutes: React.FC = () => {

@@ -5,7 +5,7 @@ const Footer: React.FC = () => {
         <footer className="py-10 px-4 container mx-auto border-t border-slate-700">
             <div className="grid md:grid-cols-3 gap-8 text-sm text-slate-400">
                 <div>
-                    <h3 className="font-bold text-slate-200 mb-2">Campanha Pró</h3>
+                    <h3 className="font-bold text-slate-200 mb-2">Campanha Pro</h3>
                     <p>Rua Bento Gonçalves 279</p>
                     <p>Engenho de Dentro, Rio de Janeiro - RJ</p>
                     <p>Brasil</p>
@@ -22,7 +22,7 @@ const Footer: React.FC = () => {
                 </div>
             </div>
             <div className="text-center text-xs text-slate-500 mt-10">
-                <p>&copy; {new Date().getFullYear()} Campanha Pró. Todos os direitos reservados a ExamePad. | v1.0.3</p>
+                <p>&copy; {new Date().getFullYear()} Campanha Pro. Todos os direitos reservados a ExamePad. | v1.0.3</p>
             </div>
         </footer>
     );

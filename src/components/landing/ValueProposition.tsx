@@ -6,7 +6,7 @@ const ValueProposition: React.FC = () => {
             <div className="container mx-auto text-center">
                 <h2 className="text-3xl font-bold mb-4">Deixe as Planilhas no Passado. Centralize sua Estratégia.</h2>
                 <p className="text-lg text-slate-400 max-w-3xl mx-auto mb-12">
-                    Campanha Pró é a plataforma de inteligência de campo que transforma a desorganização, o "achismo" e a perda de dados em uma máquina de conquistar votos.
+                    Campanha Pro é a plataforma de inteligência de campo que transforma a desorganização, o "achismo" e a perda de dados em uma máquina de conquistar votos.
                 </p>
                 <div className="grid md:grid-cols-3 gap-8 text-left">
                     <div className="bg-slate-900 p-6 rounded-lg transition-transform duration-300 hover:-translate-y-2">

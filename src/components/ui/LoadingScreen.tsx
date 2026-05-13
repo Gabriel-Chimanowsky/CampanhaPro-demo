@@ -10,7 +10,7 @@ const LoadingScreen: React.FC = () => {
     <div className="min-h-screen bg-slate-900 flex flex-col justify-center items-center p-4 text-center">
       <img
         src={LOGO_MONO_BASE64}
-        alt="Logo Campanha Pró"
+        alt="Logo Campanha Pro"
         className="h-16 w-16 mx-auto mb-8 animate-pulse-subtle"
       />
 
