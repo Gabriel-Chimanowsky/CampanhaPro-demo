@@ -1860,21 +1860,64 @@ app.get('/api/war-room/feed', (_req, res) => {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
       `);
 
-      // 5. Criar usuário Admin inicial se não existir
-      const [existingAdmins]: any = await pool.execute('SELECT * FROM users WHERE type = "Admin" LIMIT 1');
-      if (existingAdmins.length === 0) {
-        console.log('[Database] No Admin found. Creating default admin...');
-        const adminId = 'd2087ac0-ed3f-4a7d-bdd9-09e56adb310c';
-        const hashedPass = await bcrypt.hash('CampanhaPro@2024', 10);
-        await pool.execute(
-          `INSERT INTO users (id, email, password, name, type, plan, role, campaign_id, is_supreme_admin) 
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [adminId, 'demo@campanhapro.com.br', hashedPass, 'Administrador Central', 'Admin', 'Total', 'active', '455d21f3-f254-4b96-b49c-e70192c3fe27', 0]
-        );
-      } else {
-        // Garantir que o demo@campanhapro.com.br NÃO seja supreme admin se ele já existir
-        await pool.execute('UPDATE users SET is_supreme_admin = 0 WHERE email = "demo@campanhapro.com.br"');
+      // 5. agent_chat_history
+      await pool.execute(`
+        CREATE TABLE IF NOT EXISTS agent_chat_history (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          campaign_id CHAR(36),
+          agent_id VARCHAR(100),
+          role ENUM('user', 'assistant', 'system', 'agent'),
+          content LONGTEXT,
+          metadata JSON,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+      `);
+
+      // 6. agent_outputs
+      await pool.execute(`
+        CREATE TABLE IF NOT EXISTS agent_outputs (
+          id CHAR(36) PRIMARY KEY,
+          campaign_id CHAR(36),
+          agent_id VARCHAR(100),
+          agent_type VARCHAR(100),
+          output_type VARCHAR(100),
+          content LONGTEXT,
+          metadata JSON,
+          created_by CHAR(36),
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+      `);
+
+      // 7. campaign_configs
+      await pool.execute(`
+        CREATE TABLE IF NOT EXISTS campaign_configs (
+          id CHAR(36) PRIMARY KEY,
+          features JSON,
+          limits JSON,
+          status VARCHAR(50) DEFAULT 'active',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+      `);
+
+      // Se existir o arquivo seed.sql, executa ele
+      const seedPath = path.join(process.cwd(), 'seed.sql');
+      if (fs.existsSync(seedPath)) {
+        console.log('[Database] Seeding data from seed.sql...');
+        const seedSql = fs.readFileSync(seedPath, 'utf8');
+        const statements = seedSql.split(';').filter(s => s.trim() !== '');
+        for (const statement of statements) {
+          try {
+            await pool.execute(statement);
+          } catch (err) {
+            // Ignorar erros de duplicata se usar INSERT IGNORE
+          }
+        }
+        console.log('[Database] Seeding complete.');
       }
+
+      // Garantir que o demo@campanhapro.com.br NÃO seja supreme admin se ele já existir
+      await pool.execute('UPDATE users SET is_supreme_admin = 0 WHERE email = "demo@campanhapro.com.br"');
 
       console.log('[Database] System Tables Ready.');
     } catch (dbErr) {
