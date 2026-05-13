@@ -12,11 +12,9 @@ RUN npm ci
 # Copy source
 COPY . .
 
-# Environment variables for build
-ARG VITE_SUPABASE_URL
-ARG VITE_SUPABASE_ANON_KEY
-ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
-ENV VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
+# Environment variables for build (optional now with local bridge)
+ARG VITE_APP_URL
+ENV VITE_APP_URL=$VITE_APP_URL
 
 # Build frontend
 RUN npm run build
@@ -24,7 +22,7 @@ RUN npm run build
 # Create uploads directory
 RUN mkdir -p uploads
 
-EXPOSE 3005
+EXPOSE 3001
 
-# Use tsx for simplicity in this version, or change to node if using tsc
-CMD ["npm", "run", "server"]
+# Run the unified server (serves frontend + api)
+CMD ["npm", "start"]
