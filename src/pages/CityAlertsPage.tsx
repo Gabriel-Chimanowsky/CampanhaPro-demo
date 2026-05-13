@@ -42,11 +42,22 @@ const icons = {
 };
 
 // Helper component to center map
-const ChangeView = ({ center, zoom }: { center: [number, number], zoom: number }) => {
+const MapController = ({ alerts, selectedAlert }: { alerts: any[], selectedAlert: any }) => {
     const map = useMap();
+
     useEffect(() => {
-        map.setView(center, zoom);
-    }, [center, zoom, map]);
+        if (selectedAlert && selectedAlert.latitude && selectedAlert.longitude) {
+            map.setView([selectedAlert.latitude, selectedAlert.longitude], 16);
+            return;
+        }
+
+        const validAlerts = alerts.filter(a => a.latitude && a.longitude);
+        if (validAlerts.length > 0) {
+            const bounds = L.latLngBounds(validAlerts.map(a => [a.latitude, a.longitude]));
+            map.fitBounds(bounds, { padding: [100, 100], maxZoom: 15 });
+        }
+    }, [alerts, selectedAlert, map]);
+
     return null;
 };
 
@@ -372,7 +383,7 @@ const CityAlertsPage: React.FC = () => {
             {/* Map Area */}
             <div className="flex-1 relative bg-[#0f172a]">
                 <MapContainer center={mapCenter} zoom={zoom} zoomControl={false} style={{ height: '100%', width: '100%' }}>
-                    <ChangeView center={mapCenter} zoom={zoom} />
+                    <MapController alerts={filteredAlerts} selectedAlert={selectedAlert} />
                     <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
                     {filteredAlerts.filter(a => a.latitude && a.longitude).map(alert => (
                         <Marker 

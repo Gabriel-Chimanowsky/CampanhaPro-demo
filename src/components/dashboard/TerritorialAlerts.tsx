@@ -6,7 +6,6 @@ import { useNavigate } from 'react-router-dom';
 
 const TerritorialAlerts: React.FC = () => {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [alerts, setAlerts] = useState<TerritorialGap[]>([]);
   const [loading, setLoading] = useState(true);
 

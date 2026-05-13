@@ -36,6 +36,20 @@ const icons = {
     Negativo: createColoredIcon('#ef4444')  // Red
 };
 
+const MapController = ({ alerts }: { alerts: any[] }) => {
+    const map = useMap();
+
+    useEffect(() => {
+        const validAlerts = alerts.filter(a => a.latitude && a.longitude);
+        if (validAlerts.length > 0) {
+            const bounds = L.latLngBounds(validAlerts.map(a => [a.latitude, a.longitude]));
+            map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
+        }
+    }, [alerts, map]);
+
+    return null;
+};
+
 const CityAlertsMap: React.FC<{ campaignId: string }> = ({ campaignId }) => {
     const navigate = useNavigate();
     const [alerts, setAlerts] = useState<any[]>([]);
@@ -122,11 +136,12 @@ const CityAlertsMap: React.FC<{ campaignId: string }> = ({ campaignId }) => {
 
             <div className="flex-1 relative z-10">
                 <MapContainer 
-                    center={alerts.length > 0 && alerts[0].latitude ? [alerts[0].latitude, alerts[0].longitude] : [-22.9068, -43.1729]} 
+                    center={[-22.9068, -43.1729]} 
                     zoom={13} 
                     style={{ height: '100%', width: '100%' }}
                     scrollWheelZoom={false}
                 >
+                    <MapController alerts={alerts} />
                     <TileLayer
                         url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
                         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
