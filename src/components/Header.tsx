@@ -66,7 +66,7 @@ const Header = ({ logoUrl }: HeaderProps) => {
   const { user } = useAuth();
   
     return (
-        <header className="bg-slate-900/50 backdrop-blur-sm sticky top-0 z-10 no-print">
+        <header className="bg-slate-900/50 backdrop-blur-sm sticky top-0 z-[5000] no-print">
             <div className="container mx-auto px-4 sm:px-6 md:px-8 py-3 flex justify-between items-center">
                 <div className="flex items-center gap-3">
                     <Link to="/">
