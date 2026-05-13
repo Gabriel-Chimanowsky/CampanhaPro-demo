@@ -15,7 +15,6 @@ interface ProgressChartProps {
     allApoiadores: string[];
 }
 
-// Componente de Gráfico de Barras SVG Moderno e Animado
 const AnimatedBarChart = ({ data }: { data: { date: string; visits: number; votes: number }[] }) => {
     const [hoveredIndex, setHoveredIndex] = React.useState<number | null>(null);
     const [tooltipPos, setTooltipPos] = React.useState({ x: 0, y: 0 });
@@ -30,7 +29,7 @@ const AnimatedBarChart = ({ data }: { data: { date: string; visits: number; vote
     
     const yScale = (value: number) => chartHeight - padding.bottom - (value / yMax) * (chartHeight - padding.top - padding.bottom);
     const spacing = (chartWidth - padding.left - padding.right) / data.length;
-    const barWidth = Math.min(spacing * 0.35, 30);
+    const barWidth = Math.max(Math.min(spacing * 0.4, 25), 5);
 
     const handleMouseMove = (e: React.MouseEvent, index: number) => {
         const svg = e.currentTarget.closest('svg');
@@ -50,30 +49,21 @@ const AnimatedBarChart = ({ data }: { data: { date: string; visits: number; vote
                 <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} preserveAspectRatio="xMidYMid meet" className="min-w-[800px] select-none">
                     <defs>
                         <linearGradient id="gradVisits" x1="0%" y1="0%" x2="0%" y2="100%">
-                            <stop offset="0%" stopColor="#4ac7f0" stopOpacity="1" />
-                            <stop offset="100%" stopColor="#2563eb" stopOpacity="0.8" />
+                            <stop offset="0%" stopColor="#4ac7f0" />
+                            <stop offset="100%" stopColor="#2563eb" />
                         </linearGradient>
                         <linearGradient id="gradVotes" x1="0%" y1="0%" x2="0%" y2="100%">
-                            <stop offset="0%" stopColor="#1abc9c" stopOpacity="1" />
-                            <stop offset="100%" stopColor="#0d9488" stopOpacity="0.8" />
+                            <stop offset="0%" stopColor="#1abc9c" />
+                            <stop offset="100%" stopColor="#0d9488" />
                         </linearGradient>
                     </defs>
 
-                    {/* Y Grid Lines */}
                     {[0, 0.25, 0.5, 0.75, 1].map((p, i) => {
                         const val = Math.round(yMax * p);
                         const y = yScale(val);
                         return (
                             <g key={i}>
-                                <line 
-                                    x1={padding.left} 
-                                    x2={chartWidth - padding.right} 
-                                    y1={y} 
-                                    y2={y} 
-                                    stroke="#334155" 
-                                    strokeWidth="0.5" 
-                                    strokeDasharray="4 4" 
-                                />
+                                <line x1={padding.left} x2={chartWidth - padding.right} y1={y} y2={y} stroke="#334155" strokeWidth="0.5" strokeDasharray="4 4" />
                                 <text x={padding.left - 10} y={y + 4} textAnchor="end" className="text-[10px] fill-slate-500 font-bold">{val}</text>
                             </g>
                         );
@@ -86,40 +76,15 @@ const AnimatedBarChart = ({ data }: { data: { date: string; visits: number; vote
                         const base = chartHeight - padding.bottom;
 
                         return (
-                            <g key={i} onMouseMove={(e) => handleMouseMove(e, i)} onMouseLeave={() => setHoveredIndex(null)} className="cursor-pointer">
-                                {/* Invisible hit area */}
-                                <rect x={x - spacing / 2} y={padding.top} width={spacing} height={chartHeight - padding.top - padding.bottom} fill="transparent" />
-                                
-                                {/* Visit Bar */}
-                                <rect 
-                                    x={x - barWidth - 2} 
-                                    y={visitY} 
-                                    width={barWidth} 
-                                    height={Math.max(base - visitY, 2)} 
-                                    fill="url(#gradVisits)" 
-                                    rx="4"
-                                    className="transition-all duration-300"
-                                    style={{ filter: hoveredIndex === i ? 'brightness(1.2)' : 'none' }}
-                                />
-
-                                {/* Vote Bar */}
-                                <rect 
-                                    x={x + 2} 
-                                    y={voteY} 
-                                    width={barWidth} 
-                                    height={Math.max(base - voteY, 2)} 
-                                    fill="url(#gradVotes)" 
-                                    rx="4"
-                                    className="transition-all duration-300"
-                                    style={{ filter: hoveredIndex === i ? 'brightness(1.2)' : 'none' }}
-                                />
-
-                                {/* X Labels */}
+                            <g key={i} onMouseMove={(e) => handleMouseMove(e, i)} onMouseLeave={() => setHoveredIndex(null)}>
+                                <rect x={x - spacing / 2} y={padding.top} width={spacing} height={chartHeight - padding.top - padding.bottom} fill="transparent" className="cursor-pointer" />
+                                <rect x={x - barWidth - 1} y={visitY} width={barWidth} height={Math.max(base - visitY, 2)} fill="url(#gradVisits)" rx="2" className="transition-all duration-300" style={{ filter: hoveredIndex === i ? 'brightness(1.2)' : 'none' }} />
+                                <rect x={x + 1} y={voteY} width={barWidth} height={Math.max(base - voteY, 2)} fill="url(#gradVotes)" rx="2" className="transition-all duration-300" style={{ filter: hoveredIndex === i ? 'brightness(1.2)' : 'none' }} />
                                 {i % (Math.ceil(data.length / 10)) === 0 && (
-                                    <text x={x} y={chartHeight - 5} textAnchor="middle" className="text-[10px] fill-slate-500 font-bold">
+                                    <text x={x} y={chartHeight - 5} textAnchor="middle" className="text-[9px] fill-slate-500 font-bold">
                                         {(() => {
-                                            const parts = d.date.split('-');
-                                            return `${parts[2]}/${parts[1]}`;
+                                            const p = d.date.split('-');
+                                            return `${p[2]}/${p[1]}`;
                                         })()}
                                     </text>
                                 )}
@@ -128,7 +93,6 @@ const AnimatedBarChart = ({ data }: { data: { date: string; visits: number; vote
                     })}
                 </svg>
 
-                {/* Tooltip */}
                 {hoveredIndex !== null && data[hoveredIndex] && (
                     <div 
                         className="absolute z-50 pointer-events-none bg-slate-900/95 border border-slate-700 p-2 rounded-lg shadow-2xl backdrop-blur-sm min-w-[120px]"
@@ -139,22 +103,16 @@ const AnimatedBarChart = ({ data }: { data: { date: string; visits: number; vote
                     >
                         <p className="text-[9px] font-black text-slate-500 uppercase mb-1">
                             {(() => {
-                                const parts = data[hoveredIndex].date.split('-');
-                                return `${parts[2]}/${parts[1]}/${parts[0]}`;
+                                const p = data[hoveredIndex].date.split('-');
+                                return `${p[2]}/${p[1]}/${p[0]}`;
                             })()}
                         </p>
                         <div className="flex justify-between items-center gap-2 mb-1">
-                            <div className="flex items-center gap-1.5">
-                                <div className="w-1.5 h-1.5 rounded-full bg-[#4ac7f0]" />
-                                <span className="text-[10px] text-slate-300 font-bold">Visitas</span>
-                            </div>
+                            <div className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-[#4ac7f0]" /><span className="text-[10px] text-slate-300 font-bold">Visitas</span></div>
                             <span className="text-[10px] text-white font-black">{data[hoveredIndex].visits}</span>
                         </div>
                         <div className="flex justify-between items-center gap-2">
-                            <div className="flex items-center gap-1.5">
-                                <div className="w-1.5 h-1.5 rounded-full bg-[#1abc9c]" />
-                                <span className="text-[10px] text-slate-300 font-bold">Votos</span>
-                            </div>
+                            <div className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-[#1abc9c]" /><span className="text-[10px] text-slate-300 font-bold">Votos</span></div>
                             <span className="text-[10px] text-white font-black">{data[hoveredIndex].votes}</span>
                         </div>
                     </div>
@@ -165,20 +123,12 @@ const AnimatedBarChart = ({ data }: { data: { date: string; visits: number; vote
 };
 
 const ProgressChart: React.FC<ProgressChartProps> = ({ 
-    filteredVisits, 
-    municipioFilter, 
-    setMunicipioFilter, 
-    allMunicipios,
-    bairroFilter,
-    setBairroFilter,
-    allBairros,
-    apoiadorFilter,
-    setApoiadorFilter,
-    allApoiadores
+    filteredVisits, municipioFilter, setMunicipioFilter, allMunicipios,
+    bairroFilter, setBairroFilter, allBairros,
+    apoiadorFilter, setApoiadorFilter, allApoiadores
 }) => {
     const data = React.useMemo(() => {
         const aggregated: Record<string, { date: string, visits: number, votes: number }> = {};
-        
         filteredVisits.forEach(v => {
             const dateStr = v.data; 
             if (!dateStr) return;
@@ -186,36 +136,32 @@ const ProgressChart: React.FC<ProgressChartProps> = ({
             if (!aggregated[date]) aggregated[date] = { date, visits: 0, votes: 0 };
             if (v.realizada === 'sim') {
                 aggregated[date].visits++;
-                aggregated[date].votes += v.votos;
+                aggregated[date].votes += (v.votos || 0);
             }
         });
-
         return Object.values(aggregated).sort((a, b) => a.date.localeCompare(b.date));
     }, [filteredVisits]);
 
     return (
-        <Card className="p-3 sm:p-4 print-break-inside-avoid shadow-xl">
+        <Card className="p-3 sm:p-4 shadow-xl border-slate-700/50">
             <h3 className="font-bold text-base text-slate-300 mb-2">Progresso (Visitas e Votos / Dia)</h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-2 no-print">
-                <select value={municipioFilter} onChange={e => { setMunicipioFilter(e.target.value); setBairroFilter(''); }} className="w-full bg-slate-700/50 text-xs border border-slate-600 rounded-md py-1 px-2 focus:ring-1 focus:ring-blue-500 transition-all">
+                <select value={municipioFilter} onChange={e => { setMunicipioFilter(e.target.value); setBairroFilter(''); }} className="bg-slate-800/50 text-xs border border-slate-700 rounded-md py-1 px-2">
                     <option value="">Todos os Municípios</option>
                     {allMunicipios.map(m => <option key={m} value={m}>{m}</option>)}
                 </select>
-                <select value={bairroFilter} onChange={e => setBairroFilter(e.target.value)} className="w-full bg-slate-700/50 text-xs border border-slate-600 rounded-md py-1 px-2 focus:ring-1 focus:ring-blue-500 transition-all">
+                <select value={bairroFilter} onChange={e => setBairroFilter(e.target.value)} className="bg-slate-800/50 text-xs border border-slate-700 rounded-md py-1 px-2">
                     <option value="">Todos os Bairros</option>
                     {allBairros.map(b => <option key={b} value={b}>{b}</option>)}
                 </select>
-                <select value={apoiadorFilter} onChange={e => setApoiadorFilter(e.target.value)} className="w-full bg-slate-700/50 text-xs border border-slate-600 rounded-md py-1 px-2 focus:ring-1 focus:ring-blue-500 transition-all">
+                <select value={apoiadorFilter} onChange={e => setApoiadorFilter(e.target.value)} className="bg-slate-800/50 text-xs border border-slate-700 rounded-md py-1 px-2">
                     <option value="">Todos os Apoiadores</option>
                     {allApoiadores.map(a => <option key={a} value={a}>{a}</option>)}
                 </select>
             </div>
-            
-            {data.length > 0 ? (
-                <AnimatedBarChart data={data} />
-            ) : (
-                <div className="h-40 flex items-center justify-center text-slate-500 text-sm border border-dashed border-slate-700 rounded-xl bg-slate-800/20">
-                    <p className="italic">Sem dados de desempenho para exibir no período.</p>
+            {data.length > 0 ? <AnimatedBarChart data={data} /> : (
+                <div className="h-32 flex items-center justify-center text-slate-500 text-sm border border-dashed border-slate-800 rounded-xl bg-slate-900/20">
+                    <p className="italic">Sem dados para exibir.</p>
                 </div>
             )}
         </Card>

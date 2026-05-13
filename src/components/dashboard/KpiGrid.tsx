@@ -27,8 +27,8 @@ const KpiCard = ({ title, value, description, valueClassName = '', isLoading = f
       {isLoading ? (
           <div className="h-10 bg-slate-600/50 rounded w-1/2 animate-pulse"></div>
       ) : (
-          <div className="flex flex-col">
-            <p className={`text-3xl font-black leading-tight ${valueClassName}`}>{value}</p>
+          <div className={`text-3xl font-black leading-tight ${valueClassName}`}>
+            {value}
           </div>
       )}
     </div>
