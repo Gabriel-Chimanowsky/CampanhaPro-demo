@@ -598,12 +598,24 @@ async function startServer() {
 
       const [rows]: any = await pool.execute(query, params as any);
       
-      // Convert result keys to camelCase for frontend compatibility
+      // Convert result keys to camelCase and sanitize URLs
       const camelRows = rows.map((row: any) => {
         const newRow: any = {};
         for (const key of Object.keys(row)) {
           const camelKey = key.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
-          newRow[camelKey] = row[key];
+          let value = row[key];
+          
+          // Sanitize URLs to be relative if they contain the APP_URL or localhost
+          if (typeof value === 'string' && (camelKey === 'mediaUrls' || camelKey === 'videoUrl' || camelKey === 'fotoUrl')) {
+            const appUrl = process.env.APP_URL || '';
+            if (appUrl && value.includes(appUrl)) {
+              value = value.replace(appUrl, '');
+            } else if (value.includes('http://localhost:3001')) {
+              value = value.replace('http://localhost:3001', '');
+            }
+          }
+          
+          newRow[camelKey] = value;
         }
         return newRow;
       });
