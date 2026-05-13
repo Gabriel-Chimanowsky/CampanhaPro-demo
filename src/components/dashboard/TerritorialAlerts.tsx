@@ -41,8 +41,7 @@ const TerritorialAlerts: React.FC = () => {
         {alerts.slice(0, 4).map((alert) => (
           <div 
             key={alert.neighborhood} 
-            onClick={() => navigate('/app/alertas-urbano')}
-            className="bg-black/20 border border-slate-700/50 rounded-2xl p-3 hover:border-orange-500/30 transition-all group cursor-pointer"
+            className="bg-black/20 border border-slate-700/50 rounded-2xl p-3 hover:border-orange-500/30 transition-all group"
           >
             <div className="flex justify-between items-start mb-2">
               <div className="flex items-center gap-2">
@@ -76,12 +75,9 @@ const TerritorialAlerts: React.FC = () => {
       </div>
 
       {alerts.length > 4 && (
-        <button 
-          onClick={() => navigate('/app/alertas-urbano')}
-          className="w-full text-center py-2 text-[10px] text-slate-500 hover:text-slate-50 transition-colors"
-        >
-          Ver todos os {alerts.length} bairros críticos →
-        </button>
+        <div className="w-full text-center py-2 text-[10px] text-slate-500">
+          Análise baseada em {alerts.length} bairros críticos
+        </div>
       )}
     </div>
   );
