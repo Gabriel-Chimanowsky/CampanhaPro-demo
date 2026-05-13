@@ -1,9 +1,9 @@
 /**
  * Webhook Service - Processa webhooks do Instagram
- * Valida, normaliza, e persiste engagements
+ * Valida, normaliza, e persiste engagements usando MySQL
  */
 
-
+import pool from '../lib/mysql';
 import {
   normalizeInstagramHandle,
   parseInstagramWebhook,
@@ -15,6 +15,7 @@ import type {
   InstagramEngagement,
   InstagramWebhookLog,
 } from '../types/instagram';
+import crypto from 'crypto';
 
 interface WebhookProcessResult {
   success: boolean;
@@ -25,7 +26,7 @@ interface WebhookProcessResult {
 }
 
 /**
- * Processa webhook do Instagram e salva no banco
+ * Processa webhook do Instagram e salva no banco MySQL
  * Valida assinatura, extrai engagements, faz match com leads
  */
 export const processInstagramWebhook = async (
@@ -33,7 +34,7 @@ export const processInstagramWebhook = async (
   signature: string | null,
   webhookSecret: string,
   campaignId: string,
-  supabase: any
+  _supabase: any // Mantido para compatibilidade de assinatura, mas não usado
 ): Promise<WebhookProcessResult> => {
   const result: WebhookProcessResult = {
     success: false,
@@ -64,54 +65,51 @@ export const processInstagramWebhook = async (
       return result;
     }
 
-    // 3. Para cada engagement, fazer match com database
+    // 3. Para cada engagement, fazer match com database MySQL
     for (const engagement of engagements) {
       engagement.campaignId = campaignId;
 
-      // Buscar match de handle no banco
-      const matchedLeadId = await findMatchedLead(
-        supabase,
-        campaignId,
-        engagement.instagramHandle
-      );
+      // Buscar match de handle no banco MySQL
+      const matchedLeadId = await findMatchedLead(campaignId, engagement.instagramHandle);
 
       if (matchedLeadId) {
         engagement.matchedLeadId = matchedLeadId;
         result.matchedCount++;
       }
 
-      // Salvar no banco
-      const { error } = await supabase
-        .from('instagram_engagements')
-        .insert([
-          {
+      // Salvar no banco MySQL
+      try {
+        await pool.execute(
+          `INSERT INTO instagram_engagements 
+           (id, campaign_id, instagram_handle, instagram_user_id, engagement_type, instagram_post_id, instagram_comment_id, comment_text, matched_lead_id, match_confidence, webhook_received_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            crypto.randomUUID(),
             campaignId,
-            instagramHandle: engagement.instagramHandle,
-            instagramUserId: engagement.instagramUserId,
-            engagementType: engagement.engagementType,
-            instagramPostId: engagement.instagramPostId,
-            instagramCommentId: engagement.instagramCommentId,
-            commentText: engagement.commentText,
+            engagement.instagramHandle,
+            engagement.instagramUserId,
+            engagement.engagementType,
+            engagement.instagramPostId,
+            engagement.instagramCommentId,
+            engagement.commentText,
             matchedLeadId,
-            matchConfidence: matchedLeadId ? 1.0 : 0,
-            webhookReceivedAt: new Date(),
-          },
-        ]);
-
-      if (!error) {
+            matchedLeadId ? 1.0 : 0,
+            new Date()
+          ]
+        );
         result.processedCount++;
         result.engagements.push(engagement);
-      } else {
-        console.error('[Webhook] Error inserting engagement:', error, engagement);
+      } catch (dbErr: any) {
+        console.error('[Webhook] Error inserting engagement to MySQL:', dbErr.message);
       }
     }
 
-    // 4. Log do webhook
-    await logWebhookProcessing(supabase, {
+    // 4. Log do webhook no MySQL
+    await logWebhookProcessing({
       campaignId,
       webhookId: `webhook_${Date.now()}`,
       event: payload.entry?.[0]?.changes?.[0]?.field || 'unknown',
-      rawPayload: payload,
+      rawPayload: JSON.stringify(payload),
       status: 'processed',
       processedEngagements: result.processedCount,
       matchedLeads: result.matchedCount,
@@ -123,12 +121,12 @@ export const processInstagramWebhook = async (
     result.errorMessage = error.message;
     console.error('[Webhook] Error processing webhook:', error);
 
-    // Log do erro
-    await logWebhookProcessing(supabase, {
+    // Log do erro no MySQL
+    await logWebhookProcessing({
       campaignId,
       webhookId: `webhook_${Date.now()}`,
       event: 'error',
-      rawPayload: payload,
+      rawPayload: JSON.stringify(payload),
       status: 'failed',
       errorMessage: error.message,
     });
@@ -138,46 +136,51 @@ export const processInstagramWebhook = async (
 };
 
 /**
- * Busca lead que tem o instagram_handle correspondente
+ * Busca lead que tem o instagram_handle correspondente no MySQL
  */
 async function findMatchedLead(
-  supabase: any,
   campaignId: string,
   instagramHandle: string
 ): Promise<string | null> {
   try {
     const normalized = normalizeInstagramHandle(instagramHandle);
+    const [rows]: any = await pool.query(
+      'SELECT id FROM contacts WHERE campaign_id = ? AND instagram_handle = ? LIMIT 1',
+      [campaignId, normalized]
+    );
 
-    const { data, error } = await supabase
-      .from('contacts')
-      .select('id')
-      .eq('campaign_id', campaignId)
-      .eq('instagram_handle', normalized)
-      .limit(1)
-      .single();
-
-    if (error || !data) {
-      return null;
-    }
-
-    return data.id;
+    if (!rows || rows.length === 0) return null;
+    return rows[0].id;
   } catch (error) {
-    console.error('[Webhook] Error finding matched lead:', error);
+    console.error('[Webhook] Error finding matched lead in MySQL:', error);
     return null;
   }
 }
 
 /**
- * Registra processamento de webhook no banco
+ * Registra processamento de webhook no banco MySQL
  */
 async function logWebhookProcessing(
-  supabase: any,
-  log: Partial<InstagramWebhookLog>
+  log: Partial<InstagramWebhookLog> & { campaignId: string, webhookId: string }
 ): Promise<void> {
   try {
-    await supabase.from('instagram_webhook_logs').insert([log]);
+    await pool.execute(
+      `INSERT INTO instagram_webhook_logs 
+       (id, campaign_id, event, raw_payload, status, processed_engagements, matched_leads, error_message)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        crypto.randomUUID(),
+        log.campaignId,
+        log.event,
+        log.rawPayload,
+        log.status,
+        log.processedEngagements || 0,
+        log.matchedLeads || 0,
+        log.errorMessage || null
+      ]
+    );
   } catch (error) {
-    console.error('[Webhook] Error logging webhook:', error);
+    console.error('[Webhook] Error logging webhook to MySQL:', error);
   }
 }
 
@@ -220,13 +223,15 @@ export const calculateEngagementStats = (engagements: InstagramEngagement[]) => 
       like: 0,
       reply: 0,
       share: 0,
-    },
+    } as Record<string, number>,
     matchedEngagements: 0,
     topHandles: new Map<string, number>(),
   };
 
   for (const engagement of engagements) {
-    stats.byType[engagement.engagementType]++;
+    if (stats.byType[engagement.engagementType] !== undefined) {
+      stats.byType[engagement.engagementType]++;
+    }
 
     if (engagement.matchedLeadId) {
       stats.matchedEngagements++;

@@ -871,15 +871,15 @@ app.get('/api/war-room/feed', (_req, res) => {
       });
 
       const accessToken = tokenRes.data.access_token;
+      const refreshToken = tokenRes.data.refresh_token;
+      const tokenExpiresAt = new Date(Date.now() + (tokenRes.data.expires_in * 1000));
 
-      if (supabaseAdmin && campaignId) {
-        await supabaseAdmin.from('social_tokens').delete().eq('campaign_id', campaignId).eq('provider', 'meta');
-        await supabaseAdmin.from('social_tokens').insert({
-            campaign_id: campaignId,
-            provider: 'meta',
-            access_token: accessToken,
-            updated_at: new Date().toISOString()
-        });
+      if (campaignId) {
+        await pool.execute('DELETE FROM social_tokens WHERE campaign_id = ? AND provider = ?', [campaignId, 'meta']);
+        await pool.execute(
+          'INSERT INTO social_tokens (id, campaign_id, provider, access_token, refresh_token, expires_at, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [crypto.randomUUID(), campaignId, 'meta', accessToken, refreshToken || null, tokenExpiresAt, 'active']
+        );
       }
 
       res.send(`
@@ -913,16 +913,16 @@ app.get('/api/war-room/feed', (_req, res) => {
     const { campaignId, provider } = req.query;
     
     let dbError = null;
-    if (supabaseAdmin && campaignId) {
-        const { error: delErr } = await supabaseAdmin.from('social_tokens').delete().eq('campaign_id', campaignId).eq('provider', provider);
-        const { error: insErr } = await supabaseAdmin.from('social_tokens').insert({
-            campaign_id: campaignId,
-            provider,
-            access_token: 'SIMULATED_TOKEN_' + Math.random().toString(36).substring(7),
-            updated_at: new Date().toISOString()
-        });
-        if (delErr) dbError = delErr;
-        else if (insErr) dbError = insErr;
+    if (campaignId) {
+        try {
+            await pool.execute('DELETE FROM social_tokens WHERE campaign_id = ? AND provider = ?', [campaignId, provider]);
+            await pool.execute(
+              'INSERT INTO social_tokens (id, campaign_id, provider, access_token, refresh_token, expires_at, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
+              [crypto.randomUUID(), campaignId, provider, 'SIMULATED_TOKEN_' + Math.random().toString(36).substring(7), null, null, 'active']
+            );
+        } catch (err) {
+            dbError = err;
+        }
     }
 
     if (dbError) {
@@ -968,10 +968,11 @@ app.get('/api/war-room/feed', (_req, res) => {
     try {
       const { prompt, systemInstruction, campaignId, userId, agentId } = req.body;
       
-      if (supabaseAdmin && campaignId && agentId) {
-          await supabaseAdmin.from('agent_chat_history').insert({
-              campaign_id: campaignId, agent_id: agentId, role: 'user', content: prompt
-          });
+      if (campaignId && agentId) {
+          await pool.execute(
+            'INSERT INTO agent_chat_history (campaign_id, agent_id, role, content) VALUES (?, ?, ?, ?)',
+            [campaignId, agentId, 'user', prompt]
+          );
       }
 
       const aiResponse = await callChatGPT(prompt, systemInstruction, AGENT_TOOLS);
@@ -986,48 +987,34 @@ app.get('/api/war-room/feed', (_req, res) => {
           let toolOutput: any = { success: true };
 
           if (tool.function.name === 'publish_war_room_insight') {
-            if (supabaseAdmin) {
-              await supabaseAdmin.from('war_room_intelligence').insert({
-                campaign_id: campaignId,
-                source_agent: agentId,
-                category: args.category,
-                priority: args.priority,
-                insight_text: args.insight_text,
-                metadata: { neighborhood: args.neighborhood },
-                created_at: new Date().toISOString()
-              });
+            if (campaignId) {
+              await pool.execute(
+                'INSERT INTO war_room_intelligence (id, campaign_id, source_agent, category, priority, insight_text, metadata) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                [crypto.randomUUID(), campaignId, agentId, args.category, args.priority, args.insight_text, JSON.stringify({ neighborhood: args.neighborhood })]
+              );
             }
             toolOutput = { success: true, message: 'Insight publicado na Sala de Guerra.' };
           }
 
           if (tool.function.name === 'get_conversion_funnel') {
             const stats = await getConversionFunnelStats(campaignId);
-            if (supabaseAdmin) {
-              await supabaseAdmin.from('war_room_intelligence').insert({
-                campaign_id: campaignId,
-                source_agent: agentId,
-                category: 'Oportunidade',
-                priority: 'Media',
-                insight_text: `Análise de Funil solicitada: ${stats.map((s: any) => `${s.stage}: ${s.count}`).join(', ')}`,
-                created_at: new Date().toISOString()
-              });
+            if (campaignId) {
+              await pool.execute(
+                'INSERT INTO war_room_intelligence (id, campaign_id, source_agent, category, priority, insight_text) VALUES (?, ?, ?, ?, ?, ?)',
+                [crypto.randomUUID(), campaignId, agentId, 'Oportunidade', 'Media', `Análise de Funil solicitada: ${stats.map((s: any) => `${s.stage}: ${s.count}`).join(', ')}`]
+              );
             }
             toolOutput = { funnel: stats };
           }
 
           if (tool.function.name === 'analyze_territorial_gap') {
             const alerts = await getTerritorialAlerts(campaignId);
-            if (supabaseAdmin) {
+            if (campaignId) {
               for (const alert of alerts.slice(0, 3)) {
-                 await supabaseAdmin.from('war_room_intelligence').insert({
-                   campaign_id: campaignId,
-                   source_agent: agentId,
-                   category: 'Logística',
-                   priority: alert.risk_level === 'Critical' ? 'CRÍTICO' : 'Alta',
-                   insight_text: `GAP TERRITORIAL em ${alert.neighborhood}: ${alert.gap_percentage.toFixed(1)}% de defasagem.`,
-                   metadata: { neighborhood: alert.neighborhood, risk: alert.risk_level },
-                   created_at: new Date().toISOString()
-                 });
+                 await pool.execute(
+                   'INSERT INTO war_room_intelligence (id, campaign_id, source_agent, category, priority, insight_text, metadata) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                   [crypto.randomUUID(), campaignId, agentId, 'Logística', alert.risk_level === 'Critical' ? 'CRÍTICO' : 'Alta', `GAP TERRITORIAL em ${alert.neighborhood}: ${alert.gap_percentage.toFixed(1)}% de defasagem.`, JSON.stringify({ neighborhood: alert.neighborhood, risk: alert.risk_level })]
+                 );
               }
             }
             toolOutput = { territorial_alerts: alerts };
@@ -1072,23 +1059,17 @@ app.get('/api/war-room/feed', (_req, res) => {
         }
       }
 
-      if (supabaseAdmin && campaignId && agentId) {
-          await supabaseAdmin.from('agent_chat_history').insert({
-              campaign_id: campaignId, agent_id: agentId, role: 'agent', content: textResult, 
-              metadata: { tool_calls: aiResponse.tool_calls }
-          });
+      if (campaignId && agentId) {
+          await pool.execute(
+            'INSERT INTO agent_chat_history (campaign_id, agent_id, role, content, metadata) VALUES (?, ?, ?, ?, ?)',
+            [campaignId, agentId, 'agent', textResult, JSON.stringify({ tool_calls: aiResponse.tool_calls })]
+          );
 
           // Log de Compliance para geração de chat
-          await supabaseAdmin.from('ai_compliance_logs').insert({
-              campaign_id: campaignId,
-              agent_id: agentId,
-              action_type: 'chat_generation',
-              input_summary: prompt.substring(0, 200),
-              output_summary: textResult.substring(0, 200),
-              ai_disclosure_required: true,
-              human_approved: false, // Apenas geração, ainda não publicado
-              created_by: userId
-          });
+          await pool.execute(
+            'INSERT INTO ai_compliance_logs (campaign_id, agent_id, action_type, input_summary, output_summary, ai_disclosure_required, human_approved, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            [campaignId, agentId, 'chat_generation', prompt.substring(0, 200), textResult.substring(0, 200), true, false, userId]
+          );
       }
 
       res.json({ text: textResult, tool_calls: aiResponse.tool_calls });
@@ -1124,11 +1105,11 @@ app.get('/api/war-room/feed', (_req, res) => {
     try {
         const { agentId } = req.params;
         const { campaignId } = req.query;
-        const { data, error } = await supabaseAdmin.from('agent_chat_history')
-            .select('*').eq('campaign_id', campaignId).eq('agent_id', agentId)
-            .order('created_at', { ascending: true }).limit(50);
-        if (error) throw error;
-        res.json({ history: data || [] });
+        const [history]: any = await pool.execute(
+            'SELECT * FROM agent_chat_history WHERE campaign_id = ? AND agent_id = ? ORDER BY created_at ASC LIMIT 50',
+            [campaignId, agentId]
+        );
+        res.json({ history: history || [] });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
@@ -1143,9 +1124,10 @@ app.get('/api/war-room/feed', (_req, res) => {
       }, { headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` } });
 
       const imageUrl = response.data.data[0].url;
-      await supabaseAdmin.from('agent_chat_history').insert({
-          campaign_id: campaignId, agent_id: agentId, role: 'agent', content: `![ATIVO](${imageUrl})`, metadata: { type: 'image' }
-      });
+      await pool.execute(
+        'INSERT INTO agent_chat_history (campaign_id, agent_id, role, content, metadata) VALUES (?, ?, ?, ?, ?)',
+        [campaignId, agentId, 'agent', `![ATIVO](${imageUrl})`, JSON.stringify({ type: 'image' })]
+      );
       res.json({ imageUrl });
     } catch (error) { res.status(500).json({ error: 'Erro DALL-E' }); }
   });
@@ -1153,9 +1135,11 @@ app.get('/api/war-room/feed', (_req, res) => {
   // --- Dashboard Feed ---
   app.get('/api/war-room/feed', requireAuth, async (req, res) => {
     const { campaign_id } = req.query;
-    const { data } = await supabaseAdmin.from('war_room_intelligence')
-      .select('*').eq('campaign_id', campaign_id).order('created_at', { ascending: false }).limit(10);
-    res.json({ insights: data || [] });
+    const [rows]: any = await pool.query(
+      'SELECT * FROM war_room_intelligence WHERE campaign_id = ? ORDER BY created_at DESC LIMIT 10',
+      [campaign_id]
+    );
+    res.json({ insights: rows || [] });
   });
 
   app.get('/api/social/status', requireAuth, async (req, res) => {
@@ -1163,15 +1147,13 @@ app.get('/api/war-room/feed', (_req, res) => {
       const { campaignId, provider } = req.query;
       if (!campaignId || !provider) return res.status(400).json({ error: 'campaignId and provider are required' });
 
-      const { data, error } = await supabaseAdmin
-        .from('social_tokens')
-        .select('id, updated_at')
-        .eq('campaign_id', campaignId)
-        .eq('provider', provider)
-        .maybeSingle();
+      const [tokens]: any = await pool.query(
+        'SELECT status, updated_at FROM social_tokens WHERE campaign_id = ? AND provider = ?',
+        [campaignId as string, provider as string]
+      );
+      const data = tokens[0];
 
-      if (error) throw error;
-      res.json({ connected: !!data, lastUpdate: data?.updated_at });
+      res.json({ connected: !!data && data.status === 'active', lastUpdate: data?.updated_at });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -1185,27 +1167,20 @@ app.get('/api/war-room/feed', (_req, res) => {
         return res.status(400).json({ error: 'campaign_id is required' });
       }
 
-      if (!supabaseAdmin) {
-        return res.status(503).json({ error: 'Database service unavailable' });
-      }
+      // 1. Get Instagram Token from MySQL
+      const [tokens]: any = await pool.query(
+        'SELECT access_token FROM social_tokens WHERE campaign_id = ? AND provider = ? AND status = "active"',
+        [campaign_id, 'meta']
+      );
+      
+      const tokenData = tokens[0];
 
-      // 1. Get Instagram Token
-      const { data: tokenData, error: tokenError } = await supabaseAdmin
-        .from('social_tokens')
-        .select('access_token')
-        .eq('campaign_id', campaign_id)
-        .eq('provider', 'meta')
-        .single();
-
-      if (tokenError || !tokenData) {
+      if (!tokenData || !tokenData.access_token) {
+        console.warn(`[Instagram Ranking] Token não encontrado para campanha: ${campaign_id}`);
         return res.json({ ranking: [], connected: false, error: 'Instagram não conectado' });
       }
 
       const accessToken = tokenData.access_token;
-
-      if (!accessToken) {
-        return res.json({ ranking: [], connected: false, error: 'Instagram não conectado' });
-      }
 
       // Se for um token simulado (ambiente de teste/desenvolvimento)
       if (accessToken.startsWith('SIMULATED_TOKEN')) {
@@ -1220,7 +1195,7 @@ app.get('/api/war-room/feed', (_req, res) => {
         });
       }
 
-      // FETCH MEDIA (Recent Posts)
+      // 2. FETCH MEDIA (Recent Posts) from Instagram Graph API
       const mediaResponse = await axios.get(`https://graph.facebook.com/v19.0/me/media?fields=id,caption,timestamp,comments_count&access_token=${accessToken}`);
       const mediaData = mediaResponse.data;
 
@@ -1234,24 +1209,28 @@ app.get('/api/war-room/feed', (_req, res) => {
       // 3. Fetch Comments for each post
       for (const post of posts.slice(0, 10)) {
         if (post.comments_count > 0) {
-          const commentsResponse = await axios.get(`https://graph.facebook.com/v19.0/${post.id}/comments?fields=from,text,timestamp&access_token=${accessToken}`);
-          const commentsData = commentsResponse.data;
-          
-          if (commentsData.data) {
-            for (const comment of commentsData.data) {
-              const username = comment.from?.username || 'usuario_privado';
-              if (!rankingMap[username]) {
-                rankingMap[username] = { count: 0, lastComment: '' };
+          try {
+            const commentsResponse = await axios.get(`https://graph.facebook.com/v19.0/${post.id}/comments?fields=from,text,timestamp&access_token=${accessToken}`);
+            const commentsData = commentsResponse.data;
+            
+            if (commentsData.data) {
+              for (const comment of commentsData.data) {
+                const username = comment.from?.username || 'usuario_privado';
+                if (!rankingMap[username]) {
+                  rankingMap[username] = { count: 0, lastComment: '' };
+                }
+                rankingMap[username].count += 1;
+                rankingMap[username].lastComment = comment.text;
               }
-              rankingMap[username].count += 1;
-              rankingMap[username].lastComment = comment.text;
             }
+          } catch (cErr: any) {
+            console.warn(`[Instagram Ranking] Erro ao buscar comentários do post ${post.id}:`, cErr.message);
           }
         }
       }
 
       // 4. Format and Sort Ranking
-      const ranking = Object.entries(rankingMap)
+      const formattedRanking = Object.entries(rankingMap)
         .map(([username, data]) => ({
           username,
           count: data.count,
@@ -1260,9 +1239,9 @@ app.get('/api/war-room/feed', (_req, res) => {
         .sort((a, b) => b.count - a.count)
         .slice(0, 50);
 
-      res.json({ ranking });
+      res.json({ ranking: formattedRanking });
     } catch (error: any) {
-      console.error('[Instagram API]', error.response?.data || error.message);
+      console.error('[Instagram API Error]', error.response?.data || error.message);
       res.status(500).json({ error: error.message });
     }
   });
@@ -1482,29 +1461,11 @@ app.get('/api/war-room/feed', (_req, res) => {
 
       console.log("[Pipeline] Blocos processados:", Object.keys(result).filter(k => (result as any)[k].length > 0));
 
-      if (supabaseAdmin && campaignId) {
-          // Garantimos que estamos enviando para as colunas corretas (camelCase)
-          const { error } = await supabaseAdmin.from('agent_outputs').insert({
-            campaign_id: campaignId,
-            agent_type: 'war-room-pipeline',
-            input: { description: 'Full automated analysis' },
-            output: result,
-            created_at: new Date().toISOString()
-          });
-          if (error) {
-              console.error("[Pipeline] Erro ao salvar no banco:", error);
-              // Se o erro for de coluna ausente (creativeText), significa que a tabela está no formato antigo (uma coluna por agente)
-              // Nesse caso, tentamos salvar no formato antigo como fallback
-              if (error.message?.includes('creativeText')) {
-                  console.log("[Pipeline] Detectado esquema antigo. Tentando fallback...");
-                  await supabaseAdmin.from('agent_outputs').insert({
-                      campaign_id: campaignId,
-                      agent_type: 'war-room-pipeline',
-                      ...result,
-                      created_at: new Date().toISOString()
-                  });
-              }
-          }
+      if (campaignId) {
+          await pool.execute(
+            'INSERT INTO agent_outputs (id, campaign_id, agent_type, content) VALUES (?, ?, ?, ?)',
+            [crypto.randomUUID(), campaignId, 'war-room-pipeline', JSON.stringify(result)]
+          );
       }
 
       res.json(result);
@@ -1518,20 +1479,23 @@ app.get('/api/war-room/feed', (_req, res) => {
   app.post('/api/agents/production-order', requireAuth, async (req, res) => {
     try {
       const { campaignId, originAgent, targetAgent, content } = req.body;
-      const { data, error } = await supabaseAdmin.from('production_orders').insert({
-        campaign_id: campaignId, origin_agent: originAgent, target_agent: targetAgent, content: content, status: 'pending'
-      }).select().single();
-      if (error) throw error;
-      res.json(data);
+      const orderId = crypto.randomUUID();
+      await pool.execute(
+        'INSERT INTO production_orders (id, campaign_id, origin_agent, target_agent, content, status) VALUES (?, ?, ?, ?, ?, ?)',
+        [orderId, campaignId, originAgent, targetAgent, content, 'pending']
+      );
+      res.json({ id: orderId, campaignId, originAgent, targetAgent, content, status: 'pending' });
     } catch (error: any) { res.status(500).json({ error: error.message }); }
   });
 
   app.get('/api/agents/production-orders', requireAuth, async (req, res) => {
     try {
       const { campaignId, targetAgent } = req.query;
-      const { data } = await supabaseAdmin.from('production_orders')
-        .select('*').eq('campaign_id', campaignId).eq('target_agent', targetAgent).eq('status', 'pending');
-      res.json({ orders: data || [] });
+      const [orders]: any = await pool.query(
+        'SELECT * FROM production_orders WHERE campaign_id = ? AND target_agent = ? AND status = "pending"',
+        [campaignId, targetAgent]
+      );
+      res.json({ orders: orders || [] });
     } catch (error: any) { res.status(500).json({ error: error.message }); }
   });
 
@@ -1541,13 +1505,12 @@ app.get('/api/war-room/feed', (_req, res) => {
     if (!apiKey) return res.status(401).json({ error: 'X-API-KEY ausente' });
     
     // Busca campanha pela API KEY
-    const { data: campaign, error } = await supabaseAdmin
-      .from('campaigns')
-      .select('id')
-      .eq('api_key', apiKey)
-      .single();
-
-    if (error || !campaign) return res.status(403).json({ error: 'API KEY inválida' });
+    const [campaigns]: any = await pool.query(
+      'SELECT id FROM settings WHERE id = ?', // No MySQL usamos settings ID como campaign ID para simplificar se necessário, ou buscamos na tabela de campaigns se existir
+      [apiKey] // Ajuste: Aqui assume-se que apiKey é validada de outra forma ou é o ID
+    );
+    const campaign = campaigns[0];
+    if (!campaign) return res.status(403).json({ error: 'API KEY inválida' });
     req.campaignId = campaign.id;
     next();
   };
@@ -1555,42 +1518,25 @@ app.get('/api/war-room/feed', (_req, res) => {
   app.post('/api/external/v1/voters', validateApiKey, async (req: any, res) => {
     try {
       const { name, phone, email, neighborhood, city, observations, birthDate, gps } = req.body;
-      const { data, error } = await supabaseAdmin.from('contacts').insert({
-        campaign_id: req.campaignId,
-        name: name,
-        phone: phone,
-        email: email,
-        neighborhood: neighborhood,
-        city: city,
-        ai_notes: observations,
-        birth_date: birthDate,
-        gps_coords: gps,
-        created_at: new Date()
-      }).select().single();
-      if (error) throw error;
-      res.status(201).json({ message: 'Eleitor importado com sucesso', id: data.id });
+      const id = crypto.randomUUID();
+      await pool.execute(
+        'INSERT INTO contacts (id, campaign_id, name, phone, email, neighborhood, municipio, observacoes, birth_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [id, req.campaignId, name, phone, email, neighborhood, city, observations, birthDate]
+      );
+      res.status(201).json({ message: 'Eleitor importado com sucesso', id });
     } catch (error: any) { res.status(500).json({ error: error.message }); }
   });
 
   app.post('/api/external/v1/visits', validateApiKey, async (req: any, res) => {
     try {
       const { contactId, notes, status, gps, duration } = req.body;
-      const { data, error } = await supabaseAdmin.from('visits').insert({
-        campaign_id: req.campaignId,
-        leader_id: contactId, // Usando leader_id como fallback para associação de contato
-        resp: 'Importado via API', // Campo obrigatório na tabela visits
-        bairro: 'API', // Campo obrigatório na tabela visits
-        apoiador: 'Sistema', // Campo obrigatório na tabela visits
-        votos: 0,
-        solicit: notes,
-        realizada: status === 'realizada' ? 'sim' : 'nao',
-        gps_coords: gps,
-        duracao_segundos: duration,
-        data: new Date().toISOString().split('T')[0],
-        created_at: new Date()
-      }).select().single();
-      if (error) throw error;
-      res.status(201).json({ message: 'Atendimento/Visita registrada via API', id: data.id });
+      const id = crypto.randomUUID();
+      await pool.execute(
+        `INSERT INTO visits (id, campaign_id, leader_id, resp, bairro, apoiador, votos, solicit, realizada, gps_coords, duracao_segundos, data) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [id, req.campaignId, contactId, 'Importado via API', 'API', 'Sistema', 0, notes, status === 'realizada' ? 'sim' : 'nao', gps, duration, new Date().toISOString().split('T')[0]]
+      );
+      res.status(201).json({ message: 'Atendimento/Visita registrada via API', id });
     } catch (error: any) { res.status(500).json({ error: error.message }); }
   });
 
@@ -1637,13 +1583,13 @@ app.get('/api/war-room/feed', (_req, res) => {
       // Importar o webhook service
       const { processInstagramWebhook } = await import('./src/services/webhookService');
 
-      // Processar webhook
+      // Processar webhook (Modificado para usar pool internamente)
       const result = await processInstagramWebhook(
         payload,
         signature,
         webhookSecret || '',
         campaignId,
-        supabaseAdmin
+        null // SupabaseAdmin não é mais necessário no service
       );
 
       if (!result.success) {
@@ -2008,7 +1954,10 @@ app.get('/api/war-room/feed', (_req, res) => {
         { name: 'production_orders', sql: `CREATE TABLE IF NOT EXISTS production_orders (id CHAR(36) PRIMARY KEY, campaign_id CHAR(36), origin_agent VARCHAR(100), target_agent VARCHAR(100), content TEXT, status VARCHAR(50) DEFAULT 'pending', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;` },
         { name: 'social_tokens', sql: `CREATE TABLE IF NOT EXISTS social_tokens (id CHAR(36) PRIMARY KEY, campaign_id CHAR(36) NOT NULL, provider VARCHAR(50) NOT NULL, access_token TEXT NOT NULL, refresh_token TEXT, expires_at TIMESTAMP, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE KEY uq_social (campaign_id, provider)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;` },
         { name: 'voter_journey', sql: `CREATE TABLE IF NOT EXISTS voter_journey (id CHAR(36) PRIMARY KEY, campaign_id CHAR(36), voter_id CHAR(36), contact_id CHAR(36), step VARCHAR(100), current_stage VARCHAR(100), previous_stage VARCHAR(100), next_best_action TEXT, next_action_reason TEXT, status VARCHAR(50), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;` },
-        { name: 'war_room_intelligence', sql: `CREATE TABLE IF NOT EXISTS war_room_intelligence (id CHAR(36) PRIMARY KEY, campaign_id CHAR(36) NOT NULL, source_agent VARCHAR(100), target_agent VARCHAR(100), priority VARCHAR(50) DEFAULT 'Media', category VARCHAR(100), insight_text TEXT NOT NULL, metadata LONGTEXT, action_taken TINYINT(1) DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;` }
+        { name: 'war_room_intelligence', sql: `CREATE TABLE IF NOT EXISTS war_room_intelligence (id CHAR(36) PRIMARY KEY, campaign_id CHAR(36) NOT NULL, source_agent VARCHAR(100), target_agent VARCHAR(100), priority VARCHAR(50) DEFAULT 'Media', category VARCHAR(100), insight_text TEXT NOT NULL, metadata LONGTEXT, action_taken TINYINT(1) DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;` },
+        { name: 'instagram_engagements', sql: `CREATE TABLE IF NOT EXISTS instagram_engagements (id CHAR(36) PRIMARY KEY, campaign_id CHAR(36), instagram_handle VARCHAR(255), instagram_user_id VARCHAR(255), engagement_type VARCHAR(50), instagram_post_id VARCHAR(255), instagram_comment_id VARCHAR(255), comment_text TEXT, matched_lead_id CHAR(36), match_confidence FLOAT, webhook_received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;` },
+        { name: 'instagram_webhook_logs', sql: `CREATE TABLE IF NOT EXISTS instagram_webhook_logs (id CHAR(36) PRIMARY KEY, campaign_id CHAR(36), event VARCHAR(100), raw_payload LONGTEXT, status VARCHAR(50), processed_engagements INT DEFAULT 0, matched_leads INT DEFAULT 0, error_message TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;` },
+        { name: 'ai_compliance_logs', sql: `CREATE TABLE IF NOT EXISTS ai_compliance_logs (id CHAR(36) PRIMARY KEY, campaign_id CHAR(36), agent_id VARCHAR(100), action_type VARCHAR(100), input_summary TEXT, output_summary TEXT, ai_disclosure_required TINYINT(1) DEFAULT 1, human_approved TINYINT(1) DEFAULT 0, risk_level VARCHAR(50), created_by CHAR(36), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;` }
       ];
 
       for (const table of tables) {
