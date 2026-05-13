@@ -313,8 +313,7 @@ async function startServer() {
         return res.status(400).json({ error: 'Nenhum arquivo enviado' });
       }
       
-      const baseUrl = process.env.APP_URL || `http://localhost:${port}`;
-      const urls = files.map(file => `${baseUrl}/uploads/${file.filename}`);
+      const urls = files.map(file => `/uploads/${file.filename}`);
       
       res.json({ urls });
     } catch (error: any) {
@@ -598,7 +597,18 @@ async function startServer() {
       }
 
       const [rows]: any = await pool.execute(query, params as any);
-      res.json(rows);
+      
+      // Convert result keys to camelCase for frontend compatibility
+      const camelRows = rows.map((row: any) => {
+        const newRow: any = {};
+        for (const key of Object.keys(row)) {
+          const camelKey = key.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
+          newRow[camelKey] = row[key];
+        }
+        return newRow;
+      });
+
+      res.json(camelRows);
     } catch (err: any) {
       console.error(`Erro select ${req.params.table}:`, err);
       res.status(500).json({ error: err.message });

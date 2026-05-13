@@ -15,18 +15,12 @@ export default defineConfig({
       '/api': {
         target: 'http://127.0.0.1:3001',
         changeOrigin: true,
-        secure: false,
-        configure: (proxy) => {
-          proxy.on('error', (err) => {
-            console.log('[Proxy Error]', err);
-          });
-          proxy.on('proxyReq', (_proxyReq, req) => {
-            console.log('[Proxy Request]', req.method, req.url);
-          });
-          proxy.on('proxyRes', (proxyRes, req) => {
-            console.log('[Proxy Response]', proxyRes.statusCode, req.url);
-          });
-        },
+        secure: false
+      },
+      '/uploads': {
+        target: 'http://127.0.0.1:3001',
+        changeOrigin: true,
+        secure: false
       }
     }
   },
