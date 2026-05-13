@@ -298,13 +298,13 @@ const CityAlertsPage: React.FC = () => {
                                                 <div className={`px-2 py-0.5 rounded-md text-[7px] font-black uppercase border ${sentimentColors[alert.clima as keyof typeof sentimentColors] || 'border-white/10'}`}>
                                                     {alert.clima || 'Alerta'}
                                                 </div>
-                                                <span className="text-[8px] text-slate-600 font-bold">
+                                                <span className="text-[10px] text-slate-400 font-black tracking-tight">
                                                     {new Date(alert.createdAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
                                                 </span>
                                             </div>
                                             <h3 className="text-xs font-black text-white truncate uppercase mb-1">{alert.title}</h3>
                                             <div className="flex items-center justify-between gap-2">
-                                                <p className="text-[10px] text-slate-500 font-medium truncate">{alert.bairro}</p>
+                                                <p className="text-xs text-slate-300 font-bold truncate tracking-tight">{alert.bairro}</p>
                                                 <div className="flex items-center gap-1 text-[8px] text-blue-400 font-black uppercase shrink-0">
                                                     <User size={8} /> {alert.userName?.split(' ')[0] || 'Equipe'}
                                                 </div>
@@ -402,8 +402,8 @@ const CityAlertsPage: React.FC = () => {
                                         <div className={`px-4 py-1 rounded-xl text-[8px] font-black uppercase tracking-[0.2em] ${getStatusStyles(selectedAlert.clima).bg} ${getStatusStyles(selectedAlert.clima).text} border ${getStatusStyles(selectedAlert.clima).border} shadow-lg shadow-black/20`}>
                                             {selectedAlert.clima || 'ALERTA'}
                                         </div>
-                                        <div className="flex items-center gap-2 text-slate-400 font-bold text-[9px] uppercase tracking-widest bg-white/5 px-3 py-1 rounded-lg border border-white/5">
-                                            <MapPin size={12} className="text-blue-500" /> {selectedAlert.bairro}
+                                        <div className="flex items-center gap-2 text-slate-100 font-black text-[10px] uppercase tracking-widest bg-blue-500/20 px-3 py-1.5 rounded-xl border border-blue-500/30 shadow-lg shadow-blue-500/10">
+                                            <MapPin size={12} className="text-blue-400" /> {selectedAlert.bairro}
                                         </div>
                                     </div>
                                     
