@@ -76,7 +76,7 @@ const PublicCollaboratorRegisterPage: React.FC = () => {
                         name: formData.name,
                         phone: formData.phone,
                         type: 'Colaborador',
-                        campaignId: '75341594-5f1d-4064-9f41-2b1a7613fe48' // Campaign ID hardcoded para o admin demo
+                        campaignId: formData.campaignId
                     }
                 }
             });
@@ -108,7 +108,7 @@ const PublicCollaboratorRegisterPage: React.FC = () => {
                     </div>
                     <h2 className="text-2xl font-bold text-white">Cadastro Realizado!</h2>
                     <p className="text-slate-400">
-                        Sua conta foi criada com sucesso no MySQL. Você já pode acessar o Hub do Colaborador.
+                        Sua conta foi criada com sucesso. Você já pode acessar o Hub do Colaborador.
                     </p>
                     <Link 
                         to="/login-colaborador"
@@ -123,15 +123,16 @@ const PublicCollaboratorRegisterPage: React.FC = () => {
 
 
     const testConnection = async () => {
-        setPingStatus('Testando Proxy...');
+        setPingStatus('Testando Conexão...');
         try {
-            await fetch('/api/ping');
-            setPingStatus('Proxy OK! Testando Direto...');
-            const res = await fetch('http://127.0.0.1:3001/api/ping');
-            await res.json();
-            setPingStatus('TUDO OK! Conexão Direta Estabelecida.');
+            const res = await fetch('/api/ping');
+            if (res.ok) {
+                setPingStatus('CONEXÃO OK! Servidor Respondendo.');
+            } else {
+                throw new Error('Falha no Servidor');
+            }
         } catch (e: any) {
-            setPingStatus(`ERRO: ${e.message}. O servidor está rodando?`);
+            setPingStatus(`ERRO: Servidor Offline ou CORS.`);
         }
     };
 
