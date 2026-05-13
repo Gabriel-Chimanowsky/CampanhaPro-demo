@@ -205,14 +205,11 @@ const DashboardPage: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
                 <FraudAlertPanel />
                 <IssueMap visits={filteredVisits} engagements={filteredEngagements} />
+                <Card className="p-5 border-slate-700/50 bg-slate-800/80 backdrop-blur-md">
+                    <ConversionFunnel />
+                </Card>
                 <WarRoomFeed />
                 
-                <div className="md:col-span-2 xl:col-span-4 flex justify-center py-6">
-                    <div className="w-full max-w-2xl">
-                        <ConversionFunnel />
-                    </div>
-                </div>
-
                 <div className="md:col-span-2 xl:col-span-4">
                     <Rankings bairroRanking={bairroRanking} apoiadorRanking={apoiadorRanking} leaderRanking={leaderRanking} />
                 </div>
