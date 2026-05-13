@@ -15,6 +15,14 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import multer from 'multer';
 
+// Função utilitária para gerar UUID se não houver nativo
+const generateUUID = () => {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+};
+
 
 // __dirname is not needed as we use process.cwd() for path resolution
 
@@ -279,6 +287,63 @@ async function startServer() {
   setInterval(() => {
     console.log(`[Heartbeat] Server is alive - ${new Date().toISOString()}`);
   }, 30000);
+
+  // Endpoint de Upload Local
+  app.post('/api/upload', upload.array('files', 10), (req, res) => {
+    try {
+      const files = req.files as any[];
+      if (!files || files.length === 0) {
+        return res.status(400).json({ error: 'Nenhum arquivo enviado' });
+      }
+      
+      const urls = files.map(file => {
+        const baseUrl = process.env.APP_URL || `http://localhost:${port}`;
+        return `${baseUrl}/uploads/${file.filename}`;
+      });
+      
+      res.json({ urls });
+    } catch (error: any) {
+      console.error('[Upload] Erro:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/reports', async (req, res) => {
+    try {
+      const { 
+        title, reclamacao, bairro, clima, 
+        latitude, longitude, mediaUrls, videoUrl, 
+        userId, campaignId 
+      } = req.body;
+
+      const reportId = generateUUID();
+      
+      await pool.execute(
+        `INSERT INTO street_reports 
+          (id, user_id, campaign_id, title, reclamacao, bairro, clima, latitude, longitude, media_urls, video_url, status) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          reportId,
+          userId,
+          campaignId,
+          title,
+          reclamacao || '',
+          bairro || '',
+          clima,
+          latitude,
+          longitude,
+          JSON.stringify(mediaUrls || []),
+          videoUrl || null,
+          'Pendente'
+        ]
+      );
+
+      res.status(201).json({ success: true, id: reportId });
+    } catch (error: any) {
+      console.error('[Reports] Erro ao salvar:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
 
   app.post('/api/auth/register', async (req, res) => {
     const { email, password, options } = req.body || {};

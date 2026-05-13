@@ -150,45 +150,98 @@ const CollaboratorHubPage: React.FC = () => {
 
         setSubmitting(true);
         try {
-            const mediaUrls: string[] = [];
-            
-            // Upload Photos
-            for (const file of formData.mediaFiles) {
-                const fileName = `${Date.now()}-${file.name}`;
-                const { data, error } = await supabase.storage.from('reports').upload(fileName, file);
-                if (error) throw error;
-                const { data: { publicUrl } } = supabase.storage.from('reports').getPublicUrl(data.path);
-                mediaUrls.push(publicUrl);
-            }
-
-            // Upload Video
+            let mediaUrls: string[] = [];
             let videoUrl = '';
-            if (formData.videoFile) {
-                const fileName = `${Date.now()}-${formData.videoFile.name}`;
-                const { data, error } = await supabase.storage.from('reports').upload(fileName, formData.videoFile);
-                if (error) throw error;
-                const { data: { publicUrl } } = supabase.storage.from('reports').getPublicUrl(data.path);
-                videoUrl = publicUrl;
+
+            // 1. Upload via Backend Local (Fallback se Supabase falhar ou for desejado)
+            const mediaToUpload = [...formData.mediaFiles];
+            if (formData.videoFile) mediaToUpload.push(formData.videoFile);
+
+            if (mediaToUpload.length > 0) {
+                const uploadFormData = new FormData();
+                mediaToUpload.forEach(file => uploadFormData.append('files', file));
+                
+                try {
+                    const uploadRes = await fetch('/api/upload', {
+                        method: 'POST',
+                        body: uploadFormData
+                    });
+                    const uploadData = await uploadRes.json();
+                    
+                    if (uploadData.urls) {
+                        // Separar fotos do vídeo na resposta (o vídeo é o último se existir)
+                        if (formData.videoFile) {
+                            videoUrl = uploadData.urls[uploadData.urls.length - 1];
+                            mediaUrls = uploadData.urls.slice(0, -1);
+                        } else {
+                            mediaUrls = uploadData.urls;
+                        }
+                    }
+                } catch (err) {
+                    console.error('[Upload Local] Falhou, tentando Supabase...', err);
+                    
+                    // Fallback para Supabase Storage se o local falhar
+                    for (const file of formData.mediaFiles) {
+                        const fileName = `${Date.now()}-${file.name}`;
+                        const { data, error } = await supabase.storage.from('reports').upload(fileName, file);
+                        if (!error) {
+                            const { data: { publicUrl } } = supabase.storage.from('reports').getPublicUrl(data.path);
+                            mediaUrls.push(publicUrl);
+                        }
+                    }
+
+                    if (formData.videoFile) {
+                        const fileName = `${Date.now()}-${formData.videoFile.name}`;
+                        const { data, error } = await supabase.storage.from('reports').upload(fileName, formData.videoFile);
+                        if (!error) {
+                            const { data: { publicUrl } } = supabase.storage.from('reports').getPublicUrl(data.path);
+                            videoUrl = publicUrl;
+                        }
+                    }
+                }
             }
 
             const actualCampaignId = user.user_metadata?.campaignId || user.user_metadata?.campaign_id || '455d21f3-f254-4b96-b49c-e70192c3fe27';
             
-            // Save Report
-            const { error: insertError } = await supabase.from('street_reports').insert({
-                title: formData.title,
-                reclamacao: formData.reclamacao,
-                bairro: formData.bairro,
-                clima: formData.clima,
-                latitude: formData.latitude,
-                longitude: formData.longitude,
-                mediaUrls: mediaUrls,
-                videoUrl: videoUrl,
-                status: 'Pendente',
-                userId: user.id,
-                campaignId: actualCampaignId
-            });
+            // 2. Salvar no Backend Local (MySQL)
+            try {
+                const reportRes = await fetch('/api/reports', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        title: formData.title,
+                        reclamacao: formData.reclamacao,
+                        bairro: formData.bairro,
+                        clima: formData.clima,
+                        latitude: formData.latitude,
+                        longitude: formData.longitude,
+                        mediaUrls: mediaUrls,
+                        videoUrl: videoUrl,
+                        userId: user.id,
+                        campaignId: actualCampaignId
+                    })
+                });
 
-            if (insertError) throw insertError;
+                if (!reportRes.ok) throw new Error('Falha ao salvar no servidor local');
+                
+            } catch (err) {
+                console.error('[Reports Local] Falhou, salvando no Supabase...', err);
+                // Fallback para Supabase se o local falhar
+                const { error: insertError } = await supabase.from('street_reports').insert({
+                    title: formData.title,
+                    reclamacao: formData.reclamacao,
+                    bairro: formData.bairro,
+                    clima: formData.clima,
+                    latitude: formData.latitude,
+                    longitude: formData.longitude,
+                    mediaUrls: mediaUrls,
+                    videoUrl: videoUrl,
+                    status: 'Pendente',
+                    userId: user.id,
+                    campaignId: actualCampaignId
+                });
+                if (insertError) throw insertError;
+            }
 
             setSuccess(true);
         } catch (e: any) {
@@ -452,12 +505,12 @@ const CollaboratorHubPage: React.FC = () => {
                                                 <label className={`flex flex-col items-center justify-center p-4 border-2 border-dashed rounded-2xl cursor-pointer transition-all active:scale-95 ${formData.videoFile ? 'opacity-20 pointer-events-none' : 'bg-blue-600/5 border-blue-500/20'}`}>
                                                     <Camera className="w-6 h-6 text-blue-400 mb-1" />
                                                     <span className="text-[9px] font-black text-blue-400 uppercase">Fotos</span>
-                                                    <input type="file" accept="image/*" multiple className="hidden" onChange={handleAddPhotos} disabled={!!formData.videoFile} />
+                                                    <input type="file" accept="image/*" capture="environment" multiple className="hidden" onChange={handleAddPhotos} disabled={!!formData.videoFile} />
                                                 </label>
-                                                <label className={`flex flex-col items-center justify-center p-4 border-2 border-dashed rounded-2xl cursor-pointer transition-all active:scale-95 ${formData.mediaFiles.length > 0 ? 'opacity-20 pointer-events-none' : 'bg-red-600/5 border-red-500/20'}`}>
+                                                <label className={`flex flex-col items-center justify-center p-4 border-2 border-dashed rounded-2xl cursor-pointer transition-all active:scale-90 ${formData.mediaFiles.length > 0 ? 'opacity-20 pointer-events-none' : 'bg-red-600/5 border-red-500/20'}`}>
                                                     <Video className="w-6 h-6 text-red-400 mb-1" />
                                                     <span className="text-[9px] font-black text-red-400 uppercase">Vídeo</span>
-                                                    <input type="file" accept="video/*" className="hidden" onChange={handleAddVideo} disabled={formData.mediaFiles.length > 0} />
+                                                    <input type="file" accept="video/*" capture="environment" className="hidden" onChange={handleAddVideo} disabled={formData.mediaFiles.length > 0} />
                                                 </label>
                                             </div>
 
