@@ -55,11 +55,9 @@ const InstagramRankingPage: React.FC = () => {
         return;
       }
 
-      const { data: { session } } = await supabase.auth.getSession();
+      const token = localStorage.getItem('campanhapro-mysql-token');
       const response = await fetch(`/api/social/status?campaignId=${campaignId}&provider=meta`, {
-        headers: {
-          'Authorization': `Bearer ${session?.access_token}`
-        }
+        headers: { 'Authorization': `Bearer ${token}` }
       });
       
       const result = await response.json();
@@ -87,12 +85,12 @@ const InstagramRankingPage: React.FC = () => {
 
       // 1. Tenta buscar os dados reais do Express Backend
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const token = localStorage.getItem('campanhapro-mysql-token');
         const response = await fetch('/api/instagram/ranking', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session?.access_token}`
+            'Authorization': `Bearer ${token}`
           },
           body: JSON.stringify({ campaign_id: campaignId, period })
         });
@@ -200,14 +198,22 @@ const InstagramRankingPage: React.FC = () => {
     
     try {
       const campaignId = user?.campaignId || user?.campaign_id;
-      
-      const { error: delError } = await supabase
-        .from('social_tokens')
-        .delete()
-        .eq('campaign_id', campaignId)
-        .eq('provider', 'meta');
+      const token = localStorage.getItem('campanhapro-mysql-token');
 
-      if (delError) throw delError;
+      const response = await fetch('/api/social/disconnect', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ campaignId, provider: 'meta' })
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || 'Erro ao desconectar');
+      }
+
       setIsConnected(false);
       setRanking([]);
     } catch (err: any) {

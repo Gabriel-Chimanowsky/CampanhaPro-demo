@@ -1159,6 +1159,27 @@ app.get('/api/war-room/feed', (_req, res) => {
     }
   });
 
+  // Desconectar conta social (deleta token por campaign_id + provider)
+  app.post('/api/social/disconnect', requireAuth, async (req, res) => {
+    try {
+      const { campaignId, provider } = req.body;
+      if (!campaignId || !provider) {
+        return res.status(400).json({ error: 'campaignId and provider are required' });
+      }
+
+      await pool.execute(
+        'DELETE FROM social_tokens WHERE campaign_id = ? AND provider = ?',
+        [campaignId, provider]
+      );
+
+      console.log(`[Social] Token desconectado: campanha=${campaignId} provider=${provider}`);
+      res.json({ success: true, message: 'Conta desconectada com sucesso' });
+    } catch (error: any) {
+      console.error('[Social Disconnect] Erro:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.post('/api/instagram/ranking', requireAuth, async (req, res) => {
     try {
       const { campaign_id } = req.body;
