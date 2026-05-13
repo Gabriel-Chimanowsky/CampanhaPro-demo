@@ -214,44 +214,51 @@ const DashboardPage: React.FC = () => {
                 <IssueMap visits={filteredVisits} engagements={filteredEngagements} />
                 <TerritorialAlerts />
                 <WarRoomFeed />
-                <ConversionFunnel />
+                
+                <div className="md:col-span-2 xl:col-span-4 flex justify-center py-6">
+                    <div className="w-full max-w-2xl">
+                        <ConversionFunnel />
+                    </div>
+                </div>
+
                 <div className="md:col-span-2 xl:col-span-4">
                     <Rankings bairroRanking={bairroRanking} apoiadorRanking={apoiadorRanking} leaderRanking={leaderRanking} />
                 </div>
+                
                 <TeamTasksWidget />
                 <PesquisaChart data={pesquisas} />
                 <DigitalColinha />
-            </div>
-
-            <div className="mt-8 flex flex-col md:flex-row gap-6">
-                <div className="flex-1">
-                    <CityAlertsMap campaignId={user?.campaign_id || user?.campaignId || 'demo'} />
-                </div>
-                <div className="w-full md:w-80">
-                    <Card className="bg-gradient-to-br from-blue-600/20 to-indigo-600/20 border-blue-500/30 p-6">
+                
+                {/* App do Colaborador Card moved here */}
+                <Card className="bg-gradient-to-br from-blue-600/20 to-indigo-600/20 border-blue-500/30 p-6 flex flex-col justify-between">
+                    <div>
                         <Share2 className="w-8 h-8 text-blue-400 mb-4" />
                         <h3 className="text-lg font-black text-white mb-2">App do Colaborador</h3>
                         <p className="text-xs text-slate-400 mb-6">Envie este link para sua equipe de campo. Eles poderão instalar o App e enviar alertas em tempo real.</p>
-                        
-                        <div className="space-y-3">
-                            <input 
-                                readOnly
-                                value={`${window.location.origin}/colaborador`}
-                                className="w-full bg-black/40 border border-slate-700 rounded-xl px-4 py-3 text-xs text-slate-300 font-mono"
-                            />
-                            <Button 
-                                onClick={() => {
-                                    navigator.clipboard.writeText(`${window.location.origin}/colaborador`);
-                                    setCopied(true);
-                                    setTimeout(() => setCopied(false), 2000);
-                                }}
-                                className={`w-full py-3 font-bold transition-all ${copied ? 'bg-emerald-600 hover:bg-emerald-600' : 'bg-blue-600 hover:bg-blue-500 text-white'}`}
-                            >
-                                {copied ? 'Link Copiado!' : 'Copiar Link de Convite'}
-                            </Button>
-                        </div>
-                    </Card>
-                </div>
+                    </div>
+                    
+                    <div className="space-y-3">
+                        <input 
+                            readOnly
+                            value={`${window.location.origin}/colaborador`}
+                            className="w-full bg-black/40 border border-slate-700 rounded-xl px-4 py-3 text-xs text-slate-300 font-mono"
+                        />
+                        <Button 
+                            onClick={() => {
+                                navigator.clipboard.writeText(`${window.location.origin}/colaborador`);
+                                setCopied(true);
+                                setTimeout(() => setCopied(false), 2000);
+                            }}
+                            className={`w-full py-3 font-bold transition-all ${copied ? 'bg-emerald-600 hover:bg-emerald-600' : 'bg-blue-600 hover:bg-blue-500 text-white'}`}
+                        >
+                            {copied ? 'Link Copiado!' : 'Copiar Link de Convite'}
+                        </Button>
+                    </div>
+                </Card>
+            </div>
+
+            <div className="mt-8">
+                <CityAlertsMap campaignId={user?.campaign_id || user?.campaignId || 'demo'} />
             </div>
 
             {userType === 'Admin' && allLeaders.length > 0 && (
