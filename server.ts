@@ -1989,18 +1989,19 @@ app.get('/api/war-room/feed', (_req, res) => {
       // --- Migrações de colunas (ALTER TABLE para tabelas já existentes) ---
       // Executa silenciosamente: se a coluna já existir, ignora o erro
       const columnMigrations = [
-        // social_tokens: adicionar coluna status (ausente em instâncias antigas)
+        // social_tokens: colunas críticas para o ranking
         `ALTER TABLE social_tokens ADD COLUMN status VARCHAR(50) DEFAULT 'active'`,
-        // social_tokens: adicionar refresh_token se ausente
         `ALTER TABLE social_tokens ADD COLUMN refresh_token TEXT`,
-        // social_tokens: adicionar expires_at se ausente
         `ALTER TABLE social_tokens ADD COLUMN expires_at TIMESTAMP NULL`,
-        // social_tokens: adicionar updated_at se ausente
         `ALTER TABLE social_tokens ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
-        // users: garantir coluna updated_at
+        // tabelas que precisam de updated_at para a ponte MySQL
         `ALTER TABLE users ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
-        // contacts: adicionar instagram_handle para matching futuro
+        `ALTER TABLE visits ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
+        `ALTER TABLE street_reports ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
+        `ALTER TABLE contacts ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
+        // colunas extras
         `ALTER TABLE contacts ADD COLUMN instagram_handle VARCHAR(255)`,
+        `ALTER TABLE instagram_webhook_logs ADD COLUMN metadata LONGTEXT`
       ];
 
       for (const migration of columnMigrations) {
@@ -2008,9 +2009,9 @@ app.get('/api/war-room/feed', (_req, res) => {
           await pool.execute(migration);
           console.log(`[Database] Migration OK: ${migration.substring(0, 60)}...`);
         } catch (mErr: any) {
-          // Ignorar erros de "Duplicate column name" - coluna já existe
-          if (!mErr.message?.includes('Duplicate column name')) {
-            console.warn(`[Database] Migration skipped: ${mErr.message}`);
+          // Ignorar erros comuns de "Duplicate column"
+          if (!mErr.message?.includes('Duplicate column name') && !mErr.message?.includes('already exists')) {
+            console.warn(`[Database] Migration warning for "${migration.substring(0, 30)}": ${mErr.message}`);
           }
         }
       }
@@ -2020,15 +2021,22 @@ app.get('/api/war-room/feed', (_req, res) => {
       if (fs.existsSync(seedPath)) {
         console.log('[Database] Seeding data from seed.sql...');
         const seedSql = fs.readFileSync(seedPath, 'utf8');
-        const statements = seedSql.split(';').filter(s => s.trim() !== '');
+        
+        // Split mais robusto: remove comentários e quebras de linha antes de separar por ;
+        const cleanSql = seedSql.replace(/--.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+        const statements = cleanSql.split(';').map(s => s.trim()).filter(s => s.length > 0);
+        
         for (const statement of statements) {
           try {
             await pool.execute(statement);
           } catch (err: any) {
-             // Silencioso para erros de duplicata
+             // Silencioso para erros de duplicata durante o seed
+             if (!err.message?.includes('Duplicate entry')) {
+               console.warn(`[Database] Seed statement error: ${err.message.substring(0, 100)}`);
+             }
           }
         }
-        console.log('[Database] Seeding complete.');
+        console.log(`[Database] Seeding complete (${statements.length} statements processed).`);
       }
 
       // Garantir que o demo@campanhapro.com.br NÃO seja supreme admin se ele já existir
