@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { getTerritorialAlerts, TerritorialGap } from '../../services/intelligenceService';
 import { useAuth } from '../../contexts/AuthContext';
 import { AlertTriangle, MapPin, ChevronRight } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 
 const TerritorialAlerts: React.FC = () => {
   const { user } = useAuth();

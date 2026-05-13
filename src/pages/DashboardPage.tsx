@@ -21,13 +21,7 @@ import Button from '../components/ui/Button';
 import SyncButton from '../components/ui/SyncButton';
 import { PrintIcon, SparklesIcon } from '../components/icons';
 import { 
-    BarChart3, 
-    Calendar, 
-    ClipboardList,
-    Plus,
     Target,
-    Settings,
-    Download,
     Share2,
     Check
 } from 'lucide-react';

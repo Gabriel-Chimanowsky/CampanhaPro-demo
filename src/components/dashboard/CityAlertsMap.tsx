@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { supabase } from '../../lib/supabaseClient';
@@ -53,7 +53,6 @@ const MapController = ({ alerts }: { alerts: any[] }) => {
 const CityAlertsMap: React.FC<{ campaignId: string }> = ({ campaignId }) => {
     const navigate = useNavigate();
     const [alerts, setAlerts] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
     const [selectedAlert, setSelectedAlert] = useState<any>(null);
 
     useEffect(() => {
