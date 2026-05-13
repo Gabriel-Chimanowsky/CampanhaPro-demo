@@ -16,7 +16,6 @@ import WarRoomFeed from '../components/dashboard/WarRoomFeed';
 import SupporterProfileCard from '../components/dashboard/SupporterProfileCard';
 import ConversionFunnel from '../components/dashboard/ConversionFunnel';
 import TeamTasksWidget from '../components/dashboard/TeamTasksWidget';
-import TerritorialAlerts from '../components/dashboard/TerritorialAlerts';
 import Button from '../components/ui/Button';
 import SyncButton from '../components/ui/SyncButton';
 import { PrintIcon, SparklesIcon } from '../components/icons';
@@ -206,7 +205,6 @@ const DashboardPage: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
                 <FraudAlertPanel />
                 <IssueMap visits={filteredVisits} engagements={filteredEngagements} />
-                <TerritorialAlerts />
                 <WarRoomFeed />
                 
                 <div className="md:col-span-2 xl:col-span-4 flex justify-center py-6">

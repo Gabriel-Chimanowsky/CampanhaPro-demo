@@ -147,7 +147,7 @@ const CityAlertsPage: React.FC = () => {
             
             // Logic for History vs Active Alertas
             const isCompleted = alert.status === 'Concluído';
-            const matchesTab = activeTab === 'alerts' ? !isCompleted : isCompleted;
+            const matchesTab = activeTab === 'alerts' ? !isCompleted : (activeTab === 'history' ? isCompleted : true);
 
             return matchesSearch && matchesSentiment && matchesTab;
         });

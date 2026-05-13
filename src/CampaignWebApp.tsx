@@ -28,7 +28,7 @@ const ElectionDayPage = React.lazy(() => import('./pages/ElectionDayPage'));
 const ElectionReportsPage = React.lazy(() => import('./pages/ElectionReportsPage'));
 const PricingPage = React.lazy(() => import('./pages/PricingPage'));
 const CRMPage = React.lazy(() => import('./pages/CRMPage'));
-const UseCasesPage = React.lazy(() => import('./pages/UseCasesPage'));
+import UseCasesPage from './pages/UseCasesPage';
 const InstagramRankingPage = React.lazy(() => import('./pages/InstagramRankingPage'));
 const CityAlertsPage = React.lazy(() => import('./pages/CityAlertsPage'));
 
