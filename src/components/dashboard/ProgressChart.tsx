@@ -181,26 +181,28 @@ const AnimatedBarChart = ({ data }: { data: { date: string; visits: number; vote
                                 <span className="flex items-center gap-1.5 text-sm text-slate-300">
                                     <div className="w-2 h-2 rounded-full bg-blue-500"></div> Visitas
                                 </span>
-                                <span className="text-sm font-black text-slate-50">{data[hoveredIndex].visits}</span>
-                            </div>
-                            <div className="flex justify-between items-center gap-4">
-                                <span className="flex items-center gap-1.5 text-sm text-slate-300">
-                                    <div className="w-2 h-2 rounded-full bg-emerald-500"></div> Votos
-                                </span>
-                                <span className="text-sm font-black text-slate-50">{data[hoveredIndex].votes}</span>
-                            </div>
+                        <p className="text-[10px] font-black text-slate-500 uppercase mb-1">{formatFullDate(data[hoveredIndex].date)}</p>
+                        <div className="flex items-center gap-2 mb-1">
+                            <div className="w-2 h-2 rounded-full bg-[#4ac7f0]" />
+                            <span className="text-xs text-slate-300 font-bold">Visitas</span>
+                            <span className="ml-auto text-xs text-white font-black">{data[hoveredIndex].visits}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-[#1abc9c]" />
+                            <span className="text-xs text-slate-300 font-bold">Votos</span>
+                            <span className="ml-auto text-xs text-white font-black">{data[hoveredIndex].votes}</span>
                         </div>
                     </div>
                 )}
             </div>
         </div>
     );
-}
+};
 
-const ProgressChart = ({
-    filteredVisits,
-    municipioFilter,
-    setMunicipioFilter,
+const ProgressChart: React.FC<ProgressChartProps> = ({ 
+    filteredVisits, 
+    municipioFilter, 
+    setMunicipioFilter, 
     allMunicipios,
     bairroFilter,
     setBairroFilter,
@@ -208,52 +210,51 @@ const ProgressChart = ({
     apoiadorFilter,
     setApoiadorFilter,
     allApoiadores
-}: ProgressChartProps) => {
-    const chartData = React.useMemo(() => {
-        const dataByDay: { [date: string]: { visits: number; votes: number } } = {};
+}) => {
+    const data = React.useMemo(() => {
+        const aggregated: Record<string, { date: string, visits: number, votes: number }> = {};
+        
         filteredVisits.forEach(v => {
-          if (v.realizada === 'sim') {
-            const dateKey = v.data; // Assumindo formato YYYY-MM-DD
-            if (!dataByDay[dateKey]) {
-              dataByDay[dateKey] = { visits: 0, votes: 0 };
+            const dateStr = v.data; 
+            if (!dateStr) return;
+            const date = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+            if (!aggregated[date]) aggregated[date] = { date, visits: 0, votes: 0 };
+            if (v.realizada === 'sim') {
+                aggregated[date].visits++;
+                aggregated[date].votes += v.votos;
             }
-            dataByDay[dateKey].visits += 1;
-            dataByDay[dateKey].votes += v.votos;
-          }
         });
-        return Object.keys(dataByDay)
-          .map(date => ({ date, visits: dataByDay[date].visits, votes: dataByDay[date].votes }))
-          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-      }, [filteredVisits]);
+
+        return Object.values(aggregated).sort((a, b) => a.date.localeCompare(b.date));
+    }, [filteredVisits]);
 
     return (
         <Card className="p-3 sm:p-4 print-break-inside-avoid">
-            <h3 className="font-bold text-base text-slate-300 mb-2">Progresso (Visitas e Votos / Dia)</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-2 no-print">
+            <h3 className="font-bold text-base text-slate-300 mb-1">Progresso (Visitas e Votos / Dia)</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-1 no-print">
                 <select value={municipioFilter} onChange={e => { setMunicipioFilter(e.target.value); setBairroFilter(''); }} className="w-full bg-slate-700/50 text-xs border border-slate-600 rounded-md py-1 px-2">
                     <option value="">Todos os Municípios</option>
                     {allMunicipios.map(m => <option key={m} value={m}>{m}</option>)}
                 </select>
                 <select value={bairroFilter} onChange={e => setBairroFilter(e.target.value)} className="w-full bg-slate-700/50 text-xs border border-slate-600 rounded-md py-1 px-2">
                     <option value="">Todos os Bairros</option>
-                    {allBairros.map(b => <option key={`${municipioFilter}-${b}`} value={b}>{b}</option>)}
+                    {allBairros.map(b => <option key={b} value={b}>{b}</option>)}
                 </select>
                 <select value={apoiadorFilter} onChange={e => setApoiadorFilter(e.target.value)} className="w-full bg-slate-700/50 text-xs border border-slate-600 rounded-md py-1 px-2">
                     <option value="">Todos os Apoiadores</option>
                     {allApoiadores.map(a => <option key={a} value={a}>{a}</option>)}
                 </select>
             </div>
-            
-            <div className="flex items-center gap-4 text-[10px] mb-2 opacity-80">
-                <div className="flex items-center gap-1.5"><div className="w-2 h-2 bg-sky-500 rounded-sm"></div><span>Visitas</span></div>
-                <div className="flex items-center gap-1.5"><div className="w-2 h-2 bg-teal-500 rounded-sm"></div><span>Votos</span></div>
+            <div className="flex items-center gap-4 mb-2 text-[10px] font-bold no-print">
+                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-[#4ac7f0]" /> Visitas</div>
+                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-[#1abc9c]" /> Votos</div>
             </div>
-
-            {chartData.length > 0 ? (
-                <AnimatedBarChart data={chartData} />
+            
+            {data.length > 0 ? (
+                <AnimatedBarChart data={data} />
             ) : (
-                <div className="h-80 flex items-center justify-center text-slate-400">
-                    <p>Sem dados de visitas realizadas para exibir o gráfico.</p>
+                <div className="h-40 flex items-center justify-center text-slate-400 text-sm">
+                    <p>Sem dados de visitas realizadas.</p>
                 </div>
             )}
         </Card>

@@ -5,6 +5,7 @@ import L from 'leaflet';
 import { supabase } from '../../lib/supabaseClient';
 import { AlertCircle, MapPin, User, X } from 'lucide-react';
 import Card from '../ui/Card';
+import { useNavigate } from 'react-router-dom';
 
 // Fix Leaflet icon issue
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
@@ -36,6 +37,7 @@ const icons = {
 };
 
 const CityAlertsMap: React.FC<{ campaignId: string }> = ({ campaignId }) => {
+    const navigate = useNavigate();
     const [alerts, setAlerts] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedAlert, setSelectedAlert] = useState<any>(null);
@@ -91,55 +93,37 @@ const CityAlertsMap: React.FC<{ campaignId: string }> = ({ campaignId }) => {
     };
 
     return (
-        <Card className="h-[600px] flex flex-col p-0 overflow-hidden border-slate-700/50">
-            <div className="p-4 border-b border-slate-800 bg-slate-800/50 flex justify-between items-center">
-                <h3 className="font-bold text-lg text-slate-200 flex items-center gap-2">
-                    <AlertCircle className="text-orange-400" /> Monitoramento em Tempo Real (GPS)
-                </h3>
-                <div className="flex gap-4 text-xs">
-                    <span className="flex items-center gap-1 text-green-400"><div className="w-2 h-2 rounded-full bg-green-400" /> Positivo</span>
-                    <span className="flex items-center gap-1 text-red-400"><div className="w-2 h-2 rounded-full bg-red-400" /> Crítico</span>
+        <Card className="h-[500px] flex flex-col p-0 overflow-hidden border-slate-700/50 shadow-2xl">
+            <div className="p-4 border-b border-slate-800 bg-slate-800/80 backdrop-blur-md flex flex-wrap justify-between items-center gap-4">
+                <div className="flex items-center gap-3">
+                    <div className="p-2 bg-orange-500/20 rounded-lg">
+                        <AlertCircle className="text-orange-400 w-5 h-5" />
+                    </div>
+                    <div>
+                        <h3 className="font-bold text-base text-slate-100">Monitoramento em Tempo Real (GPS)</h3>
+                        <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Alertas de Rua da Equipe</p>
+                    </div>
+                </div>
+                
+                <div className="flex items-center gap-4">
+                    <div className="hidden sm:flex gap-4 text-[10px] font-bold uppercase tracking-widest">
+                        <span className="flex items-center gap-1.5 text-green-400"><div className="w-1.5 h-1.5 rounded-full bg-green-400 shadow-[0_0_5px_rgba(74,199,156,0.5)]" /> Positivo</span>
+                        <span className="flex items-center gap-1.5 text-yellow-400"><div className="w-1.5 h-1.5 rounded-full bg-yellow-400 shadow-[0_0_5px_rgba(245,158,11,0.5)]" /> Neutro</span>
+                        <span className="flex items-center gap-1.5 text-red-400"><div className="w-1.5 h-1.5 rounded-full bg-red-400 shadow-[0_0_5px_rgba(239,68,68,0.5)]" /> Crítico</span>
+                    </div>
+                    <button 
+                        onClick={() => navigate('/app/city-alerts')}
+                        className="bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-black uppercase px-4 py-2 rounded-lg transition-all shadow-lg shadow-blue-500/20 flex items-center gap-2"
+                    >
+                        Ver Todos Alertas <MapPin size={12} />
+                    </button>
                 </div>
             </div>
 
-            <div className="flex-1 flex flex-col md:flex-row">
-                {/* List Sidebar */}
-                <div className="w-full md:w-80 border-r border-slate-800 overflow-y-auto bg-slate-900/50 max-h-[200px] md:max-h-full">
-                    {loading ? (
-                        <div className="p-10 text-center text-slate-500 text-sm">Carregando alertas...</div>
-                    ) : alerts.length === 0 ? (
-                        <div className="p-10 text-center text-slate-500 text-sm italic">Nenhum alerta recente.</div>
-                    ) : (
-                        <div className="divide-y divide-slate-800">
-                            {alerts.map((alert) => (
-                                <div key={alert.id} className="p-4 hover:bg-white/5 transition-colors cursor-pointer group">
-                                    <div className="flex justify-between items-start mb-1">
-                                        <span className={`text-[10px] font-black uppercase tracking-widest ${getStatusColor(alert.clima)}`}>
-                                            {alert.clima}
-                                        </span>
-                                        <span className="text-[10px] text-slate-600 font-mono">
-                                            {new Date(alert.createdAt || alert.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                        </span>
-                                    </div>
-                                    <h4 className="font-bold text-sm text-slate-200 group-hover:text-blue-400 transition-colors">
-                                        {alert.title || alert.bairro}
-                                    </h4>
-                                    <p className="text-xs text-slate-500 line-clamp-1 mb-2">{alert.reclamacao}</p>
-                                    <div className="flex items-center gap-2 text-[10px] text-slate-600">
-                                        <User size={10} /> {alert.users?.name || 'Colaborador'}
-                                        <MapPin size={10} /> {alert.bairro}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
-                {/* Map View */}
-                <div className="flex-1 relative z-10 min-h-[300px]">
-                    <MapContainer 
-                        center={[-22.9068, -43.1729]} 
-                        zoom={12} 
+            <div className="flex-1 relative z-10">
+                <MapContainer 
+                    center={alerts.length > 0 && alerts[0].latitude ? [alerts[0].latitude, alerts[0].longitude] : [-22.9068, -43.1729]} 
+                    zoom={13} 
                         style={{ height: '100%', width: '100%' }}
                         scrollWheelZoom={false}
                     >
