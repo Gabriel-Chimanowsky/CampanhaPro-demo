@@ -294,25 +294,31 @@ async function startServer() {
   }, 30000);
 
   // Endpoint de Upload Local
-  app.post('/api/upload', upload.array('files', 10), (req, res) => {
-    console.log('[Upload] Recebendo arquivos...', req.files?.length);
+  app.post('/api/upload', (req, res, next) => {
+    upload.array('files', 10)(req, res, (err) => {
+      if (err instanceof multer.MulterError) {
+        console.error('[Multer Error]', err);
+        return res.status(400).json({ error: `Erro no Multer: ${err.message}` });
+      } else if (err) {
+        console.error('[Upload Error]', err);
+        return res.status(500).json({ error: `Erro no Upload: ${err.message}` });
+      }
+      next();
+    });
+  }, (req, res) => {
+    console.log('[Upload] Recebendo arquivos...', (req as any).files?.length);
     try {
-      const files = req.files as any[];
+      const files = (req as any).files as any[];
       if (!files || files.length === 0) {
-        console.warn('[Upload] Nenhum arquivo recebido no req.files');
-        return res.status(400).json({ error: 'Nenhum arquivo enviado ou campo incorreto (use "files")' });
+        return res.status(400).json({ error: 'Nenhum arquivo enviado' });
       }
       
       const baseUrl = process.env.APP_URL || `http://localhost:${port}`;
-      const urls = files.map(file => {
-        return `${baseUrl}/uploads/${file.filename}`;
-      });
+      const urls = files.map(file => `${baseUrl}/uploads/${file.filename}`);
       
-      console.log('[Upload] Sucesso:', urls);
       res.json({ urls });
     } catch (error: any) {
-      console.error('[Upload] Erro Crítico:', error);
-      res.status(500).json({ error: error.message || 'Erro interno no upload' });
+      res.status(500).json({ error: error.message });
     }
   });
 
@@ -1713,6 +1719,18 @@ app.get('/api/war-room/feed', (_req, res) => {
     } catch (error: any) {
       console.error('[Social Status] Erro:', error);
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Global Error Handler
+  app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    console.error('[Global Error Handler]', err);
+    if (!res.headersSent) {
+      res.status(500).json({ 
+        error: 'Erro interno no servidor', 
+        details: err.message || 'Erro desconhecido',
+        path: _req.path 
+      });
     }
   });
 
