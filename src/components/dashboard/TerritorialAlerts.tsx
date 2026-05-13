@@ -41,6 +41,7 @@ const TerritorialAlerts: React.FC = () => {
         {alerts.slice(0, 4).map((alert) => (
           <div 
             key={alert.neighborhood} 
+            onClick={() => navigate('/app/alertas-urbano')}
             className="bg-black/20 border border-slate-700/50 rounded-2xl p-3 hover:border-orange-500/30 transition-all group cursor-pointer"
           >
             <div className="flex justify-between items-start mb-2">
