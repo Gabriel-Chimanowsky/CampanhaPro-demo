@@ -20,9 +20,9 @@ const AnimatedBarChart = ({ data }: { data: { date: string; visits: number; vote
     const [hoveredIndex, setHoveredIndex] = React.useState<number | null>(null);
     const [tooltipPos, setTooltipPos] = React.useState({ x: 0, y: 0 });
     
-    const chartHeight = 280;
+    const chartHeight = 200;
     const chartWidth = 800;
-    const padding = { top: 40, right: 30, bottom: 40, left: 50 };
+    const padding = { top: 20, right: 30, bottom: 30, left: 40 };
     
     const maxVisits = Math.max(...data.map(d => d.visits), 0);
     const maxVotes = Math.max(...data.map(d => d.votes), 0);
@@ -30,7 +30,7 @@ const AnimatedBarChart = ({ data }: { data: { date: string; visits: number; vote
     
     const yScale = (value: number) => chartHeight - padding.bottom - (value / yMax) * (chartHeight - padding.top - padding.bottom);
     const spacing = (chartWidth - padding.left - padding.right) / data.length;
-    const barWidth = Math.min(spacing * 0.35, 35);
+    const barWidth = Math.min(spacing * 0.35, 25);
 
     const handleMouseMove = (e: React.MouseEvent, index: number) => {
         const svg = e.currentTarget.closest('svg');
@@ -46,7 +46,7 @@ const AnimatedBarChart = ({ data }: { data: { date: string; visits: number; vote
 
     return (
         <div className="relative w-full overflow-hidden">
-            <div className="h-[280px] w-full overflow-x-auto custom-scrollbar">
+            <div className="h-[200px] w-full overflow-x-auto custom-scrollbar">
                 <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} preserveAspectRatio="xMidYMid meet" className="min-w-[800px] select-none">
                     <defs>
                         <linearGradient id="gradVisits" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -227,26 +227,26 @@ const ProgressChart = ({
       }, [filteredVisits]);
 
     return (
-        <Card className="print-break-inside-avoid">
-            <h3 className="font-bold text-lg text-slate-300 mb-4">Progresso (Visitas e Votos / Dia)</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4 no-print">
-                <select value={municipioFilter} onChange={e => { setMunicipioFilter(e.target.value); setBairroFilter(''); }} className="w-full bg-slate-700 border border-slate-600 rounded-md py-2 px-3">
+        <Card className="p-3 sm:p-4 print-break-inside-avoid">
+            <h3 className="font-bold text-sm text-slate-300 mb-2">Progresso (Visitas e Votos / Dia)</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-2 no-print">
+                <select value={municipioFilter} onChange={e => { setMunicipioFilter(e.target.value); setBairroFilter(''); }} className="w-full bg-slate-700/50 text-xs border border-slate-600 rounded-md py-1 px-2">
                     <option value="">Todos os Municípios</option>
                     {allMunicipios.map(m => <option key={m} value={m}>{m}</option>)}
                 </select>
-                <select value={bairroFilter} onChange={e => setBairroFilter(e.target.value)} className="w-full bg-slate-700 border border-slate-600 rounded-md py-2 px-3">
+                <select value={bairroFilter} onChange={e => setBairroFilter(e.target.value)} className="w-full bg-slate-700/50 text-xs border border-slate-600 rounded-md py-1 px-2">
                     <option value="">Todos os Bairros</option>
                     {allBairros.map(b => <option key={`${municipioFilter}-${b}`} value={b}>{b}</option>)}
                 </select>
-                <select value={apoiadorFilter} onChange={e => setApoiadorFilter(e.target.value)} className="w-full bg-slate-700 border border-slate-600 rounded-md py-2 px-3">
+                <select value={apoiadorFilter} onChange={e => setApoiadorFilter(e.target.value)} className="w-full bg-slate-700/50 text-xs border border-slate-600 rounded-md py-1 px-2">
                     <option value="">Todos os Apoiadores</option>
                     {allApoiadores.map(a => <option key={a} value={a}>{a}</option>)}
                 </select>
             </div>
             
-            <div className="flex items-center gap-4 text-sm mb-4">
-                <div className="flex items-center gap-2"><div className="w-3 h-3 bg-sky-500 rounded-sm"></div><span>Visitas</span></div>
-                <div className="flex items-center gap-2"><div className="w-3 h-3 bg-teal-500 rounded-sm"></div><span>Votos</span></div>
+            <div className="flex items-center gap-4 text-[10px] mb-2 opacity-80">
+                <div className="flex items-center gap-1.5"><div className="w-2 h-2 bg-sky-500 rounded-sm"></div><span>Visitas</span></div>
+                <div className="flex items-center gap-1.5"><div className="w-2 h-2 bg-teal-500 rounded-sm"></div><span>Votos</span></div>
             </div>
 
             {chartData.length > 0 ? (
