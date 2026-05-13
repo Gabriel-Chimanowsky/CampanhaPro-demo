@@ -113,6 +113,31 @@ const CollaboratorHubPage: React.FC = () => {
         );
     };
 
+    const handleAddVideo = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            
+            // Validar tamanho (50MB)
+            if (file.size > 50 * 1024 * 1024) {
+                alert('O vídeo deve ter no máximo 50MB.');
+                return;
+            }
+
+            // Validar duração (30 segundos)
+            const video = document.createElement('video');
+            video.preload = 'metadata';
+            video.onloadedmetadata = function() {
+                window.URL.revokeObjectURL(video.src);
+                if (video.duration > 31) { // 31s para dar uma margem
+                    alert('O vídeo deve ter no máximo 30 segundos.');
+                    return;
+                }
+                setFormData(prev => ({ ...prev, videoFile: file, mediaFiles: [] })); // Limpa fotos se escolher vídeo
+            };
+            video.src = URL.createObjectURL(file);
+        }
+    };
+
     const handleAddPhotos = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
             const files = Array.from(e.target.files);
@@ -120,18 +145,7 @@ const CollaboratorHubPage: React.FC = () => {
                 alert('Limite máximo de 10 fotos.');
                 return;
             }
-            setFormData(prev => ({ ...prev, mediaFiles: [...prev.mediaFiles, ...files] }));
-        }
-    };
-
-    const handleAddVideo = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            const file = e.target.files[0];
-            if (file.size > 50 * 1024 * 1024) { // 50MB
-                alert('O vídeo deve ter no máximo 50MB.');
-                return;
-            }
-            setFormData(prev => ({ ...prev, videoFile: file }));
+            setFormData(prev => ({ ...prev, mediaFiles: [...prev.mediaFiles, ...files], videoFile: null })); // Limpa vídeo se escolher fotos
         }
     };
 

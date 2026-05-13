@@ -189,8 +189,8 @@ async function startServer() {
     origin: allowedOrigins.length > 0 ? allowedOrigins : true,
     credentials: true
   }));
-  app.use(express.json({ limit: '50mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+  app.use(express.json({ limit: '100mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '100mb' }));
   
   // Serve static files from uploads folder
   if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
@@ -199,14 +199,19 @@ async function startServer() {
   // Configure Multer for local storage
   const storage = multer.diskStorage({
     destination: (_req, _file, cb) => {
-      cb(null, 'uploads/');
+      const uploadDir = path.join(process.cwd(), 'uploads');
+      if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+      cb(null, uploadDir);
     },
     filename: (_req, file, cb) => {
       const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
       cb(null, uniqueSuffix + path.extname(file.originalname));
     }
   });
-  const upload = multer({ storage: storage });
+  const upload = multer({ 
+    storage: storage,
+    limits: { fileSize: 100 * 1024 * 1024 } // 100MB limit
+  });
 
   app.use((req, _res, next) => {
     console.log(`[REQ] ${req.method} ${req.url} - ${new Date().toISOString()}`);
@@ -290,21 +295,24 @@ async function startServer() {
 
   // Endpoint de Upload Local
   app.post('/api/upload', upload.array('files', 10), (req, res) => {
+    console.log('[Upload] Recebendo arquivos...', req.files?.length);
     try {
       const files = req.files as any[];
       if (!files || files.length === 0) {
-        return res.status(400).json({ error: 'Nenhum arquivo enviado' });
+        console.warn('[Upload] Nenhum arquivo recebido no req.files');
+        return res.status(400).json({ error: 'Nenhum arquivo enviado ou campo incorreto (use "files")' });
       }
       
+      const baseUrl = process.env.APP_URL || `http://localhost:${port}`;
       const urls = files.map(file => {
-        const baseUrl = process.env.APP_URL || `http://localhost:${port}`;
         return `${baseUrl}/uploads/${file.filename}`;
       });
       
+      console.log('[Upload] Sucesso:', urls);
       res.json({ urls });
     } catch (error: any) {
-      console.error('[Upload] Erro:', error);
-      res.status(500).json({ error: error.message });
+      console.error('[Upload] Erro Crítico:', error);
+      res.status(500).json({ error: error.message || 'Erro interno no upload' });
     }
   });
 
