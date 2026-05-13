@@ -2,9 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { getTerritorialAlerts, TerritorialGap } from '../../services/intelligenceService';
 import { useAuth } from '../../contexts/AuthContext';
 import { AlertTriangle, MapPin, ChevronRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const TerritorialAlerts: React.FC = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [alerts, setAlerts] = useState<TerritorialGap[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -73,7 +75,10 @@ const TerritorialAlerts: React.FC = () => {
       </div>
 
       {alerts.length > 4 && (
-        <button className="w-full text-center py-2 text-[10px] text-slate-500 hover:text-slate-50 transition-colors">
+        <button 
+          onClick={() => navigate('/app/alertas-urbano')}
+          className="w-full text-center py-2 text-[10px] text-slate-500 hover:text-slate-50 transition-colors"
+        >
           Ver todos os {alerts.length} alertas →
         </button>
       )}
