@@ -124,7 +124,7 @@ const CityAlertsMap: React.FC<{ campaignId: string }> = ({ campaignId }) => {
                         <span className="flex items-center gap-1.5 text-red-400"><div className="w-1.5 h-1.5 rounded-full bg-red-400 shadow-[0_0_5px_rgba(239,68,68,0.5)]" /> Crítico</span>
                     </div>
                     <button 
-                        onClick={() => navigate('/app/city-alerts')}
+                        onClick={() => navigate('/app/alertas-urbano')}
                         className="bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-black uppercase px-4 py-2 rounded-lg transition-all shadow-lg shadow-blue-500/20 flex items-center gap-2"
                     >
                         Ver Todos Alertas <MapPin size={12} />
