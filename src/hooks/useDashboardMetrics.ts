@@ -138,6 +138,18 @@ export const useDashboardMetrics = ({
 
   const completedVisits = React.useMemo(() => visibleVisits.filter(v => v.realizada === 'sim'), [visibleVisits]);
 
+  const kpis = React.useMemo(() => {
+    const realizadas = completedVisits.length;
+    const votos = completedVisits.reduce((sum, v) => sum + v.votos, 0);
+    const avgVotos = realizadas > 0 ? parseFloat((votos / realizadas).toFixed(2)) : 0;
+    
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const activeSupporters = new Set(
+        completedVisits.filter(v => new Date(v.data) >= sevenDaysAgo).map(v => v.apoiador)
+    ).size;
+    
+    const totalAbordagens = visibleEngagements.filter(a => a.tipo === 'Abordagem Rápida').length;
     const totalMateriais = visibleEngagements.reduce((sum, a) => sum + (a.materialDistribuido || 0), 0);
 
     return { 
