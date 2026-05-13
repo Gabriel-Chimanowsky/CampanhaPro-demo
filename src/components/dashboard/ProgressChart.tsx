@@ -19,7 +19,7 @@ const AnimatedBarChart = ({ data }: { data: { date: string; visits: number; vote
     const [hoveredIndex, setHoveredIndex] = React.useState<number | null>(null);
     const [tooltipPos, setTooltipPos] = React.useState({ x: 0, y: 0 });
     
-    const chartHeight = 180;
+    const chartHeight = 300;
     const chartWidth = 800;
     const padding = { top: 20, right: 30, bottom: 40, left: 40 };
     
@@ -29,7 +29,7 @@ const AnimatedBarChart = ({ data }: { data: { date: string; visits: number; vote
     
     const yScale = (value: number) => chartHeight - padding.bottom - (value / yMax) * (chartHeight - padding.top - padding.bottom);
     const spacing = (chartWidth - padding.left - padding.right) / data.length;
-    const barWidth = Math.max(Math.min(spacing * 0.45, 30), 8);
+    const barWidth = Math.max(Math.min(spacing * 0.45, 30), 10);
 
     const handleMouseMove = (e: React.MouseEvent, index: number) => {
         const svg = e.currentTarget.closest('svg');
@@ -45,7 +45,7 @@ const AnimatedBarChart = ({ data }: { data: { date: string; visits: number; vote
 
     return (
         <div className="relative w-full overflow-hidden">
-            <div className="h-[185px] w-full overflow-x-auto overflow-y-hidden custom-scrollbar">
+            <div className="h-[305px] w-full overflow-x-auto overflow-y-hidden custom-scrollbar">
                 <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} preserveAspectRatio="xMidYMid meet" className="min-w-[800px] select-none">
                     <defs>
                         <linearGradient id="gradVisits" x1="0%" y1="0%" x2="0%" y2="100%">
