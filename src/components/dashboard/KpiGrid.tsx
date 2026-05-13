@@ -18,19 +18,23 @@ interface KpiGridProps {
 }
 
 const KpiCard = ({ title, value, description, valueClassName = '', isLoading = false }: { title: string; value: string | number; description?: string, valueClassName?: string, isLoading?: boolean }) => (
-  <div className="bg-slate-700 p-4 rounded-lg relative overflow-hidden">
-    <p className="text-sm text-slate-400">{title}</p>
-    {isLoading ? (
-        <div className="h-9 bg-slate-600 rounded mt-1 w-1/2 animate-pulse"></div>
-    ) : (
-        <p className={`text-3xl font-bold mt-1 ${valueClassName}`}>{value}</p>
-    )}
+  <div className="bg-slate-700/40 p-4 rounded-xl border border-white/5 h-full flex flex-col justify-start">
+    <p className="text-[10px] text-slate-500 font-black uppercase tracking-wider mb-2 h-4 overflow-hidden">{title}</p>
+    <div className="flex-1 flex flex-col justify-center">
+      {isLoading ? (
+          <div className="h-8 bg-slate-600/50 rounded w-1/2 animate-pulse"></div>
+      ) : (
+          <p className={`text-2xl font-black ${valueClassName}`}>{value}</p>
+      )}
+    </div>
     {description && (
-        isLoading ? (
-            <div className="h-4 bg-slate-600 rounded mt-1 w-3/4 animate-pulse"></div>
-        ) : (
-            <p className="text-xs text-slate-500 mt-1">{description}</p>
-        )
+        <div className="mt-2 h-4 flex items-end">
+          {isLoading ? (
+              <div className="h-3 bg-slate-600/50 rounded w-3/4 animate-pulse"></div>
+          ) : (
+              <p className="text-[9px] text-slate-500 font-medium truncate">{description}</p>
+          )}
+        </div>
     )}
   </div>
 );
