@@ -66,7 +66,6 @@ const KpiGrid = ({ kpis, currentScenarioStatus, isLoading = false }: KpiGridProp
       } 
       description={`Média Real: ${currentScenarioStatus.avg.toFixed(2)}`} 
       isLoading={isLoading}
-      isScenario={true}
     />
   </div>
 );
