@@ -1766,264 +1766,255 @@ app.get('/api/war-room/feed', (_req, res) => {
       app.get('*', (_req, res) => res.sendFile(path.join(distPath, 'index.html')));
   }
 
-  // Final step: Start listening
-  httpServer.listen(port, '0.0.0.0', async () => {
-    console.log(`[CRITICAL] Server listening on http://0.0.0.0:${port}`);
+  // Final step: Start initialization and then listen
+  async function initializeDatabase() {
     try {
       console.log('[Database] Checking/Creating System Tables...');
       
-      // 1. street_reports
-      await pool.execute(`
-        CREATE TABLE IF NOT EXISTS street_reports (
-          id VARCHAR(255) PRIMARY KEY,
-          user_id VARCHAR(255),
-          campaign_id VARCHAR(255),
-          title VARCHAR(255),
-          reclamacao TEXT,
-          description TEXT,
-          bairro VARCHAR(255),
-          address TEXT,
-          clima VARCHAR(100),
-          latitude DECIMAL(10, 8),
-          longitude DECIMAL(11, 8),
-          media_urls LONGTEXT,
-          video_url TEXT,
-          status VARCHAR(50) DEFAULT 'Pendente',
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-      `);
+      const tables = [
+        {
+          name: 'street_reports',
+          sql: `CREATE TABLE IF NOT EXISTS street_reports (
+            id VARCHAR(255) PRIMARY KEY,
+            user_id VARCHAR(255),
+            campaign_id VARCHAR(255),
+            title VARCHAR(255),
+            reclamacao TEXT,
+            description TEXT,
+            bairro VARCHAR(255),
+            address TEXT,
+            clima VARCHAR(100),
+            latitude DECIMAL(10, 8),
+            longitude DECIMAL(11, 8),
+            media_urls LONGTEXT,
+            video_url TEXT,
+            status VARCHAR(50) DEFAULT 'Pendente',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`
+        },
+        {
+          name: 'users',
+          sql: `CREATE TABLE IF NOT EXISTS users (
+            id CHAR(36) PRIMARY KEY,
+            email VARCHAR(255) UNIQUE NOT NULL,
+            password VARCHAR(255),
+            name VARCHAR(255),
+            type ENUM('Admin', 'Líder', 'Apoiador', 'Colaborador') DEFAULT 'Colaborador',
+            plan VARCHAR(50) DEFAULT 'Gratuito',
+            role VARCHAR(50) DEFAULT 'user',
+            phone VARCHAR(20),
+            cost DECIMAL(10, 2) DEFAULT 0.00,
+            campaign_id CHAR(36),
+            is_supreme_admin TINYINT(1) DEFAULT 0,
+            assigned_leader_id CHAR(36),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`
+        },
+        {
+          name: 'settings',
+          sql: `CREATE TABLE IF NOT EXISTS settings (
+            id CHAR(36) PRIMARY KEY,
+            campaign_name VARCHAR(255),
+            timezone VARCHAR(100) DEFAULT 'America/Sao_Paulo',
+            ai_enabled TINYINT(1) DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`
+        },
+        {
+          name: 'visits',
+          sql: `CREATE TABLE IF NOT EXISTS visits (
+            id CHAR(36) PRIMARY KEY,
+            campaign_id CHAR(36) NOT NULL,
+            voter_id CHAR(36),
+            data DATE NOT NULL,
+            resp VARCHAR(255),
+            tel VARCHAR(20),
+            nasc DATE,
+            municipio VARCHAR(100),
+            bairro VARCHAR(100),
+            apoiador VARCHAR(255),
+            eleitores INT DEFAULT 0,
+            participantes INT DEFAULT 0,
+            votos INT DEFAULT 0,
+            pet VARCHAR(10),
+            tipo_pet VARCHAR(50),
+            criancas INT DEFAULT 0,
+            solicit TEXT,
+            realizada VARCHAR(10) DEFAULT 'nao',
+            lider VARCHAR(255),
+            interesse VARCHAR(100),
+            leader_id CHAR(36),
+            nivel_engajamento VARCHAR(50),
+            observacoes_qualitativas TEXT,
+            created_by CHAR(36),
+            gps_coords VARCHAR(100),
+            duracao_segundos INT,
+            hora TIME,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`
+        },
+        {
+          name: 'agent_chat_history',
+          sql: `CREATE TABLE IF NOT EXISTS agent_chat_history (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            campaign_id CHAR(36),
+            agent_id VARCHAR(100),
+            role ENUM('user', 'assistant', 'system', 'agent'),
+            content LONGTEXT,
+            metadata LONGTEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`
+        },
+        {
+          name: 'agent_outputs',
+          sql: `CREATE TABLE IF NOT EXISTS agent_outputs (
+            id CHAR(36) PRIMARY KEY,
+            campaign_id CHAR(36),
+            agent_id VARCHAR(100),
+            agent_type VARCHAR(100),
+            output_type VARCHAR(100),
+            content LONGTEXT,
+            metadata LONGTEXT,
+            created_by CHAR(36),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`
+        },
+        {
+          name: 'campaign_configs',
+          sql: `CREATE TABLE IF NOT EXISTS campaign_configs (
+            id CHAR(36) PRIMARY KEY,
+            features LONGTEXT,
+            limits LONGTEXT,
+            status VARCHAR(50) DEFAULT 'active',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`
+        },
+        {
+          name: 'contacts',
+          sql: `CREATE TABLE IF NOT EXISTS contacts (
+            id CHAR(36) PRIMARY KEY,
+            campaign_id CHAR(36),
+            name VARCHAR(255),
+            email VARCHAR(255),
+            phone VARCHAR(50),
+            voter_journey VARCHAR(100),
+            municipio VARCHAR(100),
+            bairro VARCHAR(100),
+            observacoes TEXT,
+            birth_date DATE,
+            interesse VARCHAR(100),
+            classification VARCHAR(100),
+            neighborhood VARCHAR(100),
+            electoral_zone VARCHAR(50),
+            electoral_section VARCHAR(50),
+            criancas INT DEFAULT 0,
+            tem_pet TINYINT(1) DEFAULT 0,
+            last_interaction_at TIMESTAMP NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`
+        },
+        {
+          name: 'pesquisas',
+          sql: `CREATE TABLE IF NOT EXISTS pesquisas (
+            id CHAR(36) PRIMARY KEY,
+            campaign_id CHAR(36),
+            title VARCHAR(255),
+            status VARCHAR(50),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`
+        },
+        {
+          name: 'expenses',
+          sql: `CREATE TABLE IF NOT EXISTS expenses (
+            id CHAR(36) PRIMARY KEY,
+            campaign_id CHAR(36),
+            data DATE,
+            valor DECIMAL(15, 2),
+            descricao TEXT,
+            categoria VARCHAR(100),
+            fornecedor VARCHAR(255),
+            documento_fornecedor VARCHAR(50),
+            nota_fiscal_url TEXT,
+            status_documento VARCHAR(50),
+            tipo_documento VARCHAR(50),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`
+        },
+        {
+          name: 'incomes',
+          sql: `CREATE TABLE IF NOT EXISTS incomes (
+            id CHAR(36) PRIMARY KEY,
+            campaign_id CHAR(36),
+            data DATE,
+            valor DECIMAL(15, 2),
+            descricao TEXT,
+            categoria VARCHAR(100),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`
+        },
+        {
+          name: 'engagement_actions',
+          sql: `CREATE TABLE IF NOT EXISTS engagement_actions (
+            id CHAR(36) PRIMARY KEY,
+            campaign_id CHAR(36),
+            data DATE,
+            tipo VARCHAR(100),
+            detalhes LONGTEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`
+        },
+        {
+          name: 'scenarios',
+          sql: `CREATE TABLE IF NOT EXISTS scenarios (
+            id CHAR(36) PRIMARY KEY,
+            campaign_id CHAR(36),
+            nome VARCHAR(255),
+            dados LONGTEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`
+        },
+        {
+          name: 'calculator_settings',
+          sql: `CREATE TABLE IF NOT EXISTS calculator_settings (
+            id CHAR(36) PRIMARY KEY,
+            meta_votos INT DEFAULT 0,
+            quorum INT DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`
+        },
+        {
+          name: 'team_members',
+          sql: `CREATE TABLE IF NOT EXISTS team_members (
+            id CHAR(36) PRIMARY KEY,
+            campaign_id CHAR(36) NOT NULL,
+            name VARCHAR(255) NOT NULL,
+            role VARCHAR(100),
+            phone VARCHAR(20),
+            municipality VARCHAR(100),
+            neighborhood VARCHAR(100),
+            status VARCHAR(50) DEFAULT 'ativo',
+            assigned_leader_id CHAR(36),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`
+        },
+        { name: 'boletins_urna', sql: `CREATE TABLE IF NOT EXISTS boletins_urna (id CHAR(36) PRIMARY KEY, campaign_id CHAR(36), zona VARCHAR(50), secao VARCHAR(50), local_votacao VARCHAR(255), votos_candidato INT DEFAULT 0, votos_totais INT DEFAULT 0, foto_url TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;` },
+        { name: 'election_incidents', sql: `CREATE TABLE IF NOT EXISTS election_incidents (id CHAR(36) PRIMARY KEY, campaign_id CHAR(36), tipo VARCHAR(100), descricao TEXT, localizacao VARCHAR(255), status VARCHAR(50) DEFAULT 'pendente', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;` },
+        { name: 'fraud_audit_logs', sql: `CREATE TABLE IF NOT EXISTS fraud_audit_logs (id CHAR(36) PRIMARY KEY, campaign_id CHAR(36), type VARCHAR(100), description TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;` },
+        { name: 'locations', sql: `CREATE TABLE IF NOT EXISTS locations (id CHAR(36) PRIMARY KEY, campaign_id CHAR(36), name VARCHAR(255), lat DECIMAL(10, 8), lng DECIMAL(11, 8), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;` },
+        { name: 'production_orders', sql: `CREATE TABLE IF NOT EXISTS production_orders (id CHAR(36) PRIMARY KEY, campaign_id CHAR(36), origin_agent VARCHAR(100), target_agent VARCHAR(100), content TEXT, status VARCHAR(50) DEFAULT 'pending', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;` },
+        { name: 'social_tokens', sql: `CREATE TABLE IF NOT EXISTS social_tokens (id CHAR(36) PRIMARY KEY, campaign_id CHAR(36) NOT NULL, provider VARCHAR(50) NOT NULL, access_token TEXT NOT NULL, refresh_token TEXT, expires_at TIMESTAMP, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE KEY uq_social (campaign_id, provider)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;` },
+        { name: 'voter_journey', sql: `CREATE TABLE IF NOT EXISTS voter_journey (id CHAR(36) PRIMARY KEY, campaign_id CHAR(36), voter_id CHAR(36), contact_id CHAR(36), step VARCHAR(100), current_stage VARCHAR(100), previous_stage VARCHAR(100), next_best_action TEXT, next_action_reason TEXT, status VARCHAR(50), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;` },
+        { name: 'war_room_intelligence', sql: `CREATE TABLE IF NOT EXISTS war_room_intelligence (id CHAR(36) PRIMARY KEY, campaign_id CHAR(36) NOT NULL, source_agent VARCHAR(100), target_agent VARCHAR(100), priority VARCHAR(50) DEFAULT 'Media', category VARCHAR(100), insight_text TEXT NOT NULL, metadata LONGTEXT, action_taken TINYINT(1) DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;` }
+      ];
 
-      // 2. users
-      await pool.execute(`
-        CREATE TABLE IF NOT EXISTS users (
-          id CHAR(36) PRIMARY KEY,
-          email VARCHAR(255) UNIQUE NOT NULL,
-          password VARCHAR(255),
-          name VARCHAR(255),
-          type ENUM('Admin', 'Líder', 'Apoiador', 'Colaborador') DEFAULT 'Colaborador',
-          plan VARCHAR(50) DEFAULT 'Gratuito',
-          role VARCHAR(50) DEFAULT 'user',
-          phone VARCHAR(20),
-          cost DECIMAL(10, 2) DEFAULT 0.00,
-          campaign_id CHAR(36),
-          is_supreme_admin TINYINT(1) DEFAULT 0,
-          assigned_leader_id CHAR(36),
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-      `);
-
-      // 3. settings
-      await pool.execute(`
-        CREATE TABLE IF NOT EXISTS settings (
-          id CHAR(36) PRIMARY KEY,
-          campaign_name VARCHAR(255),
-          timezone VARCHAR(100) DEFAULT 'America/Sao_Paulo',
-          ai_enabled TINYINT(1) DEFAULT 1,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-      `);
-
-      // 4. visits
-      await pool.execute(`
-        CREATE TABLE IF NOT EXISTS visits (
-          id CHAR(36) PRIMARY KEY,
-          campaign_id CHAR(36) NOT NULL,
-          voter_id CHAR(36),
-          data DATE NOT NULL,
-          resp VARCHAR(255),
-          tel VARCHAR(20),
-          nasc DATE,
-          municipio VARCHAR(100),
-          bairro VARCHAR(100),
-          apoiador VARCHAR(255),
-          eleitores INT DEFAULT 0,
-          participantes INT DEFAULT 0,
-          votos INT DEFAULT 0,
-          pet VARCHAR(10),
-          tipo_pet VARCHAR(50),
-          criancas INT DEFAULT 0,
-          solicit TEXT,
-          realizada VARCHAR(10) DEFAULT 'nao',
-          lider VARCHAR(255),
-          interesse VARCHAR(100),
-          leader_id CHAR(36),
-          nivel_engajamento VARCHAR(50),
-          observacoes_qualitativas TEXT,
-          created_by CHAR(36),
-          gps_coords VARCHAR(100),
-          duracao_segundos INT,
-          hora TIME,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-      `);
-
-      // 5. agent_chat_history
-      await pool.execute(`
-        CREATE TABLE IF NOT EXISTS agent_chat_history (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          campaign_id CHAR(36),
-          agent_id VARCHAR(100),
-          role ENUM('user', 'assistant', 'system', 'agent'),
-          content LONGTEXT,
-          metadata JSON,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-      `);
-
-      // 6. agent_outputs
-      await pool.execute(`
-        CREATE TABLE IF NOT EXISTS agent_outputs (
-          id CHAR(36) PRIMARY KEY,
-          campaign_id CHAR(36),
-          agent_id VARCHAR(100),
-          agent_type VARCHAR(100),
-          output_type VARCHAR(100),
-          content LONGTEXT,
-          metadata JSON,
-          created_by CHAR(36),
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-      `);
-
-      // 7. campaign_configs
-      await pool.execute(`
-        CREATE TABLE IF NOT EXISTS campaign_configs (
-          id CHAR(36) PRIMARY KEY,
-          features JSON,
-          limits JSON,
-          status VARCHAR(50) DEFAULT 'active',
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-      `);
-
-      // 8. contacts
-      await pool.execute(`
-        CREATE TABLE IF NOT EXISTS contacts (
-          id CHAR(36) PRIMARY KEY,
-          campaign_id CHAR(36),
-          name VARCHAR(255),
-          email VARCHAR(255),
-          phone VARCHAR(50),
-          voter_journey VARCHAR(100),
-          municipio VARCHAR(100),
-          bairro VARCHAR(100),
-          observacoes TEXT,
-          birth_date DATE,
-          interesse VARCHAR(100),
-          classification VARCHAR(100),
-          neighborhood VARCHAR(100),
-          electoral_zone VARCHAR(50),
-          electoral_section VARCHAR(50),
-          criancas INT DEFAULT 0,
-          tem_pet TINYINT(1) DEFAULT 0,
-          last_interaction_at TIMESTAMP NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-      `);
-
-      // 9. pesquisas
-      await pool.execute(`
-        CREATE TABLE IF NOT EXISTS pesquisas (
-          id CHAR(36) PRIMARY KEY,
-          campaign_id CHAR(36),
-          title VARCHAR(255),
-          status VARCHAR(50),
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-      `);
-
-      // 10. expenses / incomes
-      await pool.execute(`
-        CREATE TABLE IF NOT EXISTS expenses (
-          id CHAR(36) PRIMARY KEY,
-          campaign_id CHAR(36),
-          data DATE,
-          valor DECIMAL(15, 2),
-          descricao TEXT,
-          categoria VARCHAR(100),
-          fornecedor VARCHAR(255),
-          documento_fornecedor VARCHAR(50),
-          nota_fiscal_url TEXT,
-          status_documento VARCHAR(50),
-          tipo_documento VARCHAR(50),
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-      `);
-
-      await pool.execute(`
-        CREATE TABLE IF NOT EXISTS incomes (
-          id CHAR(36) PRIMARY KEY,
-          campaign_id CHAR(36),
-          data DATE,
-          valor DECIMAL(15, 2),
-          descricao TEXT,
-          categoria VARCHAR(100),
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-      `);
-
-      // 11. engagement_actions
-      await pool.execute(`
-        CREATE TABLE IF NOT EXISTS engagement_actions (
-          id CHAR(36) PRIMARY KEY,
-          campaign_id CHAR(36),
-          data DATE,
-          tipo VARCHAR(100),
-          detalhes JSON,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-      `);
-
-      // 12. scenarios
-      await pool.execute(`
-        CREATE TABLE IF NOT EXISTS scenarios (
-          id CHAR(36) PRIMARY KEY,
-          campaign_id CHAR(36),
-          nome VARCHAR(255),
-          dados JSON,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-      `);
-
-      // 13. calculator_settings
-      await pool.execute(`
-        CREATE TABLE IF NOT EXISTS calculator_settings (
-          id CHAR(36) PRIMARY KEY,
-          meta_votos INT DEFAULT 0,
-          quorum INT DEFAULT 0,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-      `);
-
-      // 14. team_members
-      await pool.execute(`
-        CREATE TABLE IF NOT EXISTS team_members (
-          id CHAR(36) PRIMARY KEY,
-          campaign_id CHAR(36) NOT NULL,
-          name VARCHAR(255) NOT NULL,
-          role VARCHAR(100),
-          phone VARCHAR(20),
-          municipality VARCHAR(100),
-          neighborhood VARCHAR(100),
-          status VARCHAR(50) DEFAULT 'ativo',
-          assigned_leader_id CHAR(36),
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-      `);
-
-      // 15. boletins_urna / incidents / fraud / locations / production / social / journey / war_room
-      await pool.execute(`CREATE TABLE IF NOT EXISTS boletins_urna (id CHAR(36) PRIMARY KEY, campaign_id CHAR(36), zona VARCHAR(50), secao VARCHAR(50), local_votacao VARCHAR(255), votos_candidato INT DEFAULT 0, votos_totais INT DEFAULT 0, foto_url TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`);
-      await pool.execute(`CREATE TABLE IF NOT EXISTS election_incidents (id CHAR(36) PRIMARY KEY, campaign_id CHAR(36), tipo VARCHAR(100), descricao TEXT, localizacao VARCHAR(255), status VARCHAR(50) DEFAULT 'pendente', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`);
-      await pool.execute(`CREATE TABLE IF NOT EXISTS fraud_audit_logs (id CHAR(36) PRIMARY KEY, campaign_id CHAR(36), type VARCHAR(100), description TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`);
-      await pool.execute(`CREATE TABLE IF NOT EXISTS locations (id CHAR(36) PRIMARY KEY, campaign_id CHAR(36), name VARCHAR(255), lat DECIMAL(10, 8), lng DECIMAL(11, 8), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`);
-      await pool.execute(`CREATE TABLE IF NOT EXISTS production_orders (id CHAR(36) PRIMARY KEY, campaign_id CHAR(36), origin_agent VARCHAR(100), target_agent VARCHAR(100), content TEXT, status VARCHAR(50) DEFAULT 'pending', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`);
-      await pool.execute(`CREATE TABLE IF NOT EXISTS social_tokens (id CHAR(36) PRIMARY KEY, campaign_id CHAR(36) NOT NULL, provider VARCHAR(50) NOT NULL, access_token TEXT NOT NULL, refresh_token TEXT, expires_at TIMESTAMP, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE KEY uq_social (campaign_id, provider)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`);
-      await pool.execute(`CREATE TABLE IF NOT EXISTS voter_journey (id CHAR(36) PRIMARY KEY, campaign_id CHAR(36), voter_id CHAR(36), contact_id CHAR(36), step VARCHAR(100), current_stage VARCHAR(100), previous_stage VARCHAR(100), next_best_action TEXT, next_action_reason TEXT, status VARCHAR(50), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`);
-      await pool.execute(`CREATE TABLE IF NOT EXISTS war_room_intelligence (id CHAR(36) PRIMARY KEY, campaign_id CHAR(36) NOT NULL, source_agent VARCHAR(100), target_agent VARCHAR(100), priority VARCHAR(50) DEFAULT 'Media', category VARCHAR(100), insight_text TEXT NOT NULL, metadata JSON, action_taken TINYINT(1) DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`);
+      for (const table of tables) {
+        console.log(`[Database] Checking table: ${table.name}...`);
+        await pool.execute(table.sql);
+      }
 
       // Se existir o arquivo seed.sql, executa ele
       const seedPath = path.join(process.cwd(), 'seed.sql');
@@ -2034,8 +2025,8 @@ app.get('/api/war-room/feed', (_req, res) => {
         for (const statement of statements) {
           try {
             await pool.execute(statement);
-          } catch (err) {
-            // Ignorar erros de duplicata se usar INSERT IGNORE
+          } catch (err: any) {
+             // Silencioso para erros de duplicata
           }
         }
         console.log('[Database] Seeding complete.');
@@ -2044,10 +2035,17 @@ app.get('/api/war-room/feed', (_req, res) => {
       // Garantir que o demo@campanhapro.com.br NÃO seja supreme admin se ele já existir
       await pool.execute('UPDATE users SET is_supreme_admin = 0 WHERE email = "demo@campanhapro.com.br"');
 
-      console.log('[Database] System Tables Ready.');
+      console.log('[Database] System Ready.');
     } catch (dbErr) {
-      console.warn('[Database] Startup sync failed:', dbErr);
+      console.error('[Database] Initialization error:', dbErr);
     }
+  }
+
+  // Run init then listen
+  await initializeDatabase();
+  
+  httpServer.listen(port, '0.0.0.0', () => {
+    console.log(`[CRITICAL] Server listening on http://0.0.0.0:${port}`);
   });
 }
 
