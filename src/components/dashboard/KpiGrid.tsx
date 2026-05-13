@@ -8,6 +8,7 @@ interface KpiGridProps {
     apoiadoresAtivos: number;
     totalAbordagens: number;
     totalMateriais: number;
+    alertasCampo: number;
   };
   currentScenarioStatus: {
     name: string;
@@ -47,6 +48,7 @@ const KpiGrid = ({ kpis, currentScenarioStatus, isLoading = false }: KpiGridProp
     <KpiCard title="Votos" value={kpis.votos} description="Comprometidos" valueClassName={kpis.total === 0 ? "text-slate-500" : "text-[#1abc9c]"} isLoading={isLoading} />
     <KpiCard title="Média de Votos" value={kpis.avgVotos.toFixed(2)} description="por visita" isLoading={isLoading} />
     <KpiCard title="Apoiadores Ativos" value={kpis.apoiadoresAtivos} description="últimos 7 dias" isLoading={isLoading} />
+    <KpiCard title="Alertas de Campo" value={kpis.alertasCampo} description="ocorrências urbanas" valueClassName={kpis.alertasCampo > 0 ? "text-orange-400" : "text-slate-500"} isLoading={isLoading} />
     <KpiCard title="Total Abordagens" value={kpis.totalAbordagens} description="engajamento rápido" isLoading={isLoading} />
     <KpiCard title="Materiais Entregues" value={kpis.totalMateriais} description="panfletos, etc." isLoading={isLoading} />
     <KpiCard title="Visitas Pendentes" value={kpis.pendentes} valueClassName={kpis.total === 0 ? "text-slate-500" : "text-yellow-400"} isLoading={isLoading} />

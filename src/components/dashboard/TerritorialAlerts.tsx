@@ -30,7 +30,7 @@ const TerritorialAlerts: React.FC = () => {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 text-orange-400" /> Alertas Territoriais
+          <AlertTriangle className="w-4 h-4 text-orange-400" /> Gaps de Cobertura
         </h3>
         <span className="text-[10px] bg-orange-500/10 text-orange-400 px-2 py-0.5 rounded-full font-bold">
           {criticalAlerts.length} Críticos
@@ -80,7 +80,7 @@ const TerritorialAlerts: React.FC = () => {
           onClick={() => navigate('/app/alertas-urbano')}
           className="w-full text-center py-2 text-[10px] text-slate-500 hover:text-slate-50 transition-colors"
         >
-          Ver todos os {alerts.length} alertas →
+          Ver todos os {alerts.length} bairros críticos →
         </button>
       )}
     </div>
