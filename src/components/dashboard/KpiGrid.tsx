@@ -18,24 +18,24 @@ interface KpiGridProps {
 }
 
 const KpiCard = ({ title, value, description, valueClassName = '', isLoading = false }: { title: string; value: string | number; description?: string, valueClassName?: string, isLoading?: boolean }) => (
-  <div className="bg-slate-700/40 p-4 rounded-xl border border-white/5 h-full flex flex-col justify-start">
-    <p className="text-[10px] text-slate-500 font-black uppercase tracking-wider mb-2 h-4 overflow-hidden">{title}</p>
-    <div className="flex-1 flex flex-col justify-center">
+  <div className="bg-slate-700/40 p-4 rounded-xl border border-white/5 flex flex-col h-[110px]">
+    <div className="h-4 overflow-hidden">
+      <p className="text-[10px] text-slate-500 font-black uppercase tracking-wider">{title}</p>
+    </div>
+    
+    <div className="flex-1 flex items-center">
       {isLoading ? (
           <div className="h-8 bg-slate-600/50 rounded w-1/2 animate-pulse"></div>
       ) : (
-          <p className={`text-2xl font-black ${valueClassName}`}>{value}</p>
+          <p className={`text-2xl font-black leading-none ${valueClassName}`}>{value}</p>
       )}
     </div>
-    {description && (
-        <div className="mt-2 h-4 flex items-end">
-          {isLoading ? (
-              <div className="h-3 bg-slate-600/50 rounded w-3/4 animate-pulse"></div>
-          ) : (
-              <p className="text-[9px] text-slate-500 font-medium truncate">{description}</p>
-          )}
-        </div>
-    )}
+    
+    <div className="h-4 flex items-end overflow-hidden">
+      {!isLoading && description && (
+          <p className="text-[9px] text-slate-500 font-medium truncate opacity-80">{description}</p>
+      )}
+    </div>
   </div>
 );
 
