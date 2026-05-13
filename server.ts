@@ -224,29 +224,6 @@ async function startServer() {
     try {
       console.log('[Admin] Iniciando sincronização forçada do banco...');
       
-      // Sincronizar street_reports
-      await pool.execute(`
-        CREATE TABLE IF NOT EXISTS street_reports (
-          id VARCHAR(255) PRIMARY KEY,
-          user_id VARCHAR(255),
-          campaign_id VARCHAR(255),
-          title VARCHAR(255),
-          reclamacao TEXT,
-          description TEXT,
-          bairro VARCHAR(255),
-          address TEXT,
-          clima VARCHAR(100),
-          latitude DECIMAL(10, 8),
-          longitude DECIMAL(11, 8),
-          media_urls JSON,
-          video_url TEXT,
-          status VARCHAR(50) DEFAULT 'pending',
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
-
-      const [reportCols]: any = await pool.execute('DESCRIBE street_reports');
-      const colNames = reportCols.map((c: any) => c.Field);
       
       const requiredCols = [
         { name: 'user_id', type: 'VARCHAR(255)' },
@@ -1769,12 +1746,9 @@ app.get('/api/war-room/feed', (_req, res) => {
   httpServer.listen(port, '0.0.0.0', async () => {
     console.log(`[CRITICAL] Server listening on http://0.0.0.0:${port}`);
     try {
-      const actualCampaignId = '455d21f3-f254-4b96-b49c-e70192c3fe27';
-      await pool.execute(
-        'UPDATE street_reports SET campaign_id = ? WHERE campaign_id = ? OR campaign_id IS NULL', 
-        [actualCampaignId, 'demo']
-      );
+      console.log('[Database] Checking/Creating System Tables...');
       
+      // 1. street_reports
       await pool.execute(`
         CREATE TABLE IF NOT EXISTS street_reports (
           id VARCHAR(255) PRIMARY KEY,
@@ -1782,19 +1756,102 @@ app.get('/api/war-room/feed', (_req, res) => {
           campaign_id VARCHAR(255),
           title VARCHAR(255),
           reclamacao TEXT,
+          description TEXT,
           bairro VARCHAR(255),
+          address TEXT,
           clima VARCHAR(100),
           latitude DECIMAL(10, 8),
           longitude DECIMAL(11, 8),
-          media_urls JSON,
+          media_urls LONGTEXT,
           video_url TEXT,
-          status VARCHAR(50) DEFAULT 'pending',
+          status VARCHAR(50) DEFAULT 'Pendente',
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
       `);
+
+      // 2. users
+      await pool.execute(`
+        CREATE TABLE IF NOT EXISTS users (
+          id CHAR(36) PRIMARY KEY,
+          email VARCHAR(255) UNIQUE NOT NULL,
+          password VARCHAR(255),
+          name VARCHAR(255),
+          type ENUM('Admin', 'Líder', 'Apoiador', 'Colaborador') DEFAULT 'Colaborador',
+          plan VARCHAR(50) DEFAULT 'Gratuito',
+          role VARCHAR(50) DEFAULT 'user',
+          phone VARCHAR(20),
+          cost DECIMAL(10, 2) DEFAULT 0.00,
+          campaign_id CHAR(36),
+          is_supreme_admin TINYINT(1) DEFAULT 0,
+          assigned_leader_id CHAR(36),
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+      `);
+
+      // 3. settings
+      await pool.execute(`
+        CREATE TABLE IF NOT EXISTS settings (
+          id CHAR(36) PRIMARY KEY,
+          campaign_name VARCHAR(255),
+          timezone VARCHAR(100) DEFAULT 'America/Sao_Paulo',
+          ai_enabled TINYINT(1) DEFAULT 1,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+      `);
+
+      // 4. visits
+      await pool.execute(`
+        CREATE TABLE IF NOT EXISTS visits (
+          id CHAR(36) PRIMARY KEY,
+          campaign_id CHAR(36) NOT NULL,
+          voter_id CHAR(36),
+          data DATE NOT NULL,
+          resp VARCHAR(255),
+          tel VARCHAR(20),
+          nasc DATE,
+          municipio VARCHAR(100),
+          bairro VARCHAR(100),
+          apoiador VARCHAR(255),
+          eleitores INT DEFAULT 0,
+          participantes INT DEFAULT 0,
+          votos INT DEFAULT 0,
+          pet VARCHAR(10),
+          tipo_pet VARCHAR(50),
+          criancas INT DEFAULT 0,
+          solicit TEXT,
+          realizada VARCHAR(10) DEFAULT 'nao',
+          lider VARCHAR(255),
+          interesse VARCHAR(100),
+          leader_id CHAR(36),
+          nivel_engajamento VARCHAR(50),
+          observacoes_qualitativas TEXT,
+          created_by CHAR(36),
+          gps_coords VARCHAR(100),
+          duracao_segundos INT,
+          hora TIME,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+      `);
+
+      // 5. Criar usuário Admin inicial se não existir
+      const [existingAdmins]: any = await pool.execute('SELECT * FROM users WHERE type = "Admin" LIMIT 1');
+      if (existingAdmins.length === 0) {
+        console.log('[Database] No Admin found. Creating default admin...');
+        const adminId = 'd2087ac0-ed3f-4a7d-bdd9-09e56adb310c';
+        const hashedPass = await bcrypt.hash('CampanhaPro@2024', 10);
+        await pool.execute(
+          `INSERT INTO users (id, email, password, name, type, plan, role, campaign_id, is_supreme_admin) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [adminId, 'demo@campanhapro.com.br', hashedPass, 'Administrador Central', 'Admin', 'Total', 'active', '455d21f3-f254-4b96-b49c-e70192c3fe27', 1]
+        );
+      }
+
       console.log('[Database] System Tables Ready.');
     } catch (dbErr) {
-      console.warn('[Database] Startup sync failed.');
+      console.warn('[Database] Startup sync failed:', dbErr);
     }
   });
 }
