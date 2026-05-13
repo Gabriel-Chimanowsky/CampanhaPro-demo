@@ -1869,7 +1869,7 @@ app.get('/api/war-room/feed', (_req, res) => {
         await pool.execute(
           `INSERT INTO users (id, email, password, name, type, plan, role, campaign_id, is_supreme_admin) 
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [adminId, 'demo@campanhapro.com.br', hashedPass, 'Administrador Central', 'Admin', 'Total', 'active', '455d21f3-f254-4b96-b49c-e70192c3fe27', 1]
+          [adminId, 'demo@campanhapro.com.br', hashedPass, 'Administrador Central', 'Admin', 'Total', 'active', '455d21f3-f254-4b96-b49c-e70192c3fe27', 0]
         );
       }
 
