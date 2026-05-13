@@ -94,7 +94,6 @@ const CityAlertsMap: React.FC<{ campaignId: string }> = ({ campaignId }) => {
         if (!error && data) {
             setAlerts(data);
         }
-        setLoading(false);
     };
 
     const getStatusColor = (clima: string) => {
