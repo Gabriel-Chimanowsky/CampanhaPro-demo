@@ -3,8 +3,8 @@ import { supabase } from '../lib/supabaseClient';
 import { AuthenticatedUser, Plan } from '../types/user';
 import { ensureCampaignConfig } from '../utils/planUtils';
 
-const SUPREME_ADMIN_EMAIL = 'eldastito@gmail.com';
-const VIP_EMAILS = ['eldastito@gmail.com', 'examepad@gmail.com'];
+const SUPREME_ADMIN_EMAIL = import.meta.env.VITE_SUPREME_ADMIN_EMAIL || 'eldastito@gmail.com';
+const VIP_EMAILS = [SUPREME_ADMIN_EMAIL, 'examepad@gmail.com'];
 
 interface AuthContextType {
   user: AuthenticatedUser | null;

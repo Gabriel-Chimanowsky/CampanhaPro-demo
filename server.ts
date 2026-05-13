@@ -171,12 +171,16 @@ const callGeminiREST = async (prompt: string) => {
 
 
 async function startServer() {
-  const port: number = Number(process.env.PORT) || 3005;
+  const port: number = Number(process.env.PORT) || 3001;
   const app = express();
   const httpServer = createHttpServer(app);
 
   // Core Middlewares
-  app.use(cors());
+  const allowedOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').map(o => o.trim()).filter(Boolean);
+  app.use(cors({
+    origin: allowedOrigins.length > 0 ? allowedOrigins : true,
+    credentials: true
+  }));
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ extended: true, limit: '50mb' }));
   
@@ -611,8 +615,9 @@ async function startServer() {
     try {
       if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
       
-      // Use local server URL for the public path
-      const publicUrl = `http://localhost:3005/uploads/${req.file.filename}`;
+      // Use APP_URL for the public path
+      const appUrl = process.env.APP_URL || `http://localhost:${port}`;
+      const publicUrl = `${appUrl.replace(/\/$/, '')}/uploads/${req.file.filename}`;
       res.json({ publicUrl, path: req.file.path });
     } catch (err: any) {
       console.error('Upload Error:', err);
@@ -684,34 +689,25 @@ app.get('/api/war-room/feed', (_req, res) => {
   app.get('/api/campaigns', requireAuth, async (req, res) => {
     try {
       const userId = (req as any).user?.id;
-      if (!supabaseAdmin) {
-        return res.status(503).json({ error: 'Database service unavailable' });
-      }
+      
+      // Get user's campaign from MySQL
+      const [users]: any = await pool.execute('SELECT campaign_id FROM users WHERE id = ?', [userId]);
+      const userData = users[0];
 
-      // Get user's campaign
-      const { data: userData, error: userError } = await supabaseAdmin
-        .from('users')
-        .select('campaignId')
-        .eq('id', userId)
-        .single();
-
-      if (userError || !userData?.campaignId) {
+      if (!userData?.campaign_id) {
         return res.status(404).json({ error: 'No campaign found for user' });
       }
 
-      // Get campaign config
-      const { data: campaignData, error: campaignError } = await supabaseAdmin
-        .from('campaign_configs')
-        .select('*')
-        .eq('id', userData.campaignId)
-        .single();
+      // Get campaign config from MySQL
+      const [configs]: any = await pool.execute('SELECT * FROM campaign_configs WHERE id = ?', [userData.campaign_id]);
+      const campaignData = configs[0];
 
-      if (campaignError || !campaignData) {
+      if (!campaignData) {
         return res.status(404).json({ error: 'Campaign not found' });
       }
 
       res.json({
-        id: userData.campaignId,
+        id: userData.campaign_id,
         ...campaignData
       });
     } catch (error: any) {
@@ -723,17 +719,11 @@ app.get('/api/war-room/feed', (_req, res) => {
   app.get('/api/campaigns/:campaignId', requireAuth, async (req, res) => {
     try {
       const { campaignId } = req.params;
-      if (!supabaseAdmin) {
-        return res.status(503).json({ error: 'Database service unavailable' });
-      }
+      
+      const [configs]: any = await pool.execute('SELECT * FROM campaign_configs WHERE id = ?', [campaignId]);
+      const data = configs[0];
 
-      const { data, error } = await supabaseAdmin
-        .from('campaign_configs')
-        .select('*')
-        .eq('id', campaignId)
-        .single();
-
-      if (error || !data) {
+      if (!data) {
         return res.status(404).json({ error: 'Campaign not found' });
       }
 
@@ -1583,33 +1573,37 @@ app.get('/api/war-room/feed', (_req, res) => {
     try {
       const { campaignId, provider, accessToken, refreshToken, expiresIn } = req.body;
 
-      if (!supabaseAdmin || !campaignId) {
-        return res.status(400).json({ error: 'Missing required fields' });
+      if (!campaignId) {
+        return res.status(400).json({ error: 'Missing campaignId' });
       }
 
       const tokenExpiresAt = expiresIn
         ? new Date(Date.now() + expiresIn * 1000)
         : null;
 
-      const { data, error } = await supabaseAdmin
-        .from('social_tokens')
-        .upsert({
+      await pool.execute(
+        `INSERT INTO social_tokens (id, campaign_id, provider, access_token, refresh_token, expires_at, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE 
+            access_token = VALUES(access_token),
+            refresh_token = VALUES(refresh_token),
+            expires_at = VALUES(expires_at),
+            status = VALUES(status),
+            updated_at = CURRENT_TIMESTAMP`,
+        [
+          crypto.randomUUID(),
           campaignId,
           provider,
           accessToken,
           refreshToken,
           tokenExpiresAt,
-          status: 'active',
-          lastRefreshedAt: new Date(),
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
+          'active'
+        ]
+      );
 
       res.json({
         message: 'Token salvo com sucesso',
-        token: { id: data.id, provider: data.provider },
+        token: { provider },
       });
     } catch (error: any) {
       console.error('[Social Token] Erro:', error);
@@ -1622,27 +1616,26 @@ app.get('/api/war-room/feed', (_req, res) => {
     try {
       const { campaignId, provider } = req.query;
 
-      if (!supabaseAdmin || !campaignId) {
+      if (!campaignId) {
         return res.status(400).json({ error: 'Missing campaignId' });
       }
 
-      const { data, error } = await supabaseAdmin
-        .from('social_tokens')
-        .select('status, tokenExpiresAt')
-        .eq('campaignId', campaignId)
-        .eq('provider', provider || 'meta')
-        .single();
+      const [tokens]: any = await pool.query(
+        'SELECT status, expires_at FROM social_tokens WHERE campaign_id = ? AND provider = ?',
+        [campaignId as string, (provider as string) || 'meta']
+      );
+      const data = tokens[0];
 
-      if (error || !data) {
+      if (!data) {
         return res.json({ connected: false });
       }
 
-      const isExpired = data.tokenExpiresAt && new Date(data.tokenExpiresAt) < new Date();
+      const isExpired = data.expires_at && new Date(data.expires_at) < new Date();
 
       res.json({
         connected: data.status === 'active' && !isExpired,
         status: data.status,
-        expiresAt: data.tokenExpiresAt,
+        expiresAt: data.expires_at,
       });
     } catch (error: any) {
       console.error('[Social Status] Erro:', error);

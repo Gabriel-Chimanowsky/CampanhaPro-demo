@@ -4,8 +4,10 @@
 // para o backend local Express (que usa MySQL)
 // ============================================================
 
-const isBrowser = typeof window !== 'undefined';
-const baseUrl = (isBrowser && window.location.hostname === 'localhost') ? 'http://127.0.0.1:3005' : '';
+
+// Em desenvolvimento (Vite), o proxy no vite.config.ts redireciona /api para o backend.
+// Em produção, o backend serve o frontend no mesmo domínio.
+const baseUrl = '';
 
 class MySQLQueryBuilder {
   private table: string;
@@ -20,7 +22,7 @@ class MySQLQueryBuilder {
     this.table = table;
   }
 
-  select(columns: string = '*') {
+  select(_columns: string = '*') {
     this.action = 'select';
     return this;
   }
@@ -306,7 +308,7 @@ export const supabase: any = {
   auth: mysqlAuth,
   storage: {
     from: () => ({
-      upload: async (path: string, file: File) => {
+      upload: async (_path: string, file: File) => {
         try {
           const formData = new FormData();
           formData.append('file', file);

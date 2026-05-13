@@ -6,7 +6,7 @@
   "main": "server.ts",
   "scripts": {
     "start": "tsx server.ts",
-    "dev": "vite",
+    "dev": "vite --host",
     "server": "tsx server.ts",
     "build": "vite build",
     "lint": "tsc --noEmit"

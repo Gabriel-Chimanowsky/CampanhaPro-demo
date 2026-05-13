@@ -1,0 +1,1 @@
+import"./rolldown-runtime-BYbx6iT9.js";import{m as e}from"./charts-u3bkK7Uv.js";import{d as t}from"./libs-DcYHmDge.js";e();var n=t(),r=({children:e,className:t=``})=>(0,n.jsx)(`div`,{className:`bg-slate-900 rounded-xl shadow-lg p-4 sm:p-6 print-bg-transparent print-text-black ${t}`,children:e});export{r as t};

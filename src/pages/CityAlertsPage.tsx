@@ -8,7 +8,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
     AlertTriangle, MapPin, Clock, User, 
     Search, Maximize2,
-    CheckCircle2, Share2, Check, Loader2, Copy, Trash2
+    CheckCircle2, Share2, Check, Loader2, Copy, Trash2,
+    RefreshCw, Archive, ArrowLeft, ChevronLeft, ChevronRight, X
 } from 'lucide-react';
 
 // Fix Leaflet icon issue
@@ -56,7 +57,7 @@ const CityAlertsPage: React.FC = () => {
     const [alerts, setAlerts] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedAlert, setSelectedAlert] = useState<any>(null);
-    const [activeTab, setActiveTab] = useState<'alerts' | 'team'>('alerts');
+    const [activeTab, setActiveTab] = useState<'alerts' | 'team' | 'history'>('alerts');
     const [searchQuery, setSearchQuery] = useState('');
     const [filterSentiment, setFilterSentiment] = useState<string | null>(null);
     const [collaborators, setCollaborators] = useState<any[]>([]);
@@ -65,6 +66,9 @@ const CityAlertsPage: React.FC = () => {
     const [zoom, setZoom] = useState(12);
     
     const [copied, setCopied] = useState(false);
+    const [isMediaExpanded, setIsMediaExpanded] = useState(false);
+    const [showLightbox, setShowLightbox] = useState(false);
+    const [activeImageIndex, setActiveImageIndex] = useState(0);
 
     // Stats for the header
     const stats = useMemo(() => ({
@@ -122,12 +126,18 @@ const CityAlertsPage: React.FC = () => {
                                   alert.userName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                                   alert.bairro?.toLowerCase().includes(searchQuery.toLowerCase()));
             const matchesSentiment = !filterSentiment || alert.clima === filterSentiment;
-            return matchesSearch && matchesSentiment;
+            
+            // Logic for History vs Active Alertas
+            const isCompleted = alert.status === 'Concluído';
+            const matchesTab = activeTab === 'alerts' ? !isCompleted : isCompleted;
+
+            return matchesSearch && matchesSentiment && matchesTab;
         });
-    }, [alerts, searchQuery, filterSentiment]);
+    }, [alerts, searchQuery, filterSentiment, activeTab]);
 
     const handleSelectAlert = (alert: any) => {
         setSelectedAlert(alert);
+        setIsMediaExpanded(false);
         if (alert.latitude && alert.longitude) {
             setMapCenter([alert.latitude, alert.longitude]);
             setZoom(16);
@@ -206,10 +216,11 @@ const CityAlertsPage: React.FC = () => {
                         <div className="flex bg-black/50 p-1 rounded-xl border border-white/5">
                             <button onClick={() => setActiveTab('alerts')} className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${activeTab === 'alerts' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}>Alertas</button>
                             <button onClick={() => setActiveTab('team')} className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${activeTab === 'team' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}>Equipe</button>
+                            <button onClick={() => setActiveTab('history')} className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${activeTab === 'history' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}>Histórico</button>
                         </div>
                     </div>
 
-                    {activeTab === 'alerts' && (
+                    {(activeTab === 'alerts' || activeTab === 'history') && (
                         <div className="space-y-4">
                             {/* Stats in a single row */}
                             <div className="flex gap-2">
@@ -256,7 +267,7 @@ const CityAlertsPage: React.FC = () => {
 
                 {/* List Container - NOW GETS MOST SPACE */}
                 <div className="flex-1 overflow-y-auto px-6 py-2 space-y-3 custom-scrollbar bg-black/10">
-                    {activeTab === 'alerts' ? (
+                    {activeTab !== 'team' ? (
                         loading ? (
                             <div className="flex flex-col items-center justify-center py-10 gap-4 opacity-50">
                                 <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
@@ -287,10 +298,15 @@ const CityAlertsPage: React.FC = () => {
                                                 <div className={`px-2 py-0.5 rounded-md text-[7px] font-black uppercase border ${sentimentColors[alert.clima as keyof typeof sentimentColors] || 'border-white/10'}`}>
                                                     {alert.clima || 'Alerta'}
                                                 </div>
-                                                <span className="text-[8px] text-slate-600 font-bold">{new Date(alert.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                                                <span className="text-[8px] text-slate-600 font-bold">{new Date(alert.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
                                             </div>
                                             <h3 className="text-xs font-black text-white truncate uppercase mb-1">{alert.title}</h3>
-                                            <p className="text-[10px] text-slate-500 font-medium truncate">{alert.bairro}</p>
+                                            <div className="flex items-center justify-between gap-2">
+                                                <p className="text-[10px] text-slate-500 font-medium truncate">{alert.bairro}</p>
+                                                <div className="flex items-center gap-1 text-[8px] text-blue-400 font-black uppercase shrink-0">
+                                                    <User size={8} /> {alert.userName?.split(' ')[0] || 'Equipe'}
+                                                </div>
+                                            </div>
                                         </motion.div>
                                     );
                                 })}
@@ -349,7 +365,7 @@ const CityAlertsPage: React.FC = () => {
                 <MapContainer center={mapCenter} zoom={zoom} zoomControl={false} style={{ height: '100%', width: '100%' }}>
                     <ChangeView center={mapCenter} zoom={zoom} />
                     <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
-                    {alerts.filter(a => a.latitude && a.longitude).map(alert => (
+                    {filteredAlerts.filter(a => a.latitude && a.longitude).map(alert => (
                         <Marker 
                             key={alert.id} 
                             position={[alert.latitude, alert.longitude]}
@@ -370,71 +386,155 @@ const CityAlertsPage: React.FC = () => {
                 <AnimatePresence>
                     {selectedAlert && (
                         <motion.div 
-                            initial={{ opacity: 0, y: 50, scale: 0.95 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: 50, scale: 0.95 }}
-                            className="absolute inset-x-8 bottom-8 z-[2000] pointer-events-none"
+                            initial={{ opacity: 0, x: 50, scale: 0.98 }}
+                            animate={{ opacity: 1, x: 0, scale: 1 }}
+                            exit={{ opacity: 0, x: 50, scale: 0.98 }}
+                            className="absolute right-8 top-24 bottom-24 z-[2000] pointer-events-none w-[420px]"
                         >
-                            <div className="bg-[#0f172a]/95 backdrop-blur-3xl border border-white/10 rounded-[3rem] p-8 shadow-[0_40px_100px_rgba(0,0,0,0.9)] pointer-events-auto flex flex-col md:flex-row gap-8 max-h-[600px] overflow-hidden">
-                                <div className="flex-1 overflow-y-auto custom-scrollbar pr-4">
-                                    <div className="flex items-center gap-4 mb-4">
-                                        <div className={`px-4 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${getStatusStyles(selectedAlert.clima).bg} ${getStatusStyles(selectedAlert.clima).text} border ${getStatusStyles(selectedAlert.clima).border}`}>
+                            <div className="h-full bg-slate-950/80 backdrop-blur-2xl border border-white/10 rounded-[2.5rem] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.8)] pointer-events-auto flex flex-col overflow-hidden relative group">
+                                {/* Top Header Gradient Accent */}
+                                <div className={`absolute top-0 left-0 right-0 h-1.5 ${getStatusStyles(selectedAlert.clima).bg}`} />
+
+                                <div className="flex-1 overflow-y-auto custom-scrollbar p-7 pt-9">
+                                    <div className="flex items-center justify-between mb-6">
+                                        <div className={`px-4 py-1 rounded-xl text-[8px] font-black uppercase tracking-[0.2em] ${getStatusStyles(selectedAlert.clima).bg} ${getStatusStyles(selectedAlert.clima).text} border ${getStatusStyles(selectedAlert.clima).border} shadow-lg shadow-black/20`}>
                                             {selectedAlert.clima || 'ALERTA'}
                                         </div>
-                                        <div className="flex items-center gap-1.5 text-blue-400 font-black text-[10px] uppercase tracking-widest">
-                                            <MapPin size={14} /> {selectedAlert.bairro}
+                                        <div className="flex items-center gap-2 text-slate-400 font-bold text-[9px] uppercase tracking-widest bg-white/5 px-3 py-1 rounded-lg border border-white/5">
+                                            <MapPin size={12} className="text-blue-500" /> {selectedAlert.bairro}
                                         </div>
                                     </div>
                                     
-                                    <h2 className="text-2xl font-black text-white mb-4 tracking-tighter leading-tight uppercase">{selectedAlert.title}</h2>
+                                    <h2 className="text-xl font-black text-white mb-6 tracking-tight leading-[1.1] uppercase drop-shadow-sm italic italic-none">{selectedAlert.title}</h2>
                                     
-                                    <div className="p-6 bg-white/[0.03] border border-white/5 rounded-[2rem] mb-6">
-                                        <p className="text-slate-300 text-sm leading-relaxed font-medium">{selectedAlert.reclamacao || 'Nenhuma descrição fornecida.'}</p>
+                                    <div className="relative mb-6">
+                                        <div className="absolute -left-3 top-0 bottom-0 w-0.5 bg-blue-500/30 rounded-full" />
+                                        <p className="text-slate-400 text-[13px] leading-relaxed font-medium italic-none pl-1">
+                                            {selectedAlert.reclamacao || 'Nenhuma descrição detalhada fornecida para esta ocorrência.'}
+                                        </p>
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-4 mb-6">
-                                        <div className="flex items-center gap-3 p-4 bg-black/20 rounded-2xl border border-white/5">
-                                            <div className="w-10 h-10 rounded-xl bg-blue-600/10 flex items-center justify-center border border-blue-500/20"><User className="w-5 h-5 text-blue-400" /></div>
-                                            <div className="min-w-0">
-                                                <p className="text-[8px] text-slate-500 uppercase font-black mb-0.5 tracking-widest">Responsável</p>
-                                                <p className="text-xs font-black text-white truncate">{selectedAlert.userName || 'Colaborador'}</p>
+                                    <div className="grid grid-cols-2 gap-4 mb-8">
+                                        <div className="flex flex-col gap-2 p-4 bg-white/[0.03] rounded-2xl border border-white/5 hover:bg-white/[0.05] transition-colors group/item">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <div className="w-6 h-6 rounded-lg bg-blue-600/20 flex items-center justify-center border border-blue-500/20"><User className="w-3 h-3 text-blue-400" /></div>
+                                                <p className="text-[7px] text-slate-500 uppercase font-black tracking-[0.15em]">Relator</p>
                                             </div>
+                                            <p className="text-[11px] font-black text-white truncate group-hover/item:text-blue-400 transition-colors">{selectedAlert.userName || 'Colaborador'}</p>
                                         </div>
-                                        <div className="flex items-center gap-3 p-4 bg-black/20 rounded-2xl border border-white/5">
-                                            <div className="w-10 h-10 rounded-xl bg-amber-600/10 flex items-center justify-center border border-amber-500/20"><Clock className="w-5 h-5 text-amber-400" /></div>
-                                            <div className="min-w-0">
-                                                <p className="text-[8px] text-slate-500 uppercase font-black mb-0.5 tracking-widest">Data/Hora</p>
-                                                <p className="text-xs font-black text-white truncate">
-                                                    {selectedAlert.created_at ? new Date(selectedAlert.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'Horário não registrado'}
-                                                </p>
+                                        <div className="flex flex-col gap-2 p-4 bg-white/[0.03] rounded-2xl border border-white/5 hover:bg-white/[0.05] transition-colors group/item">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <div className="w-6 h-6 rounded-lg bg-amber-600/20 flex items-center justify-center border border-amber-500/20"><Clock className="w-3 h-3 text-amber-400" /></div>
+                                                <p className="text-[7px] text-slate-500 uppercase font-black tracking-[0.15em]">Registro</p>
                                             </div>
+                                            <p className="text-[11px] font-black text-white truncate group-hover/item:text-amber-400 transition-colors">
+                                                {selectedAlert.createdAt ? new Date(selectedAlert.createdAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '--/--'}
+                                            </p>
                                         </div>
                                     </div>
 
-                                    {/* Safe Media Rendering */}
                                     {getMediaArray(selectedAlert.mediaUrls).length > 0 && (
-                                        <div className="mt-6">
-                                            <div className="flex items-center gap-4 mb-4">
-                                                <div className="h-px flex-1 bg-white/5" />
-                                                <p className="text-[9px] text-slate-600 uppercase font-black tracking-widest">EVIDÊNCIAS NO LOCAL</p>
-                                                <div className="h-px flex-1 bg-white/5" />
+                                        <div className="mt-8">
+                                            <div className="flex items-center gap-3 mb-4">
+                                                <p className="text-[8px] text-slate-500 uppercase font-black tracking-[0.25em]">EVIDÊNCIAS VISUAIS</p>
+                                                <div className="h-px flex-1 bg-gradient-to-r from-white/10 to-transparent" />
+                                                <div className="text-[8px] text-blue-500 font-black">{getMediaArray(selectedAlert.mediaUrls).length} ITENS</div>
                                             </div>
-                                            <div className="grid grid-cols-3 gap-3">
-                                                {getMediaArray(selectedAlert.mediaUrls).map((url: string, idx: number) => (
-                                                    <motion.div key={idx} whileHover={{ scale: 1.05 }} className="group relative aspect-square rounded-2xl overflow-hidden bg-black border border-white/10 cursor-zoom-in" onClick={() => window.open(url, '_blank')}>
-                                                        <img src={url} alt="Evidência" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
-                                                        <div className="absolute inset-0 bg-blue-600/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"><Maximize2 className="text-white w-5 h-5" /></div>
-                                                    </motion.div>
-                                                ))}
+                                            
+                                            <div className="relative min-h-[200px] flex items-center justify-center py-4">
+                                                <AnimatePresence mode="wait">
+                                                    {!isMediaExpanded ? (
+                                                        <motion.div 
+                                                            key="fan"
+                                                            initial={{ opacity: 0, scale: 0.8 }}
+                                                            animate={{ opacity: 1, scale: 1 }}
+                                                            exit={{ opacity: 0, scale: 0.8 }}
+                                                            className="relative w-40 h-52 cursor-pointer group/fan"
+                                                            onClick={() => setIsMediaExpanded(true)}
+                                                        >
+                                                            {getMediaArray(selectedAlert.mediaUrls).slice(0, 3).map((url: string, idx: number) => (
+                                                                <motion.div
+                                                                    key={idx}
+                                                                    className="absolute inset-0 rounded-2xl overflow-hidden border-2 border-white/10 shadow-2xl bg-slate-900"
+                                                                    style={{ zIndex: 3 - idx }}
+                                                                    animate={{ 
+                                                                        rotate: idx === 0 ? 0 : idx === 1 ? -10 : 10,
+                                                                        x: idx === 0 ? 0 : idx === 1 ? -20 : 20,
+                                                                        y: idx === 0 ? 0 : idx === 1 ? 5 : 5
+                                                                    }}
+                                                                    whileHover={{ 
+                                                                        rotate: idx === 0 ? 0 : idx === 1 ? -15 : 15,
+                                                                        x: idx === 0 ? 0 : idx === 1 ? -30 : 30,
+                                                                        scale: 1.05
+                                                                    }}
+                                                                >
+                                                                    <img src={url} className="w-full h-full object-cover" alt="Evidência" />
+                                                                    {idx === 0 && (
+                                                                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover/fan:opacity-100 transition-opacity">
+                                                                            <p className="text-[10px] font-black text-white uppercase tracking-tighter">VER TODAS</p>
+                                                                        </div>
+                                                                    )}
+                                                                </motion.div>
+                                                            ))}
+                                                        </motion.div>
+                                                    ) : (
+                                                        <motion.div 
+                                                            key="grid"
+                                                            initial={{ opacity: 0, y: 20 }}
+                                                            animate={{ opacity: 1, y: 0 }}
+                                                            exit={{ opacity: 0, y: 20 }}
+                                                            className="grid grid-cols-3 gap-3 w-full"
+                                                        >
+                                                            {getMediaArray(selectedAlert.mediaUrls).map((url: string, idx: number) => (
+                                                                <motion.div 
+                                                                    key={idx} 
+                                                                    layoutId={`media-${idx}`}
+                                                                    whileHover={{ scale: 1.04, y: -4 }} 
+                                                                    className="group/img relative aspect-[4/5] rounded-xl overflow-hidden bg-black border border-white/10 cursor-pointer shadow-lg"
+                                                                    onClick={() => {
+                                                                        setActiveImageIndex(idx);
+                                                                        setShowLightbox(true);
+                                                                    }}
+                                                                >
+                                                                    <img src={url} alt="Evidência" className="w-full h-full object-cover" />
+                                                                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover/img:opacity-100 transition-opacity flex items-end p-3">
+                                                                        <Maximize2 className="text-white w-4 h-4 mx-auto mb-2" />
+                                                                    </div>
+                                                                </motion.div>
+                                                            ))}
+                                                            <button 
+                                                                onClick={(e) => { e.stopPropagation(); setIsMediaExpanded(false); }}
+                                                                className="col-span-3 mt-2 py-2 text-[8px] font-black text-slate-500 hover:text-white uppercase tracking-widest border border-dashed border-white/10 rounded-lg hover:border-white/20 transition-all"
+                                                            >
+                                                                RECOLHER GALERIA
+                                                            </button>
+                                                        </motion.div>
+                                                    )}
+                                                </AnimatePresence>
                                             </div>
                                         </div>
                                     )}
                                 </div>
-                                <div className="w-full md:w-[260px] flex flex-col gap-3 justify-end">
-                                    <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className={`w-full rounded-2xl h-14 font-black text-[10px] uppercase tracking-widest shadow-2xl transition-all ${selectedAlert.status === 'Concluído' ? 'bg-emerald-600 text-white' : 'bg-blue-600 text-white shadow-blue-500/20 hover:bg-blue-500'}`} onClick={() => handleUpdateStatus(selectedAlert.id, selectedAlert.status === 'Concluído' ? 'Pendente' : 'Concluído')}>
-                                        {selectedAlert.status === 'Concluído' ? 'REABRIR CHAMADO' : 'ARQUIVAR OCORRÊNCIA'}
+                                
+                                <div className="p-7 pt-0 flex flex-col gap-3">
+                                    <motion.button 
+                                        whileHover={{ scale: 1.02, backgroundColor: 'rgba(59, 130, 246, 0.9)' }} 
+                                        whileTap={{ scale: 0.98 }} 
+                                        className={`w-full rounded-[1.25rem] h-14 font-black text-[10px] uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 ${selectedAlert.status === 'Concluído' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/20' : 'bg-blue-600 text-white shadow-xl shadow-blue-500/20'}`} 
+                                        onClick={() => handleUpdateStatus(selectedAlert.id, selectedAlert.status === 'Concluído' ? 'Pendente' : 'Concluído')}
+                                    >
+                                        {selectedAlert.status === 'Concluído' ? (
+                                            <><RefreshCw size={14} /> REATIVAR ALERTA</>
+                                        ) : (
+                                            <><Archive size={14} /> ARQUIVAR OCORRÊNCIA</>
+                                        )}
                                     </motion.button>
-                                    <button className="w-full rounded-2xl h-12 text-slate-500 hover:text-white font-black text-[9px] uppercase tracking-widest border border-white/5 hover:bg-white/5 transition-all" onClick={() => setSelectedAlert(null)}>VOLTAR AO RADAR</button>
+                                    <button 
+                                        className="w-full rounded-[1.25rem] h-12 text-slate-500 hover:text-white font-black text-[9px] uppercase tracking-widest border border-white/5 hover:bg-white/5 transition-all flex items-center justify-center gap-2" 
+                                        onClick={() => setSelectedAlert(null)}
+                                    >
+                                        <ArrowLeft size={12} /> VOLTAR AO RADAR
+                                    </button>
                                 </div>
                             </div>
                         </motion.div>
@@ -448,6 +548,60 @@ const CityAlertsPage: React.FC = () => {
                         <div className="bg-emerald-600/90 backdrop-blur-2xl text-white px-10 py-6 rounded-[2.5rem] shadow-2xl flex items-center gap-5 border border-emerald-400/40">
                             <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center"><CheckCircle2 className="w-7 h-7" /></div>
                             <div><p className="font-black text-base uppercase tracking-tight">OPERACIONALIZADO</p><p className="text-[11px] opacity-80 font-bold uppercase tracking-widest mt-1.5">Link pronto para envio</p></div>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+            <AnimatePresence>
+                {showLightbox && selectedAlert && (
+                    <motion.div 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[9999] bg-black/95 backdrop-blur-3xl flex items-center justify-center p-4 md:p-12"
+                    >
+                        <button 
+                            onClick={() => setShowLightbox(false)}
+                            className="absolute top-8 right-8 w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white hover:bg-white/10 transition-all z-10"
+                        >
+                            <X size={24} />
+                        </button>
+
+                        <div className="relative w-full h-full flex items-center justify-center">
+                            <AnimatePresence mode="wait">
+                                <motion.img
+                                    key={activeImageIndex}
+                                    src={getMediaArray(selectedAlert.mediaUrls)[activeImageIndex]}
+                                    initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                                    exit={{ opacity: 0, scale: 0.9, y: -20 }}
+                                    transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                                    className="max-w-full max-h-full object-contain rounded-3xl shadow-[0_50px_100px_rgba(0,0,0,0.8)]"
+                                />
+                            </AnimatePresence>
+
+                            {getMediaArray(selectedAlert.mediaUrls).length > 1 && (
+                                <>
+                                    <button 
+                                        onClick={() => setActiveImageIndex(prev => (prev > 0 ? prev - 1 : getMediaArray(selectedAlert.mediaUrls).length - 1))}
+                                        className="absolute left-4 w-16 h-16 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white hover:bg-white/10 transition-all hover:scale-110"
+                                    >
+                                        <ChevronLeft size={32} />
+                                    </button>
+                                    <button 
+                                        onClick={() => setActiveImageIndex(prev => (prev < getMediaArray(selectedAlert.mediaUrls).length - 1 ? prev + 1 : 0))}
+                                        className="absolute right-4 w-16 h-16 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white hover:bg-white/10 transition-all hover:scale-110"
+                                    >
+                                        <ChevronRight size={32} />
+                                    </button>
+                                </>
+                            )}
+
+                            <div className="absolute bottom-8 px-6 py-3 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md">
+                                <p className="text-white font-black text-sm tracking-widest uppercase">
+                                    {activeImageIndex + 1} / {getMediaArray(selectedAlert.mediaUrls).length} EVIDÊNCIA
+                                </p>
+                            </div>
                         </div>
                     </motion.div>
                 )}

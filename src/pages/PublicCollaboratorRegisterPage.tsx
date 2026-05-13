@@ -127,7 +127,7 @@ const PublicCollaboratorRegisterPage: React.FC = () => {
         try {
             await fetch('/api/ping');
             setPingStatus('Proxy OK! Testando Direto...');
-            const res = await fetch('http://127.0.0.1:3005/api/ping');
+            const res = await fetch('http://127.0.0.1:3001/api/ping');
             await res.json();
             setPingStatus('TUDO OK! Conexão Direta Estabelecida.');
         } catch (e: any) {
