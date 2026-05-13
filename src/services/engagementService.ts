@@ -28,6 +28,7 @@ export async function getLeaderConversionStats(campaignId: string): Promise<Lead
       .eq('campaign_id', campaignId);
 
     if (visitsError) throw visitsError;
+    console.log(`[EngagementService] Visitas encontradas: ${visits?.length || 0}`);
 
     // 2. Buscar as jornadas dos eleitores para ver o estágio de conversão
     const { data: journeys, error: journeysError } = await supabase
@@ -36,6 +37,7 @@ export async function getLeaderConversionStats(campaignId: string): Promise<Lead
       .eq('campaign_id', campaignId);
 
     if (journeysError) throw journeysError;
+    console.log(`[EngagementService] Jornadas encontradas: ${journeys?.length || 0}`);
 
     // 3. Mapear estágios por contato para acesso rápido
     const stageMap: Record<string, string> = {};

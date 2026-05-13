@@ -19,9 +19,9 @@ const AnimatedBarChart = ({ data }: { data: { date: string; visits: number; vote
     const [hoveredIndex, setHoveredIndex] = React.useState<number | null>(null);
     const [tooltipPos, setTooltipPos] = React.useState({ x: 0, y: 0 });
     
-    const chartHeight = 160;
+    const chartHeight = 180;
     const chartWidth = 800;
-    const padding = { top: 10, right: 30, bottom: 30, left: 40 };
+    const padding = { top: 20, right: 30, bottom: 40, left: 40 };
     
     const maxVisits = Math.max(...data.map(d => d.visits), 0);
     const maxVotes = Math.max(...data.map(d => d.votes), 0);
@@ -29,7 +29,7 @@ const AnimatedBarChart = ({ data }: { data: { date: string; visits: number; vote
     
     const yScale = (value: number) => chartHeight - padding.bottom - (value / yMax) * (chartHeight - padding.top - padding.bottom);
     const spacing = (chartWidth - padding.left - padding.right) / data.length;
-    const barWidth = Math.max(Math.min(spacing * 0.4, 25), 5);
+    const barWidth = Math.max(Math.min(spacing * 0.45, 30), 8);
 
     const handleMouseMove = (e: React.MouseEvent, index: number) => {
         const svg = e.currentTarget.closest('svg');
@@ -45,7 +45,7 @@ const AnimatedBarChart = ({ data }: { data: { date: string; visits: number; vote
 
     return (
         <div className="relative w-full overflow-hidden">
-            <div className="h-[165px] w-full overflow-x-auto overflow-y-hidden custom-scrollbar">
+            <div className="h-[185px] w-full overflow-x-auto overflow-y-hidden custom-scrollbar">
                 <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} preserveAspectRatio="xMidYMid meet" className="min-w-[800px] select-none">
                     <defs>
                         <linearGradient id="gradVisits" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -56,6 +56,10 @@ const AnimatedBarChart = ({ data }: { data: { date: string; visits: number; vote
                             <stop offset="0%" stopColor="#1abc9c" />
                             <stop offset="100%" stopColor="#0d9488" />
                         </linearGradient>
+                        <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+                            <feGaussianBlur stdDeviation="3" result="blur" />
+                            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                        </filter>
                     </defs>
 
                     {[0, 0.25, 0.5, 0.75, 1].map((p, i) => {
@@ -74,12 +78,13 @@ const AnimatedBarChart = ({ data }: { data: { date: string; visits: number; vote
                         const visitY = yScale(d.visits);
                         const voteY = yScale(d.votes);
                         const base = chartHeight - padding.bottom;
+                        const isHovered = hoveredIndex === i;
 
                         return (
                             <g key={i} onMouseMove={(e) => handleMouseMove(e, i)} onMouseLeave={() => setHoveredIndex(null)}>
                                 <rect x={x - spacing / 2} y={padding.top} width={spacing} height={chartHeight - padding.top - padding.bottom} fill="transparent" className="cursor-pointer" />
-                                <rect x={x - barWidth - 1} y={visitY} width={barWidth} height={Math.max(base - visitY, 2)} fill="url(#gradVisits)" rx="2" className="transition-all duration-300" style={{ filter: hoveredIndex === i ? 'brightness(1.2)' : 'none' }} />
-                                <rect x={x + 1} y={voteY} width={barWidth} height={Math.max(base - voteY, 2)} fill="url(#gradVotes)" rx="2" className="transition-all duration-300" style={{ filter: hoveredIndex === i ? 'brightness(1.2)' : 'none' }} />
+                                <rect x={x - barWidth - 1} y={visitY} width={barWidth} height={Math.max(base - visitY, 2)} fill="url(#gradVisits)" rx="3" className="transition-all duration-300" style={{ filter: isHovered ? 'url(#glow)' : 'none' }} />
+                                <rect x={x + 1} y={voteY} width={barWidth} height={Math.max(base - voteY, 2)} fill="url(#gradVotes)" rx="3" className="transition-all duration-300" style={{ filter: isHovered ? 'url(#glow)' : 'none' }} />
                                 {i % (Math.ceil(data.length / 10)) === 0 && (
                                     <text x={x} y={chartHeight - 5} textAnchor="middle" className="text-[9px] fill-slate-500 font-bold">
                                         {(() => {
