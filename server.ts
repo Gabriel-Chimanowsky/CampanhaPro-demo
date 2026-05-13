@@ -225,6 +225,30 @@ async function startServer() {
       console.log('[Admin] Iniciando sincronização forçada do banco...');
       
       
+      // Sincronizar street_reports
+      await pool.execute(`
+        CREATE TABLE IF NOT EXISTS street_reports (
+          id VARCHAR(255) PRIMARY KEY,
+          user_id VARCHAR(255),
+          campaign_id VARCHAR(255),
+          title VARCHAR(255),
+          reclamacao TEXT,
+          description TEXT,
+          bairro VARCHAR(255),
+          address TEXT,
+          clima VARCHAR(100),
+          latitude DECIMAL(10, 8),
+          longitude DECIMAL(11, 8),
+          media_urls LONGTEXT,
+          video_url TEXT,
+          status VARCHAR(50) DEFAULT 'Pendente',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+      `);
+
+      const [reportCols]: any = await pool.execute('DESCRIBE street_reports');
+      const colNames = reportCols.map((c: any) => c.Field);
+
       const requiredCols = [
         { name: 'user_id', type: 'VARCHAR(255)' },
         { name: 'campaign_id', type: 'VARCHAR(255)' },
@@ -233,10 +257,10 @@ async function startServer() {
         { name: 'bairro', type: 'VARCHAR(255)' },
         { name: 'clima', type: 'VARCHAR(100)' },
         { name: 'video_url', type: 'TEXT' },
-        { name: 'media_urls', type: 'JSON' },
+        { name: 'media_urls', type: 'LONGTEXT' },
         { name: 'latitude', type: 'DECIMAL(10, 8)' },
         { name: 'longitude', type: 'DECIMAL(11, 8)' },
-        { name: 'status', type: "VARCHAR(50) DEFAULT 'pending'" }
+        { name: 'status', type: "VARCHAR(50) DEFAULT 'Pendente'" }
       ];
 
       let added = [];
