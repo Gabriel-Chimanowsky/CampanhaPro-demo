@@ -4,6 +4,9 @@
   "description": "Servidor seguro para a aplicação Campanha Pró.",
   "type": "module",
   "main": "server.ts",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "start": "tsx server.ts",
     "dev": "vite --host",
