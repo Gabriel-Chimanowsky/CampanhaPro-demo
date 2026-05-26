@@ -22,6 +22,7 @@ RUN npm run build
 # Create uploads directory
 RUN mkdir -p uploads
 
+EXPOSE 3000
 EXPOSE 3001
 
 # Run the unified server (serves frontend + api)
