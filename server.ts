@@ -179,9 +179,6 @@ const callGeminiREST = async (prompt: string) => {
 
 
 async function startServer() {
-  const isProd = process.env.NODE_ENV === 'production';
-  const defaultPort = isProd ? 3000 : 3001;
-  const port: number = Number(process.env.PORT) || defaultPort;
   const app = express();
   const httpServer = createHttpServer(app);
 
@@ -2069,9 +2066,25 @@ app.get('/api/war-room/feed', (_req, res) => {
   // Run init then listen
   await initializeDatabase();
   
-  httpServer.listen(port, '0.0.0.0', () => {
-    console.log(`[CRITICAL] Server listening on http://0.0.0.0:${port}`);
-  });
+  const isProd = process.env.NODE_ENV === 'production';
+  
+  if (isProd) {
+    // Em produção, escuta tanto na 3000 quanto na 3001 para evitar qualquer incompatibilidade de proxy
+    httpServer.listen(3000, '0.0.0.0', () => {
+      console.log(`[CRITICAL] Production server listening on http://0.0.0.0:3000`);
+    });
+    
+    const extraServer = createHttpServer(app);
+    extraServer.listen(3001, '0.0.0.0', () => {
+      console.log(`[CRITICAL] Production server listening on http://0.0.0.0:3001`);
+    });
+  } else {
+    // Em desenvolvimento local, escuta na porta dinâmica ou 3001 (para não colidir com o Vite na 3000)
+    const port: number = Number(process.env.PORT) || 3001;
+    httpServer.listen(port, '0.0.0.0', () => {
+      console.log(`[CRITICAL] Local development server listening on http://0.0.0.0:${port}`);
+    });
+  }
 }
 
 startServer();
