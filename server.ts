@@ -179,9 +179,7 @@ const callGeminiREST = async (prompt: string) => {
 
 
 async function startServer() {
-  const isProd = process.env.NODE_ENV === 'production';
-  const defaultPort = isProd ? 3000 : 3001;
-  const port: number = Number(process.env.PORT) || defaultPort;
+  const port: number = Number(process.env.PORT) || 3001;
   const app = express();
   const httpServer = createHttpServer(app);
 
