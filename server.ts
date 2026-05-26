@@ -1860,6 +1860,8 @@ app.get('/api/war-room/feed', (_req, res) => {
             output_type VARCHAR(100),
             content LONGTEXT,
             metadata LONGTEXT,
+            input LONGTEXT NULL,
+            output LONGTEXT NULL,
             created_by CHAR(36),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
           ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`
@@ -2016,7 +2018,10 @@ app.get('/api/war-room/feed', (_req, res) => {
         `ALTER TABLE contacts ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
         // colunas extras
         `ALTER TABLE contacts ADD COLUMN instagram_handle VARCHAR(255)`,
-        `ALTER TABLE instagram_webhook_logs ADD COLUMN metadata LONGTEXT`
+        `ALTER TABLE instagram_webhook_logs ADD COLUMN metadata LONGTEXT`,
+        // Correção para o erro "Unknown column 'input' in 'field list'" na tabela agent_outputs
+        `ALTER TABLE agent_outputs ADD COLUMN input LONGTEXT NULL`,
+        `ALTER TABLE agent_outputs ADD COLUMN output LONGTEXT NULL`
       ];
 
       for (const migration of columnMigrations) {
