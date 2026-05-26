@@ -23,6 +23,17 @@ const generateUUID = () => {
     });
 };
 
+// Função para higienizar valores ISO 8601 para formato MySQL DATETIME
+const sanitizeMySQLValue = (val: any): any => {
+  if (typeof val === 'string') {
+    // Detecta ISO 8601 datetimes (ex: 2026-05-26T19:14:03.171Z ou 2026-05-26T19:14:03Z)
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(val)) {
+      return val.replace('T', ' ').substring(0, 19);
+    }
+  }
+  return val;
+};
+
 
 // __dirname is not needed as we use process.cwd() for path resolution
 
@@ -635,7 +646,8 @@ async function startServer() {
       const snakeData: any = {};
       for (const key of Object.keys(data)) {
         const snakeKey = key.replace(/[A-Z]/g, (l) => `_${l.toLowerCase()}`);
-        snakeData[snakeKey] = typeof data[key] === 'object' ? JSON.stringify(data[key]) : data[key];
+        const rawVal = data[key];
+        snakeData[snakeKey] = typeof rawVal === 'object' && rawVal !== null ? JSON.stringify(rawVal) : sanitizeMySQLValue(rawVal);
       }
 
       // Auto-generate UUID if missing
@@ -668,7 +680,8 @@ async function startServer() {
       for (const key of Object.keys(data)) {
         const snakeKey = key.replace(/[A-Z]/g, (l) => `_${l.toLowerCase()}`);
         setClauses.push(`${snakeKey} = ?`);
-        values.push(typeof data[key] === 'object' ? JSON.stringify(data[key]) : data[key]);
+        const rawVal = data[key];
+        values.push(typeof rawVal === 'object' && rawVal !== null ? JSON.stringify(rawVal) : sanitizeMySQLValue(rawVal));
       }
 
       let whereClause = '1=1';
@@ -734,7 +747,8 @@ async function startServer() {
       const snakeData: any = {};
       for (const key of Object.keys(data)) {
         const snakeKey = key.replace(/[A-Z]/g, (l) => `_${l.toLowerCase()}`);
-        snakeData[snakeKey] = typeof data[key] === 'object' ? JSON.stringify(data[key]) : data[key];
+        const rawVal = data[key];
+        snakeData[snakeKey] = typeof rawVal === 'object' && rawVal !== null ? JSON.stringify(rawVal) : sanitizeMySQLValue(rawVal);
       }
 
       const keys = Object.keys(snakeData);
