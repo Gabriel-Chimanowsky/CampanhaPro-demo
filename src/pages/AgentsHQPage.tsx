@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Bot, TrendingUp, Share2, Map, Send, Loader2, LayoutDashboard, Ticket, ArrowRight, CheckCircle2, Link as LinkIcon, ShieldCheck, Sparkles as SparklesIcon, History, Shield, Zap, X, BellRing, Trash2 } from 'lucide-react';
+import { Bot, TrendingUp, Share2, Map, Send, Loader2, LayoutDashboard, Ticket, ArrowRight, CheckCircle2, Link as LinkIcon, ShieldCheck, Sparkles as SparklesIcon, History, Shield, Zap, X, BellRing, Trash2, Download, ZoomIn, MessageSquarePlus } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { askStrategist, askGrowthHacker, askSocialMedia, askFieldCommander, askCreativeProducer, askBackupAgent, askFraudAuditor, runFullPipeline, savePipelineResult, getPipelineHistory, PipelineResult, generateCreativeImage, createProductionOrder, publishToSocialMedia } from '../services/agentsClientService';
 import { createBackup, restoreBackup, BackupData } from '../services/backupService';
@@ -520,6 +520,9 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
     const [isLoading, setIsLoading] = useState(false);
     const [pendingOrders, setPendingOrders] = useState<any[]>([]);
     const [generatedImages, setGeneratedImages] = useState<Record<number, string>>({});
+    const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+    const [lightboxRefText, setLightboxRefText] = useState('');
+    const lightboxInputRef = useRef<HTMLInputElement>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -634,12 +637,19 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
                     </p>
                     <div className="grid grid-cols-3 gap-3">
                         {Object.entries(generatedImages).slice(-3).map(([, url], i) => (
-                            <div key={i} className="aspect-square rounded-lg border border-slate-700 overflow-hidden bg-slate-900">
+                            <div
+                                key={i}
+                                className="aspect-square rounded-lg border border-slate-700 overflow-hidden bg-slate-900 cursor-pointer relative group"
+                                onClick={() => { setLightboxImage(url); setLightboxRefText(''); }}
+                            >
                                 <img
                                     src={url}
-                                    className="w-full h-full object-cover opacity-80 hover:opacity-100 transition-opacity"
+                                    className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-all group-hover:scale-105"
                                     onError={(e) => { (e.target as HTMLImageElement).closest('div')!.style.display = 'none'; }}
                                 />
+                                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40">
+                                    <ZoomIn className="w-6 h-6 text-white drop-shadow-lg" />
+                                </div>
                             </div>
                         ))}
                     </div>
@@ -732,16 +742,24 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
                                         <p className="text-xs font-bold text-indigo-400 uppercase tracking-tighter mb-2 flex items-center gap-1">
                                             <SparklesIcon className="w-3 h-3" /> Ativo Visual Gerado
                                         </p>
-                                        <div className="rounded-xl overflow-hidden border border-indigo-500/40 shadow-xl shadow-indigo-900/30">
+                                        <div
+                                            className="rounded-xl overflow-hidden border border-indigo-500/40 shadow-xl shadow-indigo-900/30 cursor-pointer relative group"
+                                            onClick={() => { setLightboxImage(generatedImages[idx]); setLightboxRefText(''); }}
+                                            title="Clique para abrir, baixar ou referenciar no chat"
+                                        >
                                             <img
                                                 src={generatedImages[idx]}
                                                 alt="Ativo Visual"
-                                                className="w-full h-auto block"
+                                                className="w-full h-auto block group-hover:brightness-90 transition-all"
                                                 onError={(e) => {
                                                     const el = e.target as HTMLImageElement;
                                                     el.parentElement!.innerHTML = '<div class="p-4 text-center text-red-400 text-xs">❌ Erro ao renderizar imagem. URL pode ter expirado.</div>';
                                                 }}
                                             />
+                                            <div className="absolute inset-0 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/50 gap-2">
+                                                <ZoomIn className="w-7 h-7 text-white drop-shadow-xl" />
+                                                <span className="text-white text-xs font-bold drop-shadow">Clique para expandir</span>
+                                            </div>
                                         </div>
                                     </div>
                                 )}
@@ -796,6 +814,94 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
                 <input type="text" value={input} onChange={(e) => setInput(e.target.value)} placeholder={placeholder} className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-4 pr-12 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all" disabled={isLoading} />
                 <button type="submit" disabled={!input.trim() || isLoading} className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-blue-400 disabled:opacity-50 disabled:hover:text-slate-400 transition-colors"><Send className="w-5 h-5" /></button>
             </form>
+
+            {/* ── Lightbox Modal ─────────────────────────────────────── */}
+            {lightboxImage && (
+                <div
+                    className="fixed inset-0 z-[9999] bg-black/90 backdrop-blur-md flex items-center justify-center p-4"
+                    onClick={() => setLightboxImage(null)}
+                >
+                    <div
+                        className="relative w-full max-w-2xl bg-slate-900 rounded-2xl border border-slate-700 shadow-2xl animate-in fade-in zoom-in duration-300 overflow-hidden flex flex-col max-h-[90vh]"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Header */}
+                        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700 flex-shrink-0">
+                            <p className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                                <SparklesIcon className="w-4 h-4 text-indigo-400" />
+                                Ativo Visual Gerado
+                            </p>
+                            <div className="flex items-center gap-2">
+                                {/* Download */}
+                                <a
+                                    href={lightboxImage}
+                                    download={`ativo-visual-${Date.now()}.png`}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="flex items-center gap-1.5 text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg font-bold transition-all shadow-md hover:scale-105 active:scale-95"
+                                >
+                                    <Download className="w-3.5 h-3.5" /> Baixar Imagem
+                                </a>
+                                {/* Close */}
+                                <button
+                                    onClick={() => setLightboxImage(null)}
+                                    className="p-1.5 text-slate-400 hover:text-slate-100 hover:bg-slate-700 rounded-lg transition-all"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Image */}
+                        <div className="overflow-auto flex-1 p-4">
+                            <img
+                                src={lightboxImage}
+                                alt="Ativo Visual"
+                                className="w-full h-auto rounded-xl border border-slate-700 block"
+                            />
+                        </div>
+
+                        {/* Use in Chat */}
+                        <div className="px-4 pb-4 pt-3 border-t border-slate-700 flex-shrink-0">
+                            <p className="text-[11px] text-slate-400 mb-2 font-semibold flex items-center gap-1.5 uppercase tracking-wider">
+                                <MessageSquarePlus className="w-3.5 h-3.5 text-purple-400" />
+                                Referenciar este ativo no chat
+                            </p>
+                            <div className="flex gap-2">
+                                <input
+                                    ref={lightboxInputRef}
+                                    type="text"
+                                    value={lightboxRefText}
+                                    onChange={(e) => setLightboxRefText(e.target.value)}
+                                    placeholder="Ex: Adicione o nome do candidato em destaque..."
+                                    className="flex-1 bg-slate-800 border border-slate-600 focus:border-indigo-500 rounded-lg px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all"
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && lightboxRefText.trim()) {
+                                            setInput(`[Referindo-se ao ativo visual gerado] ${lightboxRefText.trim()}`);
+                                            setLightboxImage(null);
+                                            setLightboxRefText('');
+                                        }
+                                        if (e.key === 'Escape') setLightboxImage(null);
+                                    }}
+                                    autoFocus
+                                />
+                                <button
+                                    disabled={!lightboxRefText.trim()}
+                                    onClick={() => {
+                                        if (!lightboxRefText.trim()) return;
+                                        setInput(`[Referindo-se ao ativo visual gerado] ${lightboxRefText.trim()}`);
+                                        setLightboxImage(null);
+                                        setLightboxRefText('');
+                                    }}
+                                    className="flex items-center gap-1.5 text-xs bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-3 py-2 rounded-lg font-bold transition-all whitespace-nowrap shadow-md hover:scale-105 active:scale-95"
+                                >
+                                    <Send className="w-3 h-3" /> Usar no Chat
+                                </button>
+                            </div>
+                            <p className="text-[10px] text-slate-600 mt-1.5">Pressione Enter para enviar ou Esc para fechar</p>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
