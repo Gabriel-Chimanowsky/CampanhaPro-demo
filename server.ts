@@ -1155,12 +1155,12 @@ app.get('/api/war-room/feed', (_req, res) => {
       let imageUrl: string | null = null;
       let imageBase64: string | null = null;
 
-      // 1. Tentar primeiro o Gemini Imagen
+      // 1. Tentar primeiro o Gemini Imagen 4
       if (geminiKey) {
         try {
-          console.log('[ImageGen] Tentando Gemini Imagen para prompt:', ptPrompt);
+          console.log('[ImageGen] Tentando Gemini Imagen 4 para prompt:', ptPrompt);
           const response = await axios.post(
-            `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${geminiKey}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${geminiKey}`,
             {
               instances: [{ prompt: ptPrompt }],
               parameters: {
@@ -1184,24 +1184,24 @@ app.get('/api/war-room/feed', (_req, res) => {
             fs.writeFileSync(uploadPath, Buffer.from(b64, 'base64'));
             imageUrl = `/uploads/${filename}`;
             imageBase64 = b64;
-            console.log('[ImageGen] Gemini Imagen gerado com sucesso:', imageUrl);
+            console.log('[ImageGen] Gemini Imagen 4 gerado com sucesso:', imageUrl);
           } else {
-            console.warn('[ImageGen] Gemini Imagen não retornou predictions.');
+            console.warn('[ImageGen] Gemini Imagen 4 não retornou predictions.');
           }
         } catch (geminiErr: any) {
           const msg = geminiErr?.response?.data?.error?.message || geminiErr.message || 'Erro desconhecido na API Gemini Imagen';
-          console.warn('[ImageGen] Falha no Gemini Imagen:', msg);
+          console.warn('[ImageGen] Falha no Gemini Imagen 4:', msg);
         }
       }
 
-      // 2. Fallback para DALL-E 2 se falhou ou se chave Gemini não configurada
+      // 2. Fallback para DALL-E 3 se falhou ou se chave Gemini não configurada
       if (!imageUrl && openaiKey) {
         try {
-          console.log('[ImageGen] Tentando DALL-E 2 Fallback para prompt:', ptPrompt);
+          console.log('[ImageGen] Tentando DALL-E 3 Fallback para prompt:', ptPrompt);
           const response = await axios.post(
             'https://api.openai.com/v1/images/generations',
             {
-              model: "dall-e-2",
+              model: "dall-e-3",
               prompt: ptPrompt.substring(0, 1000),
               n: 1,
               size: "1024x1024"
@@ -1211,15 +1211,15 @@ app.get('/api/war-room/feed', (_req, res) => {
             }
           );
           imageUrl = response.data?.data?.[0]?.url;
-          console.log('[ImageGen] DALL-E 2 fallback gerado com sucesso:', imageUrl);
+          console.log('[ImageGen] DALL-E 3 fallback gerado com sucesso:', imageUrl);
         } catch (dalleErr: any) {
           const msg = dalleErr?.response?.data?.error?.message || dalleErr.message || 'Erro desconhecido na API DALL-E';
-          console.warn('[ImageGen] Falha no fallback DALL-E 2:', msg);
+          console.warn('[ImageGen] Falha no fallback DALL-E 3:', msg);
         }
       }
 
       if (!imageUrl) {
-        return res.status(500).json({ error: 'Nenhum provedor de imagem (Gemini Imagen ou DALL-E 2) conseguiu gerar a imagem com sucesso.' });
+        return res.status(500).json({ error: 'Nenhum provedor de imagem (Gemini Imagen 4 ou DALL-E 3) conseguiu gerar a imagem com sucesso.' });
       }
 
       // Salvar no histórico (não-crítico: erro não aborta resposta)
