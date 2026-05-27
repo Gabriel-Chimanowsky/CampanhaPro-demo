@@ -1515,7 +1515,10 @@ Por favor, retorne APENAS o prompt final em inglês. Não inclua nenhuma introdu
             size: "1024x1024"
           },
           {
-            headers: { 'Authorization': `Bearer ${openaiKey}` }
+            headers: { 
+              'Authorization': `Bearer ${openaiKey}`,
+              'Content-Type': 'application/json'
+            }
           }
         );
         imageUrl = response.data?.data?.[0]?.url;
@@ -1523,6 +1526,32 @@ Por favor, retorne APENAS o prompt final em inglês. Não inclua nenhuma introdu
       } catch (dalleErr: any) {
         dalleErrorDetail = dalleErr?.response?.data?.error?.message || dalleErr.message || 'Erro desconhecido na API DALL-E 3';
         console.warn('[ImageGenHelper] Falha no fallback DALL-E 3:', dalleErrorDetail);
+
+        // Tentar DALL-E 2 como contingência final!
+        try {
+          console.log('[ImageGenHelper] Tentando DALL-E 2 como contingência final...');
+          const response2 = await axios.post(
+            'https://api.openai.com/v1/images/generations',
+            {
+              model: "dall-e-2",
+              prompt: ptPrompt,
+              n: 1,
+              size: "512x512"
+            },
+            {
+              headers: { 
+                'Authorization': `Bearer ${openaiKey}`,
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+          imageUrl = response2.data?.data?.[0]?.url;
+          console.log('[ImageGenHelper] DALL-E 2 contingência gerado com sucesso:', imageUrl);
+        } catch (dalle2Err: any) {
+          const dalle2Msg = dalle2Err?.response?.data?.error?.message || dalle2Err.message || 'Erro desconhecido';
+          dalleErrorDetail += ` | DALL-E 2 Error: ${dalle2Msg}`;
+          console.warn('[ImageGenHelper] Falha na contingência DALL-E 2:', dalle2Msg);
+        }
       }
     }
 
