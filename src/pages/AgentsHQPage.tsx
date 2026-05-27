@@ -781,7 +781,12 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
                         }
                         
                          let imgUrl = generatedImages[msgKey] || extractedImgUrl;
-                         if (imgUrl && imgUrl.includes('via.placeholder.com')) {
+                         if (imgUrl && (
+                             imgUrl.includes('via.placeholder.com') ||
+                             imgUrl.includes('public/api/dalle') ||
+                             imgUrl.includes('public/uploads') ||
+                             imgUrl.startsWith('public/api/')
+                         )) {
                              imgUrl = 'https://images.unsplash.com/photo-1540910419892-4a36d2c3266c';
                          }
                          const isThisCardLoading = loadingCardKey === msgKey;

@@ -9,6 +9,14 @@
 // Em produção, o backend serve o frontend no mesmo domínio.
 const baseUrl = '';
 
+const isDeadUrl = (url: any): boolean => {
+  if (typeof url !== 'string') return false;
+  return url.includes('via.placeholder.com') || 
+         url.includes('public/api/dalle') || 
+         url.includes('public/uploads') ||
+         url.startsWith('public/api/');
+};
+
 const sanitizeValue = (val: any): any => {
   if (typeof val === 'string') {
     // Detecta ISO 8601 datetimes (ex: 2026-05-26T19:14:03.171Z ou 2026-05-26T19:14:03Z)
@@ -230,14 +238,14 @@ class MySQLQueryBuilder {
     if (obj === null || obj === undefined) return obj;
     if (Array.isArray(obj)) return obj.map(v => this.convertKeysToCamel(v));
     if (typeof obj === 'string') {
-      if (obj.includes('via.placeholder.com')) {
+      if (isDeadUrl(obj)) {
         // Se for um array de URLs stringificado em JSON
         if (obj.trim().startsWith('[') && obj.trim().endsWith(']')) {
           try {
             const arr = JSON.parse(obj);
             if (Array.isArray(arr)) {
               const cleaned = arr.map(item => 
-                typeof item === 'string' && item.includes('via.placeholder.com')
+                isDeadUrl(item)
                   ? 'https://images.unsplash.com/photo-1540910419892-4a36d2c3266c'
                   : item
               );
