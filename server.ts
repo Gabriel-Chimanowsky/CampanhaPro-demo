@@ -1393,7 +1393,7 @@ app.get('/api/war-room/feed', (_req, res) => {
         }
       }
 
-      // 2. Fallback para DALL-E 3 se falhou ou se chave Gemini não configurada
+      // 2. Fallback para DALL-E se falhou ou se chave Gemini não configurada
       if (!imageUrl && openaiKey) {
         try {
           console.log('[ImageGen] Tentando DALL-E 3 Fallback para prompt:', ptPrompt);
@@ -1413,7 +1413,28 @@ app.get('/api/war-room/feed', (_req, res) => {
           console.log('[ImageGen] DALL-E 3 fallback gerado com sucesso:', imageUrl);
         } catch (dalleErr: any) {
           dalleErrorDetail = dalleErr?.response?.data?.error?.message || dalleErr.message || 'Erro desconhecido na API DALL-E';
-          console.warn('[ImageGen] Falha no fallback DALL-E 3:', dalleErrorDetail);
+          console.warn('[ImageGen] Falha no fallback DALL-E 3, tentando DALL-E 2...', dalleErrorDetail);
+          
+          try {
+            console.log('[ImageGen] Tentando DALL-E 2 Fallback para prompt:', ptPrompt);
+            const response = await axios.post(
+              'https://api.openai.com/v1/images/generations',
+              {
+                model: "dall-e-2",
+                prompt: ptPrompt.substring(0, 1000),
+                n: 1,
+                size: "1024x1024"
+              },
+              {
+                headers: { 'Authorization': `Bearer ${openaiKey}` }
+              }
+            );
+            imageUrl = response.data?.data?.[0]?.url;
+            console.log('[ImageGen] DALL-E 2 fallback gerado com sucesso:', imageUrl);
+          } catch (dalle2Err: any) {
+            dalleErrorDetail = dalle2Err?.response?.data?.error?.message || dalle2Err.message || 'Erro desconhecido na API DALL-E 2';
+            console.warn('[ImageGen] Falha no fallback DALL-E 2:', dalleErrorDetail);
+          }
         }
       }
 
