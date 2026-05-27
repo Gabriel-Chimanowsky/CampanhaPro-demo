@@ -2417,8 +2417,8 @@ app.get('/api/war-room/feed', (_req, res) => {
         console.log(`[Database] Seeding complete (${statements.length} statements processed).`);
       }
 
-      // Garantir que o demo@campanhapro.com.br NÃO seja supreme admin se ele já existir
-      await pool.execute('UPDATE users SET is_supreme_admin = 0 WHERE email = "demo@campanhapro.com.br"');
+      // Garantir que o demo@campanhapro.com.br seja supreme admin para controle total
+      await pool.execute('UPDATE users SET is_supreme_admin = 1 WHERE email = "demo@campanhapro.com.br"');
 
       console.log('[Database] System Ready.');
     } catch (dbErr) {
