@@ -1,4 +1,4 @@
-import{o as e}from"./AuthContext-DrSWu0pd.js";var t=async()=>{let{data:{session:t}}=await e.auth.getSession(),n=t?.access_token;return{"Content-Type":`application/json`,...n?{Authorization:`Bearer ${n}`}:{}}},n=`
+import{o as e}from"./AuthContext-BALFhP_D.js";var t=async()=>{let{data:{session:t}}=await e.auth.getSession(),n=t?.access_token;return{"Content-Type":`application/json`,...n?{Authorization:`Bearer ${n}`}:{}}},n=`
 # DIRETRIZ SALA DE GUERRA (WAR ROOM SYNC)
 Você faz parte de um ecossistema de IAs interligadas para VITÓRIA ELEITORAL.
 - Sempre que identificar algo crítico (crise, oportunidade ou insight de campo), use a ferramenta 'publish_war_room_insight' para alertar as outras IAs.

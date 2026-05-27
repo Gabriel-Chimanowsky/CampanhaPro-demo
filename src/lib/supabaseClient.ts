@@ -9,6 +9,36 @@
 // Em produção, o backend serve o frontend no mesmo domínio.
 const baseUrl = '';
 
+const sanitizeValue = (val: any): any => {
+  if (typeof val === 'string') {
+    // Detecta ISO 8601 datetimes (ex: 2026-05-26T19:14:03.171Z ou 2026-05-26T19:14:03Z)
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(val)) {
+      return val.replace('T', ' ').substring(0, 19);
+    }
+  }
+  return val;
+};
+
+const sanitizePayload = (data: any): any => {
+  if (data === null || data === undefined) return data;
+  if (Array.isArray(data)) {
+    return data.map(item => sanitizePayload(item));
+  }
+  if (typeof data === 'object') {
+    const clean: any = {};
+    for (const key of Object.keys(data)) {
+      const val = data[key];
+      if (typeof val === 'string') {
+        clean[key] = sanitizeValue(val);
+      } else {
+        clean[key] = val;
+      }
+    }
+    return clean;
+  }
+  return data;
+};
+
 class MySQLQueryBuilder {
   private table: string;
   private filters: any = {};
@@ -120,8 +150,11 @@ class MySQLQueryBuilder {
       const token = localStorage.getItem('campanhapro-mysql-token');
       let response;
       
+      const cleanPayload = sanitizePayload(this.payload);
+      const cleanFilters = sanitizePayload(this.filters);
+      
       if (this.action === 'select') {
-        const queryParams = Object.entries(this.filters).map(([k, v]) => {
+        const queryParams = Object.entries(cleanFilters).map(([k, v]) => {
           const snakeKey = k.replace(/([A-Z])/g, "_$1").toLowerCase().replace('!neq', '').replace('!not!eq', '');
           return `${snakeKey}=${encodeURIComponent(v as string)}`;
         }).join('&');
@@ -140,7 +173,7 @@ class MySQLQueryBuilder {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
-          body: JSON.stringify(this.payload),
+          body: JSON.stringify(cleanPayload),
           signal: controller.signal
         });
       } else if (this.action === 'update') {
@@ -150,7 +183,7 @@ class MySQLQueryBuilder {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
-          body: JSON.stringify({ data: this.payload, filters: this.filters }),
+          body: JSON.stringify({ data: cleanPayload, filters: cleanFilters }),
           signal: controller.signal
         });
       } else { // upsert
@@ -160,7 +193,7 @@ class MySQLQueryBuilder {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
-          body: JSON.stringify(this.payload),
+          body: JSON.stringify(cleanPayload),
           signal: controller.signal
         });
       }
