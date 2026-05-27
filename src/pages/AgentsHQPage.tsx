@@ -734,7 +734,7 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
                                 {msg.role === 'agent' && title === 'O Produtor Criativo' && onExecuteAction && (
                                     <div className="mt-3 pt-3 border-t border-slate-600">
                                         <p className="text-[10px] text-slate-400 mb-2 font-bold uppercase">Execução Automática:</p>
-                                        <button onClick={() => handleExecuteAction(idx, msg.content)} disabled={isLoading} className="flex items-center gap-2 text-xs bg-indigo-600 hover:bg-indigo-700 text-slate-50 px-3 py-2 rounded-lg font-bold transition-all shadow-lg hover:scale-105 active:scale-95 disabled:opacity-50"><SparklesIcon className="w-3 h-3" /> 🚀 GERAR ATIVO VISUAL (DALL-E 3)</button>
+                                        <button onClick={() => handleExecuteAction(idx, msg.content)} disabled={isLoading} className="flex items-center gap-2 text-xs bg-indigo-600 hover:bg-indigo-700 text-slate-50 px-3 py-2 rounded-lg font-bold transition-all shadow-lg hover:scale-105 active:scale-95 disabled:opacity-50"><SparklesIcon className="w-3 h-3" /> 🚀 GERAR ATIVO VISUAL (Gemini Imagen)</button>
                                     </div>
                                 )}
                                 {msg.role === 'agent' && title === 'O Produtor Criativo' && onGeneratePost && (

@@ -1148,39 +1148,93 @@ app.get('/api/war-room/feed', (_req, res) => {
   app.post('/api/agents/generate-image', requireAuth, async (req: any, res: any) => {
     try {
       const { prompt, campaignId, agentId } = req.body;
-
+      const geminiKey = process.env.GEMINI_API_KEY;
       const openaiKey = process.env.OPENAI_API_KEY;
-      if (!openaiKey) {
-        return res.status(500).json({ error: 'OPENAI_API_KEY não configurada no servidor.' });
+      const ptPrompt = `ESTRITAMENTE EM PORTUGUÊS DO BRASIL: Qualquer texto na imagem deve ser em português brasileiro. Tema: ${prompt}`;
+      
+      let imageUrl: string | null = null;
+      let imageBase64: string | null = null;
+
+      // 1. Tentar primeiro o Gemini Imagen
+      if (geminiKey) {
+        try {
+          console.log('[ImageGen] Tentando Gemini Imagen para prompt:', ptPrompt);
+          const response = await axios.post(
+            `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${geminiKey}`,
+            {
+              instances: [{ prompt: ptPrompt }],
+              parameters: {
+                sampleCount: 1,
+                aspectRatio: "1:1",
+                personGeneration: "allow_adult"
+              }
+            },
+            {
+              headers: {
+                'Content-Type': 'application/json',
+                'x-goog-api-key': geminiKey
+              }
+            }
+          );
+
+          const b64 = response.data?.predictions?.[0]?.bytesBase64Encoded;
+          if (b64) {
+            const filename = `ai-image-${Date.now()}-${Math.floor(Math.random() * 1000)}.png`;
+            const uploadPath = path.join(process.cwd(), 'uploads', filename);
+            fs.writeFileSync(uploadPath, Buffer.from(b64, 'base64'));
+            imageUrl = `/uploads/${filename}`;
+            imageBase64 = b64;
+            console.log('[ImageGen] Gemini Imagen gerado com sucesso:', imageUrl);
+          } else {
+            console.warn('[ImageGen] Gemini Imagen não retornou predictions.');
+          }
+        } catch (geminiErr: any) {
+          const msg = geminiErr?.response?.data?.error?.message || geminiErr.message || 'Erro desconhecido na API Gemini Imagen';
+          console.warn('[ImageGen] Falha no Gemini Imagen:', msg);
+        }
       }
 
-      const ptPrompt = `ESTRITAMENTE EM PORTUGUÊS DO BRASIL: Qualquer texto na imagem deve ser em português brasileiro. Tema: ${prompt}.`;
-      
-      let imageUrl: string;
-      try {
-        const response = await axios.post('https://api.openai.com/v1/images/generations', {
-          model: "dall-e-3", prompt: ptPrompt, n: 1, size: "1024x1792"
-        }, { headers: { 'Authorization': `Bearer ${openaiKey}` } });
-        imageUrl = response.data.data[0].url;
-      } catch (dalleErr: any) {
-        const msg = dalleErr?.response?.data?.error?.message || dalleErr.message || 'Erro desconhecido na API DALL-E';
-        console.error('[DALL-E] Erro ao gerar imagem:', msg);
-        return res.status(500).json({ error: `DALL-E: ${msg}` });
+      // 2. Fallback para DALL-E 2 se falhou ou se chave Gemini não configurada
+      if (!imageUrl && openaiKey) {
+        try {
+          console.log('[ImageGen] Tentando DALL-E 2 Fallback para prompt:', ptPrompt);
+          const response = await axios.post(
+            'https://api.openai.com/v1/images/generations',
+            {
+              model: "dall-e-2",
+              prompt: ptPrompt.substring(0, 1000),
+              n: 1,
+              size: "1024x1024"
+            },
+            {
+              headers: { 'Authorization': `Bearer ${openaiKey}` }
+            }
+          );
+          imageUrl = response.data?.data?.[0]?.url;
+          console.log('[ImageGen] DALL-E 2 fallback gerado com sucesso:', imageUrl);
+        } catch (dalleErr: any) {
+          const msg = dalleErr?.response?.data?.error?.message || dalleErr.message || 'Erro desconhecido na API DALL-E';
+          console.warn('[ImageGen] Falha no fallback DALL-E 2:', msg);
+        }
+      }
+
+      if (!imageUrl) {
+        return res.status(500).json({ error: 'Nenhum provedor de imagem (Gemini Imagen ou DALL-E 2) conseguiu gerar a imagem com sucesso.' });
       }
 
       // Salvar no histórico (não-crítico: erro não aborta resposta)
       try {
         await pool.execute(
           'INSERT INTO agent_chat_history (campaign_id, agent_id, role, content, metadata) VALUES (?, ?, ?, ?, ?)',
-          [campaignId, agentId, 'agent', `![ATIVO](${imageUrl})`, JSON.stringify({ type: 'image' })]
+          [campaignId || null, agentId || null, 'agent', `![ATIVO](${imageUrl})`, JSON.stringify({ type: 'image' })]
         );
       } catch (histErr: any) {
-        console.warn('[DALL-E] Falha ao salvar histórico de imagem:', histErr.message);
+        console.warn('[ImageGen] Falha ao salvar histórico de imagem:', histErr.message);
       }
 
-      res.json({ imageUrl });
+      res.json({ imageUrl, imageBase64 });
     } catch (error: any) {
-      console.error('[DALL-E] Erro inesperado:', error.message);
+      console.error('[ImageGen] Erro inesperado:', error.message);
       res.status(500).json({ error: error.message || 'Erro interno no gerador de imagens' });
     }
   });
