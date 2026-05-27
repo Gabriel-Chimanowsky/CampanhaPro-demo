@@ -1328,6 +1328,40 @@ app.get('/api/war-room/feed', (_req, res) => {
     }
   });
 
+  const describeCandidateImage = async (base64Image: string): Promise<string> => {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) return '';
+
+    try {
+      // Extrair o base64 limpo e o mime type
+      const matches = base64Image.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,(.+)$/);
+      if (!matches || matches.length < 3) return '';
+      const mimeType = matches[1];
+      const base64Data = matches[2];
+
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+      const imagePart = {
+        inlineData: {
+          data: base64Data,
+          mimeType: mimeType
+        },
+      };
+
+      const promptText = `Describe physical features of this person in English for image generation consistency (e.g. skin tone, age group, hair color/style, beard/glasses). 
+Keep it extremely concise (max 15 words) and descriptive, starting directly like: "A smiling 45-year-old Brazilian man, short dark hair, wearing thin glasses".
+Do not use names, do not analyze mood, just physical visual attributes.`;
+
+      const result = await model.generateContent([promptText, imagePart]);
+      const response = await result.response;
+      return response.text().trim();
+    } catch (err: any) {
+      console.warn('[ImageGen] Falha ao analisar foto do candidato via Gemini Vision:', err.message);
+      return '';
+    }
+  };
+
   app.post('/api/agents/generate-image', requireAuth, async (req: any, res: any) => {
     try {
       const { prompt, campaignId, agentId, userId } = req.body;
@@ -1355,6 +1389,47 @@ app.get('/api/war-room/feed', (_req, res) => {
         }
       }
 
+      // Buscar foto e características visuais do candidato da tabela 'settings' do Supabase
+      let candidateDescription = '';
+      if (supabaseAdmin && campaignId) {
+        try {
+          const { data, error } = await supabaseAdmin
+            .from('settings')
+            .select('campaign_details')
+            .eq('id', campaignId)
+            .maybeSingle();
+
+          if (data && data.campaign_details) {
+            const details = data.campaign_details;
+            
+            // 1. Priorizar características visuais informadas manualmente pelo usuário
+            candidateDescription = details.candidateVisualFeatures || '';
+
+            // 2. Se não houver descrição manual, mas houver foto, geramos/usamos a descrição multimodal
+            if (!candidateDescription && details.candidatePhotoUrl) {
+              if (details.cachedCandidateDescription) {
+                candidateDescription = details.cachedCandidateDescription;
+              } else {
+                console.log('[ImageGen] Gerando descrição visual da foto do candidato via Gemini Vision...');
+                const description = await describeCandidateImage(details.candidatePhotoUrl);
+                if (description) {
+                  candidateDescription = description;
+                  // Salvar de volta no cache do JSON no Supabase de forma assíncrona para as próximas chamadas
+                  details.cachedCandidateDescription = description;
+                  await supabaseAdmin
+                    .from('settings')
+                    .update({ campaign_details: details, updated_at: new Date().toISOString() })
+                    .eq('id', campaignId);
+                  console.log('[ImageGen] Descrição visual do candidato salva no cache da campanha.');
+                }
+              }
+            }
+          }
+        } catch (err: any) {
+          console.warn('[ImageGen] Falha ao obter foto/características do candidato:', err.message);
+        }
+      }
+
       let optimizedPrompt = prompt;
 
       // Otimizar o prompt usando Gemini para criar uma descrição ideal para campanha política fotorrealista e profissional
@@ -1364,11 +1439,15 @@ app.get('/api/war-room/feed', (_req, res) => {
           const campaignContext = candidateName 
             ? `Candidato(a): "${candidateName}"${cityName ? ` na cidade de "${cityName}"` : ''}.` 
             : `Campanha política brasileira${cityName ? ` na cidade de "${cityName}"` : ''}.`;
+          
+          const visualConsistencyContext = candidateDescription
+            ? `\nCandidate consistency reference: The candidate's visual features are: "${candidateDescription}". ALWAYS depict the candidate matching this exact physical description in the visual scene to ensure consistent faces and features across generated campaign assets!`
+            : '';
 
           const optimizerSystemPrompt = `Você é um diretor de criação especializado em marketing e campanhas políticas de altíssimo nível.
 Sua missão é traduzir descrições e roteiros de imagens (que podem ser genéricos ou textos longos de redes sociais) em um PROMPT DE GERAÇÃO DE IMAGEM perfeito, detalhado e profissional em INGLÊS para o Gemini Imagen 4.
 
-Contexto do Candidato/Campanha: ${campaignContext}
+Contexto do Candidato/Campanha: ${campaignContext} ${visualConsistencyContext}
 
 Regras Cruciais para o Prompt que Você Gerar:
 1. O prompt final deve ser em INGLÊS.

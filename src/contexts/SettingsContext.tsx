@@ -30,7 +30,9 @@ const initialCampaignDetails: CampaignDetails = {
     estado: '',
     cep: '',
     orcamento: 50000,
-    candidatePhotoUrl: ''
+    candidatePhotoUrl: '',
+    candidateVisualFeatures: '',
+    cachedCandidateDescription: ''
 };
 
 export const SettingsProvider = ({ children }: { children?: React.ReactNode }) => {

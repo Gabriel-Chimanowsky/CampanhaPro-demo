@@ -14,7 +14,7 @@ const CampaignDetailsForm: React.FC<CampaignDetailsFormProps> = ({ initialDetail
     const [details, setDetails] = React.useState(initialDetails);
     const [showToast, setShowToast] = React.useState(false);
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value, type } = e.target;
         setDetails(prev => ({
             ...prev,
@@ -70,7 +70,7 @@ const CampaignDetailsForm: React.FC<CampaignDetailsFormProps> = ({ initialDetail
                          />
                     </div>
                 </div>
-                <div className="lg:col-span-1">
+                <div className="lg:col-span-1 space-y-4">
                     <ImageUpload 
                         label="Foto do Candidato"
                         currentImage={details.candidatePhotoUrl}
@@ -78,6 +78,20 @@ const CampaignDetailsForm: React.FC<CampaignDetailsFormProps> = ({ initialDetail
                         onImageRemove={handleImageRemove}
                         aspectRatio="square"
                     />
+                    <div className="space-y-1">
+                        <label className="block text-xs font-bold text-slate-400 uppercase">Características Visuais para IA</label>
+                        <textarea 
+                            name="candidateVisualFeatures"
+                            value={details.candidateVisualFeatures || ''}
+                            onChange={handleChange}
+                            rows={3}
+                            placeholder="Ex: Homem pardo, 45 anos, óculos de grau, camisa social azul-clara."
+                            className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-slate-200 text-sm focus:outline-none focus:border-indigo-500 transition-colors"
+                        />
+                        <p className="text-[10px] text-slate-500">
+                            Descreva os traços físicos do(a) candidato(a). A IA usará este texto para manter as imagens geradas consistentes. Se deixar em branco e subir uma foto, a IA analisará a foto e gerará a descrição automaticamente.
+                        </p>
+                    </div>
                 </div>
             </div>
             <div className="flex justify-end pt-8 mt-4 border-t border-slate-700">

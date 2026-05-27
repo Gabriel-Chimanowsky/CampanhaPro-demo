@@ -14,6 +14,8 @@ export interface CampaignDetails {
     cep: string;
     orcamento: number;
     candidatePhotoUrl?: string;
+    candidateVisualFeatures?: string;
+    cachedCandidateDescription?: string;
 }
 
 export type AdvisorTipType = 'success' | 'warning' | 'info' | 'sparkles' | 'error';
