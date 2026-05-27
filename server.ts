@@ -603,7 +603,7 @@ async function startServer() {
     // Bypass de Emergência para Administradores Conhecidos
     const cleanEmail = (email || '').trim();
     const cleanPass = (password || '').trim();
-    const isAdminBypass = (cleanEmail === 'demo@campanhapro.com.br' || cleanEmail === 'eldastito@teste.com') && cleanPass === 'CampanhaPro@2024';
+    const isAdminBypass = (cleanEmail === 'demo@campanhapro.com.br' || cleanEmail === 'eldastito@teste.com' || cleanEmail === 'supreme@campanhapro.com.br') && cleanPass === 'CampanhaPro@2024';
 
     console.log(`[DEBUG-LOGIN] Admin Bypass Check: ${isAdminBypass}`);
 
@@ -2417,8 +2417,26 @@ app.get('/api/war-room/feed', (_req, res) => {
         console.log(`[Database] Seeding complete (${statements.length} statements processed).`);
       }
 
-      // Garantir que o demo@campanhapro.com.br seja supreme admin para controle total
-      await pool.execute('UPDATE users SET is_supreme_admin = 1 WHERE email = "demo@campanhapro.com.br"');
+      // Reverter o demo@campanhapro.com.br para normal (is_supreme_admin = 0)
+      await pool.execute('UPDATE users SET is_supreme_admin = 0 WHERE email = "demo@campanhapro.com.br"');
+
+      // Garantir que exista o usuário supreme@campanhapro.com.br como Administrador Supremo
+      const [existingSupreme]: any = await pool.execute('SELECT id FROM users WHERE email = "supreme@campanhapro.com.br"');
+      if (!existingSupreme || existingSupreme.length === 0) {
+        console.log('[Database] Criando usuário de testes Administrador Supremo (supreme@campanhapro.com.br)...');
+        const supremeId = crypto.randomUUID();
+        const campaignId = crypto.randomUUID();
+        const passwordHash = '$2b$10$SunimlobdE3elxz2.aCT6.quswy.OK8u2Q4LZrul06oIooUNYZneG'; // CampanhaPro@2024
+        
+        await pool.execute(
+          `INSERT INTO users (id, name, email, password, type, plan, role, campaign_id, is_supreme_admin) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [supremeId, 'Administrador Supremo', 'supreme@campanhapro.com.br', passwordHash, 'Admin', 'Total', 'active', campaignId, 1]
+        );
+        console.log('[Database] Usuário Administrador Supremo criado com sucesso!');
+      } else {
+        await pool.execute('UPDATE users SET is_supreme_admin = 1 WHERE email = "supreme@campanhapro.com.br"');
+      }
 
       console.log('[Database] System Ready.');
     } catch (dbErr) {
