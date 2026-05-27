@@ -1148,19 +1148,43 @@ app.get('/api/war-room/feed', (_req, res) => {
   app.post('/api/agents/generate-image', requireAuth, async (req: any, res: any) => {
     try {
       const { prompt, campaignId, agentId } = req.body;
-      const ptPrompt = `ESTRITAMENTE EM PORTUGUÊS DO BRASIL: Qualquer texto na imagem deve ser em português brasileiro. Tema: ${prompt}.`;
-      const response = await axios.post('https://api.openai.com/v1/images/generations', {
-        model: "dall-e-3", prompt: ptPrompt, n: 1, size: "1024x1792"
-      }, { headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` } });
 
-      const imageUrl = response.data.data[0].url;
-      await pool.execute(
-        'INSERT INTO agent_chat_history (campaign_id, agent_id, role, content, metadata) VALUES (?, ?, ?, ?, ?)',
-        [campaignId, agentId, 'agent', `![ATIVO](${imageUrl})`, JSON.stringify({ type: 'image' })]
-      );
+      const openaiKey = process.env.OPENAI_API_KEY;
+      if (!openaiKey) {
+        return res.status(500).json({ error: 'OPENAI_API_KEY não configurada no servidor.' });
+      }
+
+      const ptPrompt = `ESTRITAMENTE EM PORTUGUÊS DO BRASIL: Qualquer texto na imagem deve ser em português brasileiro. Tema: ${prompt}.`;
+      
+      let imageUrl: string;
+      try {
+        const response = await axios.post('https://api.openai.com/v1/images/generations', {
+          model: "dall-e-3", prompt: ptPrompt, n: 1, size: "1024x1792"
+        }, { headers: { 'Authorization': `Bearer ${openaiKey}` } });
+        imageUrl = response.data.data[0].url;
+      } catch (dalleErr: any) {
+        const msg = dalleErr?.response?.data?.error?.message || dalleErr.message || 'Erro desconhecido na API DALL-E';
+        console.error('[DALL-E] Erro ao gerar imagem:', msg);
+        return res.status(500).json({ error: `DALL-E: ${msg}` });
+      }
+
+      // Salvar no histórico (não-crítico: erro não aborta resposta)
+      try {
+        await pool.execute(
+          'INSERT INTO agent_chat_history (campaign_id, agent_id, role, content, metadata) VALUES (?, ?, ?, ?, ?)',
+          [campaignId, agentId, 'agent', `![ATIVO](${imageUrl})`, JSON.stringify({ type: 'image' })]
+        );
+      } catch (histErr: any) {
+        console.warn('[DALL-E] Falha ao salvar histórico de imagem:', histErr.message);
+      }
+
       res.json({ imageUrl });
-    } catch (error) { res.status(500).json({ error: 'Erro DALL-E' }); }
+    } catch (error: any) {
+      console.error('[DALL-E] Erro inesperado:', error.message);
+      res.status(500).json({ error: error.message || 'Erro interno no gerador de imagens' });
+    }
   });
+
 
   // --- Dashboard Feed ---
   app.get('/api/war-room/feed', requireAuth, async (req, res) => {
