@@ -1339,8 +1339,64 @@ app.get('/api/war-room/feed', (_req, res) => {
 
       const geminiKey = process.env.GEMINI_API_KEY;
       const openaiKey = process.env.OPENAI_API_KEY;
-      const ptPrompt = `ESTRITAMENTE EM PORTUGUÊS DO BRASIL: Qualquer texto na imagem deve ser em português brasileiro. Tema: ${prompt}`;
-      
+
+      // Buscar informações da campanha/candidato no banco de dados para contextualizar a imagem
+      let candidateName = '';
+      let cityName = '';
+      if (campaignId) {
+        try {
+          const [campRows]: any = await pool.execute('SELECT candidate_name, city FROM campaigns WHERE id = ?', [campaignId]);
+          if (campRows && campRows.length > 0) {
+            candidateName = campRows[0].candidate_name || '';
+            cityName = campRows[0].city || '';
+          }
+        } catch (dbErr: any) {
+          console.warn('[ImageGen] Falha ao obter dados da campanha no banco:', dbErr.message);
+        }
+      }
+
+      let optimizedPrompt = prompt;
+
+      // Otimizar o prompt usando Gemini para criar uma descrição ideal para campanha política fotorrealista e profissional
+      if (geminiKey) {
+        try {
+          console.log('[ImageGen] Otimizando prompt com Gemini para contexto de campanha política...');
+          const campaignContext = candidateName 
+            ? `Candidato(a): "${candidateName}"${cityName ? ` na cidade de "${cityName}"` : ''}.` 
+            : `Campanha política brasileira${cityName ? ` na cidade de "${cityName}"` : ''}.`;
+
+          const optimizerSystemPrompt = `Você é um diretor de criação especializado em marketing e campanhas políticas de altíssimo nível.
+Sua missão é traduzir descrições e roteiros de imagens (que podem ser genéricos ou textos longos de redes sociais) em um PROMPT DE GERAÇÃO DE IMAGEM perfeito, detalhado e profissional em INGLÊS para o Gemini Imagen 4.
+
+Contexto do Candidato/Campanha: ${campaignContext}
+
+Regras Cruciais para o Prompt que Você Gerar:
+1. O prompt final deve ser em INGLÊS.
+2. Formato e Estilo: Fotorrealismo impecável. Descreva uma fotografia de campanha autêntica e de alta qualidade: "High-quality political campaign professional photography, warm natural sunlight, shot on 35mm lens, realistic textures, cinematic composition".
+3. Evite "look de IA barata": Diga explicitamente para ter "highly realistic skin textures, authentic expressions, natural posture, clean lighting, no plastic looks, realistic hands and fingers".
+4. O Candidato(a) ${candidateName ? `(${candidateName})` : ''}: Represente como uma figura inspiradora e empática, vestindo uma roupa de campanha clássica e elegante (como camisa social azul-clara, branca ou amarela de mangas dobradas), interagindo calorosamente com moradores de um bairro real no Brasil. O candidato deve passar credibilidade, otimismo e liderança.
+5. Eleitores/Apoiadores: Uma multidão ou grupo de pessoas reais e sorridentes, de origens diversas (jovens, idosos, trabalhadores locais), segurando bandeiras ou conversando, gerando um sentimento de forte conexão comunitária e esperança.
+6. Texto na Imagem: Se o texto original solicitar explicitamente nomes ou slogans, adicione uma instrução para renderizar um texto extremamente simples e elegante em português brasileiro, cercado por aspas triplas ou duplas no prompt, ex: 'with text "NOME" written in bold modern white typography'. Caso contrário, não adicione nenhum texto para evitar borrões da IA.
+7. Se for uma arte de feed ou folheto/flyer, descreva como um design profissional de agência: "A clean modern political flyer graphic layout with a professional photo of...".
+
+Por favor, retorne APENAS o prompt final em inglês. Não inclua nenhuma introdução, aspas envolvendo todo o texto ou explicação.`;
+
+          const optimizerResponse = await callGeminiREST(`${optimizerSystemPrompt}\n\nTexto original a ser transformado em imagem:\n"${prompt}"`);
+          const text = optimizerResponse.text().trim();
+          if (text) {
+            optimizedPrompt = text;
+            console.log('[ImageGen] Prompt otimizado para Imagen 4:', optimizedPrompt);
+          }
+        } catch (optErr: any) {
+          console.warn('[ImageGen] Erro na otimização de prompt, usando prompt original:', optErr.message);
+        }
+      }
+
+      // Garante que o prompt contém instruções estritas sobre o português se houver qualquer texto
+      const ptPrompt = optimizedPrompt.toLowerCase().includes('portuguese') || optimizedPrompt.toLowerCase().includes('português')
+        ? optimizedPrompt
+        : `ESTRITAMENTE EM PORTUGUÊS DO BRASIL: Qualquer palavra ou texto na imagem deve ser em português brasileiro. Prompt: ${optimizedPrompt}`;
+
       let imageUrl: string | null = null;
       let imageBase64: string | null = null;
       let geminiErrorDetail = '';
