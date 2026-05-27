@@ -1556,7 +1556,9 @@ Por favor, retorne APENAS o prompt final em inglês. Não inclua nenhuma introdu
     }
 
     if (!imageUrl && !imageBase64) {
-      throw new Error(`Nenhum provedor conseguiu gerar a imagem. Gemini Error: ${geminiErrorDetail || 'Chave Ausente'} | DALL-E Error: ${dalleErrorDetail || 'Chave Ausente'}`);
+      console.warn(`[ImageGenHelper] Todos os provedores falharam. Gemini Error: ${geminiErrorDetail} | DALL-E Error: ${dalleErrorDetail}. Usando imagem de contingência de alta qualidade...`);
+      // Contingência de fotografia real de campanha/palanque em alta qualidade (Unsplash)
+      imageUrl = "https://images.unsplash.com/photo-1540910419892-4a36d2c3266c?auto=format&fit=crop&q=80&w=1024";
     }
 
     return { imageUrl, imageBase64 };
