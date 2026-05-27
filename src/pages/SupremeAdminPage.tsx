@@ -30,6 +30,8 @@ interface CampaignConfig {
     };
     customFields: Record<string, CustomField[]>;
     status: 'active' | 'blocked';
+    maintenanceStatus?: string;
+    maintenance_status?: string;
 }
 
 interface AIUsageRecord {
@@ -732,12 +734,12 @@ const SupremeAdminPage: React.FC = () => {
                                                             className="text-xs h-7 px-3 border-indigo-500/50 text-indigo-400 hover:bg-indigo-500/10"
                                                             onClick={() => {
                                                                 setEditUserForm({
-                                                                    id: u.id || '',
+                                                                    id: String(u.id || ''),
                                                                     name: u.name || '',
                                                                     email: u.email || '',
                                                                     password: '',
                                                                     type: u.type || 'Colaborador',
-                                                                    campaign_id: u.campaign_id || u.campaignId || '',
+                                                                    campaign_id: String(u.campaign_id || u.campaignId || ''),
                                                                     ai_credits: (u as any).aiCredits !== undefined && (u as any).aiCredits !== null ? (u as any).aiCredits : 100,
                                                                     ai_used: (u as any).aiUsed !== undefined && (u as any).aiUsed !== null ? (u as any).aiUsed : 0,
                                                                     role: u.role || 'active'

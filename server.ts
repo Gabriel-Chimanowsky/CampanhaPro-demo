@@ -193,6 +193,7 @@ const callGeminiREST = async (prompt: string) => {
     console.error("[Gemini] Erro na chamada:", error.message);
     throw error;
   }
+};
 const checkAndConsumeAICredit = async (userId: string | undefined, campaignId: string | undefined): Promise<{ allowed: boolean; error?: string }> => {
   // Se for Supreme Admin, créditos ilimitados
   if (userId) {
@@ -258,6 +259,7 @@ const checkAndConsumeAICredit = async (userId: string | undefined, campaignId: s
 
 
 async function startServer() {
+  const PORT = Number(process.env.PORT) || 3001;
   const app = express();
   const httpServer = createHttpServer(app);
 
@@ -906,7 +908,7 @@ async function startServer() {
       if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
       
       // Use APP_URL for the public path
-      const appUrl = process.env.APP_URL || `http://localhost:${port}`;
+      const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
       const publicUrl = `${appUrl.replace(/\/$/, '')}/uploads/${req.file.filename}`;
       res.json({ publicUrl, path: req.file.path });
     } catch (err: any) {
@@ -2408,9 +2410,8 @@ app.get('/api/war-room/feed', (_req, res) => {
     });
   } else {
     // Em desenvolvimento local, escuta na porta dinâmica ou 3001 (para não colidir com o Vite na 3000)
-    const port: number = Number(process.env.PORT) || 3001;
-    httpServer.listen(port, '0.0.0.0', () => {
-      console.log(`[CRITICAL] Local development server listening on http://0.0.0.0:${port}`);
+    httpServer.listen(PORT, '0.0.0.0', () => {
+      console.log(`[CRITICAL] Local development server listening on http://0.0.0.0:${PORT}`);
     });
   }
 }
