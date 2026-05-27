@@ -791,7 +791,15 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
                                         onClick={async () => {
                                             if (!confirm("Excluir este card permanentemente?")) return;
                                             try {
-                                                if (msg.id) await supabase.from('agent_chat_history').delete().eq('id', msg.id);
+                                                if (msg.id) {
+                                                    const { data: { session } } = await supabase.auth.getSession();
+                                                    const token = session?.access_token;
+                                                    const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
+                                                    await fetch(`/api/db/agent_chat_history?id=${msg.id}`, {
+                                                        method: 'DELETE',
+                                                        headers
+                                                    });
+                                                }
                                                 const newHistory = history.filter((_, i) => i !== absoluteIdx);
                                                 setHistory(agentId, newHistory);
                                             } catch (e) { console.error(e); }
