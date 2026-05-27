@@ -1343,8 +1343,10 @@ app.get('/api/war-room/feed', (_req, res) => {
       
       let imageUrl: string | null = null;
       let imageBase64: string | null = null;
+      let geminiErrorDetail = '';
+      let dalleErrorDetail = '';
 
-      // 1. Tentar primeiro o Gemini Imagen 3
+      // 1. Tentar primeiro o Gemini Imagen 4
       if (geminiKey) {
         try {
           console.log('[ImageGen] Tentando Gemini Imagen 4 para prompt:', ptPrompt);
@@ -1368,18 +1370,26 @@ app.get('/api/war-room/feed', (_req, res) => {
 
           const b64 = response.data?.predictions?.[0]?.bytesBase64Encoded;
           if (b64) {
+            // Garantir que a pasta uploads existe antes de escrever (super importante para Docker/Easypanel)
+            const uploadsDir = path.join(process.cwd(), 'uploads');
+            if (!fs.existsSync(uploadsDir)) {
+              console.log('[ImageGen] Criando diretório de uploads...');
+              fs.mkdirSync(uploadsDir, { recursive: true });
+            }
+
             const filename = `ai-image-${Date.now()}-${Math.floor(Math.random() * 1000)}.png`;
-            const uploadPath = path.join(process.cwd(), 'uploads', filename);
+            const uploadPath = path.join(uploadsDir, filename);
             fs.writeFileSync(uploadPath, Buffer.from(b64, 'base64'));
             imageUrl = `/uploads/${filename}`;
             imageBase64 = b64;
             console.log('[ImageGen] Gemini Imagen 4 gerado com sucesso:', imageUrl);
           } else {
+            geminiErrorDetail = 'API Gemini não retornou predictions.';
             console.warn('[ImageGen] Gemini Imagen 4 não retornou predictions.');
           }
         } catch (geminiErr: any) {
-          const msg = geminiErr?.response?.data?.error?.message || geminiErr.message || 'Erro desconhecido na API Gemini Imagen';
-          console.warn('[ImageGen] Falha no Gemini Imagen 4:', msg);
+          geminiErrorDetail = geminiErr?.response?.data?.error?.message || geminiErr.message || 'Erro desconhecido na API Gemini Imagen';
+          console.warn('[ImageGen] Falha no Gemini Imagen 4:', geminiErrorDetail);
         }
       }
 
@@ -1402,13 +1412,15 @@ app.get('/api/war-room/feed', (_req, res) => {
           imageUrl = response.data?.data?.[0]?.url;
           console.log('[ImageGen] DALL-E 3 fallback gerado com sucesso:', imageUrl);
         } catch (dalleErr: any) {
-          const msg = dalleErr?.response?.data?.error?.message || dalleErr.message || 'Erro desconhecido na API DALL-E';
-          console.warn('[ImageGen] Falha no fallback DALL-E 3:', msg);
+          dalleErrorDetail = dalleErr?.response?.data?.error?.message || dalleErr.message || 'Erro desconhecido na API DALL-E';
+          console.warn('[ImageGen] Falha no fallback DALL-E 3:', dalleErrorDetail);
         }
       }
 
       if (!imageUrl) {
-        return res.status(500).json({ error: 'Nenhum provedor de imagem (Gemini Imagen 4 ou DALL-E 3) conseguiu gerar a imagem com sucesso.' });
+        return res.status(500).json({ 
+          error: `Nenhum provedor conseguiu gerar a imagem. Gemini Error: ${geminiErrorDetail || 'Chave Ausente'} | DALL-E Error: ${dalleErrorDetail || 'Chave Ausente'}` 
+        });
       }
 
       // Salvar no histórico (não-crítico: erro não aborta resposta)
