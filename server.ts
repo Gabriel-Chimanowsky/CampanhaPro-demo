@@ -1398,8 +1398,15 @@ app.get('/api/war-room/feed', (_req, res) => {
         }
       }
 
+      // Se o Gemini gerou base64 mas o disco falhou, usar como data URL diretamente
+      if (!imageUrl && imageBase64) {
+        imageUrl = `data:image/png;base64,${imageBase64}`;
+        console.log('[ImageGen] Usando base64 como data URL (sem arquivo em disco)');
+      }
+
       // 2. Fallback para DALL-E se falhou ou se chave Gemini não configurada
       if (!imageUrl && openaiKey) {
+
         try {
           console.log('[ImageGen] Tentando DALL-E 3 Fallback para prompt:', ptPrompt);
           const response = await axios.post(

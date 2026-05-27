@@ -519,6 +519,7 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
     const history = histories[agentId] || [];
     const [isLoading, setIsLoading] = useState(false);
     const [pendingOrders, setPendingOrders] = useState<any[]>([]);
+    const [generatedImages, setGeneratedImages] = useState<Record<number, string>>({});
     const scrollRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -592,9 +593,11 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
         setIsLoading(true);
         try {
             const resultUrl = await onExecuteAction(content, agentId);
-            const newHistory = [...history];
-            newHistory[msgIdx].content += `\n\n![ATIVO GERADO](${resultUrl})`;
-            setHistory(agentId, newHistory);
+            if (resultUrl) {
+                setGeneratedImages(prev => ({ ...prev, [msgIdx]: resultUrl }));
+            } else {
+                alert('Geração concluída mas a URL da imagem ficou vazia. Tente novamente.');
+            }
         } catch (error: any) {
             console.error("Erro na geração da imagem:", error);
             alert(`Erro ao gerar ativo visual: ${error.message || error}`);
@@ -623,33 +626,22 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
                 )}
             </div>
             
-            {/* Galeria de Ativos Recentes (Top 3) */}
-            {agentId === 'creative' && history.some(m => m.content.includes('![ATIVO GERADO]')) && (
+            {/* Galeria de Ativos Gerados nesta Sessão */}
+            {agentId === 'creative' && Object.keys(generatedImages).length > 0 && (
                 <div className="mb-6 animate-in fade-in zoom-in duration-500">
                     <p className="text-[10px] font-bold text-slate-500 uppercase mb-2 tracking-widest flex items-center gap-2">
-                        <SparklesIcon className="w-3 h-3 text-yellow-400" /> Ativos Criativos Recentes
+                        <SparklesIcon className="w-3 h-3 text-yellow-400" /> Ativos Criativos desta Sessão
                     </p>
                     <div className="grid grid-cols-3 gap-3">
-                        {history
-                            .filter(m => m.content.includes('![ATIVO GERADO]'))
-                            .slice(-3)
-                            .map((msg, i) => {
-                                const url = msg.content.match(/\!\[ATIVO GERADO\]\((.*?)\)/)?.[1];
-                                return (
-                                    <div key={i} className="aspect-square rounded-lg border border-slate-700 overflow-hidden bg-slate-900 group relative">
-                                        <img src={url} className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity" />
-                                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-2">
-                                            <button 
-                                                onClick={() => setInput(msg.content.split(')')[1]?.trim())}
-                                                className="text-[9px] font-bold text-slate-50 bg-indigo-600/80 hover:bg-indigo-600 p-1 rounded text-center"
-                                            >
-                                                REPRODUZIR
-                                            </button>
-                                        </div>
-                                    </div>
-                                );
-                            })
-                        }
+                        {Object.entries(generatedImages).slice(-3).map(([, url], i) => (
+                            <div key={i} className="aspect-square rounded-lg border border-slate-700 overflow-hidden bg-slate-900">
+                                <img
+                                    src={url}
+                                    className="w-full h-full object-cover opacity-80 hover:opacity-100 transition-opacity"
+                                    onError={(e) => { (e.target as HTMLImageElement).closest('div')!.style.display = 'none'; }}
+                                />
+                            </div>
+                        ))}
                     </div>
                 </div>
             )}
@@ -726,23 +718,34 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
                                     </button>
                                 )}
                                 <div className="whitespace-pre-wrap text-sm leading-relaxed">
-                                    {msg.content.includes('![ATIVO GERADO]') ? (
-                                        <div className="flex flex-col gap-3">
-                                            <p className="text-xs font-bold text-indigo-400 uppercase tracking-tighter">✨ Novo Ativo Criativo</p>
-                                            <div className="relative group rounded-lg overflow-hidden border border-indigo-500/50 shadow-lg">
-                                                <img src={msg.content.match(/\!\[ATIVO GERADO\]\((.*?)\)/)?.[1]} alt="Ativo" className="w-full h-auto" />
-                                            </div>
-                                            <p className="italic text-[10px] opacity-60 line-clamp-2">{msg.content.split(')')[1]}</p>
+                                    {msg.content.startsWith('🛡️') || msg.content.startsWith('🛠️') ? (
+                                        <div className="flex items-center gap-3 py-1 opacity-80">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-ping" />
+                                            <span className="text-[11px] font-medium text-indigo-300 italic">{msg.content}</span>
                                         </div>
-                                    ) : (
-                                        msg.content.startsWith('🛡️') || msg.content.startsWith('🛠️') ? (
-                                            <div className="flex items-center gap-3 py-1 opacity-80">
-                                                <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-ping" />
-                                                <span className="text-[11px] font-medium text-indigo-300 italic">{msg.content}</span>
-                                            </div>
-                                        ) : msg.content
-                                    )}
+                                    ) : msg.content}
                                 </div>
+
+                                {/* Imagem gerada para este card - renderizada inline no chat */}
+                                {generatedImages[idx] && (
+                                    <div className="mt-4 animate-in fade-in zoom-in duration-500">
+                                        <p className="text-xs font-bold text-indigo-400 uppercase tracking-tighter mb-2 flex items-center gap-1">
+                                            <SparklesIcon className="w-3 h-3" /> Ativo Visual Gerado
+                                        </p>
+                                        <div className="rounded-xl overflow-hidden border border-indigo-500/40 shadow-xl shadow-indigo-900/30">
+                                            <img
+                                                src={generatedImages[idx]}
+                                                alt="Ativo Visual"
+                                                className="w-full h-auto block"
+                                                onError={(e) => {
+                                                    const el = e.target as HTMLImageElement;
+                                                    el.parentElement!.innerHTML = '<div class="p-4 text-center text-red-400 text-xs">❌ Erro ao renderizar imagem. URL pode ter expirado.</div>';
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
                                 {msg.role === 'agent' && title === 'O Comandante de Campo' && onGeneratePost && !msg.content.startsWith('🛡️') && !msg.content.startsWith('🛠️') && !msg.content.startsWith('❌') && (
                                     <div className="mt-3 pt-3 border-t border-slate-600">
                                         <p className="text-[10px] text-slate-400 mb-2 font-bold uppercase">Ação da Linha de Montagem:</p>
@@ -755,7 +758,8 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
                                         <button onClick={() => onHandoff(msg.content)} className="flex items-center gap-2 text-xs bg-yellow-600 hover:bg-yellow-700 text-slate-50 px-3 py-2 rounded-lg font-bold transition-all shadow-lg hover:scale-105 active:scale-95"><SparklesIcon className="w-3 h-3" /> ENVIAR SCRIPT PARA PRODUÇÃO</button>
                                     </div>
                                 )}
-                                {msg.role === 'agent' && title === 'O Produtor Criativo' && onExecuteAction && !msg.content.startsWith('🛡️') && !msg.content.startsWith('🛠️') && !msg.content.startsWith('❌') && (
+                                {/* Botão GERAR ATIVO — só aparece se ainda não há imagem gerada para este card */}
+                                {msg.role === 'agent' && title === 'O Produtor Criativo' && onExecuteAction && !msg.content.startsWith('🛡️') && !msg.content.startsWith('🛠️') && !msg.content.startsWith('❌') && !generatedImages[idx] && (
                                     <div className="mt-3 pt-3 border-t border-slate-600">
                                         <p className="text-[10px] text-slate-400 mb-2 font-bold uppercase">Execução Automática:</p>
                                         <button onClick={() => handleExecuteAction(idx, msg.content)} disabled={isLoading} className="flex items-center gap-2 text-xs bg-indigo-600 hover:bg-indigo-700 text-slate-50 px-3 py-2 rounded-lg font-bold transition-all shadow-lg hover:scale-105 active:scale-95 disabled:opacity-50"><SparklesIcon className="w-3 h-3" /> 🚀 GERAR ATIVO VISUAL (Gemini Imagen)</button>
@@ -767,14 +771,11 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
                                         <button onClick={() => onGeneratePost(msg.content)} className="flex items-center gap-2 text-xs bg-green-600 hover:bg-green-700 text-slate-50 px-3 py-2 rounded-lg font-bold transition-all shadow-lg hover:scale-105 active:scale-95"><CheckCircle2 className="w-3 h-3" /> DEVOLVER PARA SOCIAL MEDIA</button>
                                     </div>
                                 )}
-                                {msg.role === 'agent' && onPublish && !msg.content.startsWith('🛡️') && (
+                                {/* Publicar nas redes — aparece só quando há imagem gerada OU para outros agentes */}
+                                {msg.role === 'agent' && onPublish && !msg.content.startsWith('🛡️') && !msg.content.startsWith('❌') && generatedImages[idx] && (
                                     <div className="mt-3 pt-3 border-t border-slate-600/50">
-                                        <button 
-                                            onClick={() => {
-                                                const mediaUrl = msg.content.match(/\!\[ATIVO GERADO\]\((.*?)\)/)?.[1];
-                                                const cleanContent = msg.content.split('![ATIVO GERADO](')[0].replace(/\*\*/g, '').trim();
-                                                onPublish(cleanContent, mediaUrl);
-                                            }} 
+                                        <button
+                                            onClick={() => onPublish(msg.content.replace(/\*\*/g, '').trim(), generatedImages[idx])}
                                             className="w-full flex items-center justify-center gap-2 text-[10px] bg-emerald-600 hover:bg-emerald-500 text-slate-50 py-2 rounded-lg font-bold transition-all shadow-md active:scale-95"
                                         >
                                             <Send className="w-3 h-3" /> PUBLICAR NAS REDES CONECTADAS
