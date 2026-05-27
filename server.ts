@@ -626,6 +626,11 @@ async function startServer() {
             }
           }
           
+          // Auto-parse JSON strings back to objects/arrays (output, input, metadata, features, limits, detalhes)
+          if (typeof value === 'string' && (value.startsWith('{') || value.startsWith('['))) {
+            try { value = JSON.parse(value); } catch (_) { /* keep as string */ }
+          }
+          
           newRow[camelKey] = value;
         }
         return newRow;
@@ -1855,7 +1860,7 @@ app.get('/api/war-room/feed', (_req, res) => {
         {
           name: 'agent_chat_history',
           sql: `CREATE TABLE IF NOT EXISTS agent_chat_history (
-            id INT AUTO_INCREMENT PRIMARY KEY,
+            id BIGINT AUTO_INCREMENT PRIMARY KEY,
             campaign_id CHAR(36),
             agent_id VARCHAR(100),
             role ENUM('user', 'assistant', 'system', 'agent'),
@@ -2009,7 +2014,8 @@ app.get('/api/war-room/feed', (_req, res) => {
         { name: 'war_room_intelligence', sql: `CREATE TABLE IF NOT EXISTS war_room_intelligence (id CHAR(36) PRIMARY KEY, campaign_id CHAR(36) NOT NULL, source_agent VARCHAR(100), target_agent VARCHAR(100), priority VARCHAR(50) DEFAULT 'Media', category VARCHAR(100), insight_text TEXT NOT NULL, metadata LONGTEXT, action_taken TINYINT(1) DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;` },
         { name: 'instagram_engagements', sql: `CREATE TABLE IF NOT EXISTS instagram_engagements (id CHAR(36) PRIMARY KEY, campaign_id CHAR(36), instagram_handle VARCHAR(255), instagram_user_id VARCHAR(255), engagement_type VARCHAR(50), instagram_post_id VARCHAR(255), instagram_comment_id VARCHAR(255), comment_text TEXT, matched_lead_id CHAR(36), match_confidence FLOAT, webhook_received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;` },
         { name: 'instagram_webhook_logs', sql: `CREATE TABLE IF NOT EXISTS instagram_webhook_logs (id CHAR(36) PRIMARY KEY, campaign_id CHAR(36), event VARCHAR(100), raw_payload LONGTEXT, status VARCHAR(50), processed_engagements INT DEFAULT 0, matched_leads INT DEFAULT 0, error_message TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;` },
-        { name: 'ai_compliance_logs', sql: `CREATE TABLE IF NOT EXISTS ai_compliance_logs (id CHAR(36) PRIMARY KEY, campaign_id CHAR(36), agent_id VARCHAR(100), action_type VARCHAR(100), input_summary TEXT, output_summary TEXT, ai_disclosure_required TINYINT(1) DEFAULT 1, human_approved TINYINT(1) DEFAULT 0, risk_level VARCHAR(50), created_by CHAR(36), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;` }
+        { name: 'ai_compliance_logs', sql: `CREATE TABLE IF NOT EXISTS ai_compliance_logs (id CHAR(36) PRIMARY KEY, campaign_id CHAR(36), agent_id VARCHAR(100), action_type VARCHAR(100), input_summary TEXT, output_summary TEXT, ai_disclosure_required TINYINT(1) DEFAULT 1, human_approved TINYINT(1) DEFAULT 0, risk_level VARCHAR(50), created_by CHAR(36), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;` },
+        { name: 'backups', sql: `CREATE TABLE IF NOT EXISTS backups (id CHAR(36) PRIMARY KEY, campaign_id CHAR(36), name VARCHAR(255), status VARCHAR(50) DEFAULT 'completed', size_kb INT DEFAULT 0, data LONGTEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, INDEX idx_backups_campaign (campaign_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;` }
       ];
 
       for (const table of tables) {
@@ -2035,7 +2041,9 @@ app.get('/api/war-room/feed', (_req, res) => {
         `ALTER TABLE instagram_webhook_logs ADD COLUMN metadata LONGTEXT`,
         // Correção para o erro "Unknown column 'input' in 'field list'" na tabela agent_outputs
         `ALTER TABLE agent_outputs ADD COLUMN input LONGTEXT NULL`,
-        `ALTER TABLE agent_outputs ADD COLUMN output LONGTEXT NULL`
+        `ALTER TABLE agent_outputs ADD COLUMN output LONGTEXT NULL`,
+        // Fix overflow INT -> BIGINT na agent_chat_history (Duplicate entry '2147483647')
+        `ALTER TABLE agent_chat_history MODIFY COLUMN id BIGINT AUTO_INCREMENT`
       ];
 
       for (const migration of columnMigrations) {

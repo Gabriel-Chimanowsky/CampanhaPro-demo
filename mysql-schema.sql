@@ -318,7 +318,7 @@ CREATE TABLE IF NOT EXISTS agent_outputs (
 -- 21. Histórico de Chat com Agentes
 DROP TABLE IF EXISTS agent_chat_history;
 CREATE TABLE IF NOT EXISTS agent_chat_history (
-    id INT AUTO_INCREMENT PRIMARY KEY,
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
     campaign_id CHAR(36),
     agent_id VARCHAR(100),
     role ENUM('user', 'assistant', 'system', 'agent'),
@@ -367,6 +367,19 @@ CREATE TABLE IF NOT EXISTS election_incidents (
     status VARCHAR(50) DEFAULT 'pendente',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX (campaign_id)
+);
+
+-- 25. Backups da Campanha
+DROP TABLE IF EXISTS backups;
+CREATE TABLE IF NOT EXISTS backups (
+    id CHAR(36) PRIMARY KEY,
+    campaign_id CHAR(36),
+    name VARCHAR(255),
+    status VARCHAR(50) DEFAULT 'completed',
+    size_kb INT DEFAULT 0,
+    data LONGTEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_backups_campaign (campaign_id)
 );
 
 -- DADOS INICIAIS (SEED)
