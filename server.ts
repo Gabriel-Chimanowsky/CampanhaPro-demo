@@ -38,8 +38,8 @@ const sanitizeMySQLValue = (val: any): any => {
 // __dirname is not needed as we use process.cwd() for path resolution
 
 // Configuração centralizada
-const AI_MODEL = "gpt-4o-mini"; 
-const GEMINI_MODEL_NAME = "gemini-1.5-flash"; 
+const AI_MODEL = "gemini-2.5-flash"; 
+const GEMINI_MODEL_NAME = "gemini-2.5-flash"; 
 
 let supabaseAdmin: any = null;
 
@@ -147,8 +147,8 @@ const AGENT_TOOLS = [
 const cleanJSON = (text: string) => text.replace(/```json/g, '').replace(/```/g, '').trim();
 
 const callChatGPT = async (prompt: string, systemInstruction?: string, tools?: any[]) => {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error("OPENAI_API_KEY não configurada.");
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("GEMINI_API_KEY não configurada.");
 
   const messages: any[] = [];
   if (systemInstruction) messages.push({ role: 'system', content: systemInstruction });
@@ -157,7 +157,7 @@ const callChatGPT = async (prompt: string, systemInstruction?: string, tools?: a
   const body: any = { model: AI_MODEL, messages, temperature: 0.7 };
   if (tools && tools.length > 0) { body.tools = tools; body.tool_choice = "auto"; }
 
-  const response = await axios.post('https://api.openai.com/v1/chat/completions', body, {
+  const response = await axios.post('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', body, {
     headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
   });
 
@@ -1049,7 +1049,7 @@ app.get('/api/war-room/feed', (_req, res) => {
       // SEGUNDA CHAMADA: alimentar resultados das tools de volta na IA pra gerar texto final
       if (toolResults.length > 0) {
         try {
-          const apiKey = process.env.OPENAI_API_KEY;
+          const apiKey = process.env.GEMINI_API_KEY;
           const followupMessages: any[] = [];
           if (systemInstruction) followupMessages.push({ role: 'system', content: systemInstruction });
           followupMessages.push({ role: 'user', content: prompt });
@@ -1066,7 +1066,7 @@ app.get('/api/war-room/feed', (_req, res) => {
             });
           }
 
-          const followup = await axios.post('https://api.openai.com/v1/chat/completions', {
+          const followup = await axios.post('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {
             model: AI_MODEL,
             messages: followupMessages,
             temperature: 0.7
