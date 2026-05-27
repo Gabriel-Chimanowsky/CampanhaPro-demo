@@ -164,35 +164,65 @@ const callChatGPT = async (prompt: string, systemInstruction?: string, tools?: a
   const body: any = { model: AI_MODEL, messages, temperature: 0.7 };
   if (tools && tools.length > 0) { body.tools = tools; body.tool_choice = "auto"; }
 
-  const response = await axios.post('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', body, {
-    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
-  });
+  let retries = 3;
+  let delay = 1500;
+  while (retries > 0) {
+    try {
+      const response = await axios.post('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', body, {
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
+      });
 
-  const result = response.data.choices[0].message;
-  return {
-    text: () => result.content || "",
-    tool_calls: result.tool_calls,
-    response: { text: () => result.content || "" }
-  };
+      const result = response.data.choices[0].message;
+      return {
+        text: () => result.content || "",
+        tool_calls: result.tool_calls,
+        response: { text: () => result.content || "" }
+      };
+    } catch (error: any) {
+      const status = error?.response?.status;
+      if (status === 429 && retries > 1) {
+        console.warn(`[Gemini Rate Limit] 429 detectado em callChatGPT. Aguardando ${delay}ms para tentar novamente. Tentativas restantes: ${retries - 1}`);
+        await new Promise(r => setTimeout(r, delay));
+        retries--;
+        delay *= 2; // backoff exponencial
+      } else {
+        throw error;
+      }
+    }
+  }
+  throw new Error("Limite de requisições do Gemini atingido após várias tentativas.");
 };
 
 const callGeminiREST = async (prompt: string) => {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY não configurada.");
 
-  try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: GEMINI_MODEL_NAME });
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    return {
-      text: () => response.text(),
-      response: { text: () => response.text() }
-    };
-  } catch (error: any) {
-    console.error("[Gemini] Erro na chamada:", error.message);
-    throw error;
+  let retries = 3;
+  let delay = 1500;
+  while (retries > 0) {
+    try {
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: GEMINI_MODEL_NAME });
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      return {
+        text: () => response.text(),
+        response: { text: () => response.text() }
+      };
+    } catch (error: any) {
+      const isRateLimit = error?.status === 429 || error?.message?.includes('429') || error?.response?.status === 429;
+      if (isRateLimit && retries > 1) {
+        console.warn(`[Gemini Rate Limit] 429 detectado em callGeminiREST. Aguardando ${delay}ms para tentar novamente. Tentativas restantes: ${retries - 1}`);
+        await new Promise(r => setTimeout(r, delay));
+        retries--;
+        delay *= 2; // backoff exponencial
+      } else {
+        console.error("[Gemini] Erro na chamada:", error.message);
+        throw error;
+      }
+    }
   }
+  throw new Error("Limite de requisições do Gemini atingido em callGeminiREST.");
 };
 const checkAndConsumeAICredit = async (userId: string | undefined, campaignId: string | undefined): Promise<{ allowed: boolean; error?: string }> => {
   // Se for Supreme Admin, créditos ilimitados
