@@ -1475,7 +1475,7 @@ Do not use names, do not analyze mood, just physical visual attributes.`;
 
   app.post('/api/agents/generate-image', requireAuth, async (req: any, res: any) => {
     try {
-      const { prompt, campaignId, agentId, userId } = req.body;
+      const { prompt, campaignId, agentId, userId, referenceImage } = req.body;
       
       const creditCheck = await checkAndConsumeAICredit(userId, campaignId);
       if (!creditCheck.allowed) {
@@ -1502,7 +1502,23 @@ Do not use names, do not analyze mood, just physical visual attributes.`;
 
       // Buscar foto e características visuais do candidato da tabela 'settings' do Supabase
       let candidateDescription = '';
-      if (supabaseAdmin && campaignId) {
+
+      // 1. Se o usuário enviou uma imagem de referência específica nesta chamada, nós a analisamos na hora!
+      if (referenceImage) {
+        try {
+          console.log('[ImageGen] Analisando imagem de referência enviada pelo usuário via Gemini Vision...');
+          const refDesc = await describeCandidateImage(referenceImage);
+          if (refDesc) {
+            candidateDescription = refDesc;
+            console.log('[ImageGen] Descrição da imagem de referência gerada:', candidateDescription);
+          }
+        } catch (refErr: any) {
+          console.warn('[ImageGen] Falha ao analisar imagem de referência:', refErr.message);
+        }
+      }
+
+      // 2. Se não houver descrição da imagem de referência enviada, busca as configurações gerais
+      if (!candidateDescription && supabaseAdmin && campaignId) {
         try {
           const { data } = await supabaseAdmin
             .from('settings')
@@ -1513,10 +1529,10 @@ Do not use names, do not analyze mood, just physical visual attributes.`;
           if (data && data.campaign_details) {
             const details = data.campaign_details;
             
-            // 1. Priorizar características visuais informadas manualmente pelo usuário
+            // A. Priorizar características visuais informadas manualmente pelo usuário
             candidateDescription = details.candidateVisualFeatures || '';
 
-            // 2. Se não houver descrição manual, mas houver foto, geramos/usamos a descrição multimodal
+            // B. Se não houver descrição manual, mas houver foto, geramos/usamos a descrição multimodal
             if (!candidateDescription && details.candidatePhotoUrl) {
               if (details.cachedCandidateDescription) {
                 candidateDescription = details.cachedCandidateDescription;

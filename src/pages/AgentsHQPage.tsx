@@ -362,9 +362,9 @@ const AgentsHQPage: React.FC = () => {
     };
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-4 flex flex-col h-[calc(100vh-140px)] md:h-[calc(100vh-180px)] min-h-[650px] overflow-hidden">
             {notifications.length > 0 && (
-                <div className="space-y-2">
+                <div className="space-y-2 flex-shrink-0">
                     {notifications.map(notif => (
                         <div
                             key={notif.id}
@@ -406,7 +406,7 @@ const AgentsHQPage: React.FC = () => {
                     </div>
                 </div>
             )}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-shrink-0">
                 <div>
                     <h2 className="text-2xl font-bold text-slate-50 flex items-center gap-2">
                         <Bot className="w-6 h-6 text-blue-400" />
@@ -448,7 +448,7 @@ const AgentsHQPage: React.FC = () => {
                 </div>
             </div>
 
-            <div className="flex space-x-2 bg-slate-800 p-1 rounded-lg border border-slate-700 overflow-x-auto">
+            <div className="flex space-x-2 bg-slate-800 p-1 rounded-lg border border-slate-700 overflow-x-auto flex-shrink-0">
                 <button onClick={() => setActiveTab('war-room')} className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${activeTab === 'war-room' ? 'bg-red-500/20 text-red-400' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'}`}>
                     <LayoutDashboard className="w-4 h-4" /> War Room
                 </button>
@@ -482,9 +482,9 @@ const AgentsHQPage: React.FC = () => {
                 </button>
             </div>
 
-            <div className="bg-slate-800 rounded-xl border border-slate-700 p-6 min-h-[500px] flex flex-col">
+            <div className="bg-slate-800 rounded-xl border border-slate-700 p-6 flex-1 min-h-0 flex flex-col overflow-hidden">
                 {!isHydrated ? (
-                    <div className="flex flex-col items-center justify-center h-64 text-slate-400">
+                    <div className="flex flex-col items-center justify-center h-full text-slate-400">
                         <Loader2 className="w-8 h-8 animate-spin mb-4 text-blue-400" />
                         <p className="text-sm font-medium">Sincronizando Quartel General...</p>
                     </div>
@@ -524,7 +524,11 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
     const [lightboxImage, setLightboxImage] = useState<string | null>(null);
     const [lightboxRefText, setLightboxRefText] = useState('');
     const lightboxInputRef = useRef<HTMLInputElement>(null);
-
+    
+    // Suporte para imagem de referência temporária no chat
+    const [referenceImage, setReferenceImage] = useState<string | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+ 
     // Chave estável por mensagem (usa id do banco ou índice absoluto)
     const getMsgKey = (msg: any, absoluteIdx: number) => msg.id ? String(msg.id) : String(absoluteIdx);
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -600,7 +604,8 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
         setLoadingCardKey(msgKey);
         setIsLoading(true);
         try {
-            const resultUrl = await onExecuteAction(content, agentId);
+            // Se houver uma imagem de referência anexada no chat pelo usuário, envia ela na chamada
+            const resultUrl = await generateCreativeImage(content, campaignId, String(user?.id || 'unknown'), referenceImage || undefined);
             if (resultUrl) {
                 setGeneratedImages(prev => ({ ...prev, [msgKey]: resultUrl }));
             } else {
@@ -658,8 +663,8 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
     };
 
     return (
-        <div className="flex flex-col h-full">
-            <div className="flex flex-col md:flex-row md:items-center gap-3 mb-6 pb-4 border-b border-slate-700">
+        <div className="flex flex-col h-full overflow-hidden">
+            <div className="flex flex-col md:flex-row md:items-center gap-3 mb-4 pb-4 border-b border-slate-700 flex-shrink-0">
                 <div className="p-3 bg-slate-900 rounded-lg border border-slate-700 w-fit">{icon}</div>
                 <div className="flex-1">
                     <h3 className="text-xl font-bold text-slate-50">{title}</h3>
@@ -679,7 +684,7 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
             
             {/* Galeria de Ativos desta Sessão — compacta, no topo */}
             {agentId === 'creative' && Object.keys(generatedImages).length > 0 && (
-                <div className="mb-4 animate-in fade-in zoom-in duration-500">
+                <div className="mb-4 animate-in fade-in zoom-in duration-500 flex-shrink-0">
                     <p className="text-[10px] font-bold text-slate-500 uppercase mb-2 tracking-widest flex items-center gap-2">
                         <SparklesIcon className="w-3 h-3 text-yellow-400" /> Ativos desta Sessão
                     </p>
@@ -702,7 +707,7 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
 
             {/* Painel de Alertas do Auditor (Top 3) */}
             {agentId === 'fraud' && history.some(m => m.content.includes('🛡️')) && (
-                <div className="mb-6 animate-in fade-in slide-in-from-top-2 duration-500 bg-red-500/5 border border-red-500/10 p-4 rounded-xl">
+                <div className="mb-4 animate-in fade-in slide-in-from-top-2 duration-500 bg-red-500/5 border border-red-500/10 p-4 rounded-xl flex-shrink-0">
                     <p className="text-[10px] font-bold text-red-400 uppercase mb-3 tracking-widest flex items-center gap-2">
                         <Shield className="w-3 h-3" /> Relatórios de Integridade Recentes
                     </p>
@@ -721,9 +726,9 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
                 </div>
             )}
 
-            <div className="flex-1 min-h-0 overflow-y-auto mb-4 space-y-4 pr-2" ref={scrollRef}>
+            <div className="flex-1 min-h-0 overflow-y-auto mb-4 space-y-4 pr-2 select-none" ref={scrollRef}>
                 {pendingOrders.length > 0 && (
-                    <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 mb-6">
+                    <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 mb-6 flex-shrink-0">
                         <div className="flex items-center gap-2 mb-3 text-blue-400 font-bold text-sm uppercase tracking-wider"><BellRing className="w-4 h-4" /> ⚡ Ordens de Produção Pendentes</div>
                         <div className="space-y-3">
                             {pendingOrders.map((order) => (
@@ -877,9 +882,65 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
                     </div>
                 )}
             </div>
-            <form onSubmit={handleSubmit} className="relative mt-auto">
-                <input type="text" value={input} onChange={(e) => setInput(e.target.value)} placeholder={placeholder} className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-4 pr-12 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all" disabled={isLoading} />
-                <button type="submit" disabled={!input.trim() || isLoading} className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-blue-400 disabled:opacity-50 disabled:hover:text-slate-400 transition-colors"><Send className="w-5 h-5" /></button>
+            {/* Área de anexo de imagem de referência no Chat input */}
+            <form onSubmit={handleSubmit} className="relative mt-auto flex-shrink-0">
+                {referenceImage && (
+                    <div className="absolute bottom-full left-0 mb-2 p-2 bg-slate-900 border border-slate-700 rounded-xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        <div className="w-10 h-10 rounded-lg overflow-hidden border border-indigo-500/40 relative">
+                            <img src={referenceImage} alt="Referência" className="w-full h-full object-cover" />
+                            <button 
+                                type="button" 
+                                onClick={() => setReferenceImage(null)} 
+                                className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity text-red-400"
+                                title="Remover"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+                        <div className="text-[10px]">
+                            <p className="text-indigo-400 font-bold uppercase tracking-wider">Imagem de Referência Ativa</p>
+                            <p className="text-slate-500">Substituirá o candidato nesta geração.</p>
+                        </div>
+                    </div>
+                )}
+                
+                <input 
+                    type="text" 
+                    value={input} 
+                    onChange={(e) => setInput(e.target.value)} 
+                    placeholder={placeholder} 
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-12 pr-12 py-3.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm" 
+                    disabled={isLoading} 
+                />
+                
+                {/* Botão de Anexo */}
+                <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isLoading}
+                    className="absolute left-2.5 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-indigo-400 transition-colors disabled:opacity-50"
+                    title="Anexar Imagem de Referência para a IA"
+                >
+                    <ZoomIn className="w-5 h-5" />
+                </button>
+                <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                                setReferenceImage(reader.result as string);
+                            };
+                            reader.readAsDataURL(file);
+                        }
+                    }} 
+                    accept="image/*" 
+                    className="hidden" 
+                />
+
+                <button type="submit" disabled={!input.trim() || isLoading} className="absolute right-2.5 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-blue-400 disabled:opacity-50 disabled:hover:text-slate-400 transition-colors"><Send className="w-5 h-5" /></button>
             </form>
 
             {/* ── Lightbox Modal ─────────────────────────────────────── */}

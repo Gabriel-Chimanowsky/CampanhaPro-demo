@@ -205,13 +205,13 @@ export const askBackupAgent = (prompt: string, campaignId?: string, userId?: str
 export const askCrmSpecialist = (prompt: string, campaignId?: string, userId?: string): Promise<any> => callAgent(CRM_AGENT_INSTRUCTION, prompt, campaignId, userId, 'crm');
 export const askFraudAuditor = (prompt: string, campaignId?: string, userId?: string): Promise<any> => callAgent(FRAUD_AUDITOR_INSTRUCTION, prompt, campaignId, userId, 'fraud');
 
-export const generateCreativeImage = async (prompt: string, _campaignId?: string, _userId?: string): Promise<string> => {
+export const generateCreativeImage = async (prompt: string, _campaignId?: string, _userId?: string, referenceImage?: string): Promise<string> => {
     try {
         const headers = await getAuthHeaders();
         const response = await fetch('/api/agents/generate-image', {
             method: 'POST',
             headers,
-            body: JSON.stringify({ prompt, campaignId: _campaignId, userId: _userId })
+            body: JSON.stringify({ prompt, campaignId: _campaignId, userId: _userId, referenceImage })
         });
 
         if (!response.ok) {
