@@ -1370,19 +1370,24 @@ app.get('/api/war-room/feed', (_req, res) => {
 
           const b64 = response.data?.predictions?.[0]?.bytesBase64Encoded;
           if (b64) {
-            // Garantir que a pasta uploads existe antes de escrever (super importante para Docker/Easypanel)
-            const uploadsDir = path.join(process.cwd(), 'uploads');
-            if (!fs.existsSync(uploadsDir)) {
-              console.log('[ImageGen] Criando diretório de uploads...');
-              fs.mkdirSync(uploadsDir, { recursive: true });
-            }
-
-            const filename = `ai-image-${Date.now()}-${Math.floor(Math.random() * 1000)}.png`;
-            const uploadPath = path.join(uploadsDir, filename);
-            fs.writeFileSync(uploadPath, Buffer.from(b64, 'base64'));
-            imageUrl = `/uploads/${filename}`;
             imageBase64 = b64;
-            console.log('[ImageGen] Gemini Imagen 4 gerado com sucesso:', imageUrl);
+            try {
+              // Garantir que a pasta uploads existe antes de escrever (super importante para Docker/Easypanel)
+              const uploadsDir = path.join(process.cwd(), 'uploads');
+              if (!fs.existsSync(uploadsDir)) {
+                console.log('[ImageGen] Criando diretório de uploads...');
+                fs.mkdirSync(uploadsDir, { recursive: true });
+              }
+
+              const filename = `ai-image-${Date.now()}-${Math.floor(Math.random() * 1000)}.png`;
+              const uploadPath = path.join(uploadsDir, filename);
+              fs.writeFileSync(uploadPath, Buffer.from(b64, 'base64'));
+              imageUrl = `/uploads/${filename}`;
+              console.log('[ImageGen] Gemini Imagen 4 gerado com sucesso no disco:', imageUrl);
+            } catch (writeErr: any) {
+              console.warn('[ImageGen] Falha ao escrever arquivo no disco, usando apenas Base64:', writeErr.message);
+              // Não falhamos a requisição pois temos a base64 na memória
+            }
           } else {
             geminiErrorDetail = 'API Gemini não retornou predictions.';
             console.warn('[ImageGen] Gemini Imagen 4 não retornou predictions.');
@@ -1438,7 +1443,7 @@ app.get('/api/war-room/feed', (_req, res) => {
         }
       }
 
-      if (!imageUrl) {
+      if (!imageUrl && !imageBase64) {
         return res.status(500).json({ 
           error: `Nenhum provedor conseguiu gerar a imagem. Gemini Error: ${geminiErrorDetail || 'Chave Ausente'} | DALL-E Error: ${dalleErrorDetail || 'Chave Ausente'}` 
         });
@@ -1446,10 +1451,13 @@ app.get('/api/war-room/feed', (_req, res) => {
 
       // Salvar no histórico (não-crítico: erro não aborta resposta)
       try {
-        await pool.execute(
-          'INSERT INTO agent_chat_history (campaign_id, agent_id, role, content, metadata) VALUES (?, ?, ?, ?, ?)',
-          [campaignId || null, agentId || null, 'agent', `![ATIVO](${imageUrl})`, JSON.stringify({ type: 'image' })]
-        );
+        const historyContent = imageUrl || (imageBase64 ? (imageBase64.startsWith('data:') ? imageBase64 : `data:image/png;base64,${imageBase64}`) : '');
+        if (historyContent) {
+          await pool.execute(
+            'INSERT INTO agent_chat_history (campaign_id, agent_id, role, content, metadata) VALUES (?, ?, ?, ?, ?)',
+            [campaignId || null, agentId || null, 'agent', `![ATIVO](${historyContent})`, JSON.stringify({ type: 'image' })]
+          );
+        }
       } catch (histErr: any) {
         console.warn('[ImageGen] Falha ao salvar histórico de imagem:', histErr.message);
       }

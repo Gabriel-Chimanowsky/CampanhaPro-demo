@@ -220,7 +220,8 @@ export const generateCreativeImage = async (prompt: string, _campaignId?: string
         }
 
         const data = await response.json();
-        return data.imageUrl || data.imageBase64;
+        const base64Url = data.imageBase64 ? (data.imageBase64.startsWith('data:') ? data.imageBase64 : `data:image/png;base64,${data.imageBase64}`) : null;
+        return data.imageUrl || base64Url || "";
     } catch (error) {
         console.error("Erro no Produtor Criativo (Image Gen):", error);
         throw error;

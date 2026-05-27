@@ -595,8 +595,9 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
             const newHistory = [...history];
             newHistory[msgIdx].content += `\n\n![ATIVO GERADO](${resultUrl})`;
             setHistory(agentId, newHistory);
-        } catch (error) {
-            alert("Erro ao executar ação automática.");
+        } catch (error: any) {
+            console.error("Erro na geração da imagem:", error);
+            alert(`Erro ao gerar ativo visual: ${error.message || error}`);
         } finally {
             setIsLoading(false);
         }
@@ -742,25 +743,25 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
                                         ) : msg.content
                                     )}
                                 </div>
-                                {msg.role === 'agent' && title === 'O Comandante de Campo' && onGeneratePost && (
+                                {msg.role === 'agent' && title === 'O Comandante de Campo' && onGeneratePost && !msg.content.startsWith('🛡️') && !msg.content.startsWith('🛠️') && !msg.content.startsWith('❌') && (
                                     <div className="mt-3 pt-3 border-t border-slate-600">
                                         <p className="text-[10px] text-slate-400 mb-2 font-bold uppercase">Ação da Linha de Montagem:</p>
                                         <button onClick={() => onGeneratePost(msg.content)} className="flex items-center gap-2 text-xs bg-purple-600 hover:bg-purple-700 text-slate-50 px-3 py-2 rounded-lg font-bold transition-all shadow-lg hover:scale-105 active:scale-95"><Share2 className="w-3 h-3" /> GERAR POST VIRAL AGORA</button>
                                     </div>
                                 )}
-                                {msg.role === 'agent' && title === 'O Social Media' && onHandoff && (
+                                {msg.role === 'agent' && title === 'O Social Media' && onHandoff && !msg.content.startsWith('🛡️') && !msg.content.startsWith('🛠️') && !msg.content.startsWith('❌') && (
                                     <div className="mt-3 pt-3 border-t border-slate-600">
                                         <p className="text-[10px] text-slate-400 mb-2 font-bold uppercase">Integração Google Flow:</p>
                                         <button onClick={() => onHandoff(msg.content)} className="flex items-center gap-2 text-xs bg-yellow-600 hover:bg-yellow-700 text-slate-50 px-3 py-2 rounded-lg font-bold transition-all shadow-lg hover:scale-105 active:scale-95"><SparklesIcon className="w-3 h-3" /> ENVIAR SCRIPT PARA PRODUÇÃO</button>
                                     </div>
                                 )}
-                                {msg.role === 'agent' && title === 'O Produtor Criativo' && onExecuteAction && (
+                                {msg.role === 'agent' && title === 'O Produtor Criativo' && onExecuteAction && !msg.content.startsWith('🛡️') && !msg.content.startsWith('🛠️') && !msg.content.startsWith('❌') && (
                                     <div className="mt-3 pt-3 border-t border-slate-600">
                                         <p className="text-[10px] text-slate-400 mb-2 font-bold uppercase">Execução Automática:</p>
                                         <button onClick={() => handleExecuteAction(idx, msg.content)} disabled={isLoading} className="flex items-center gap-2 text-xs bg-indigo-600 hover:bg-indigo-700 text-slate-50 px-3 py-2 rounded-lg font-bold transition-all shadow-lg hover:scale-105 active:scale-95 disabled:opacity-50"><SparklesIcon className="w-3 h-3" /> 🚀 GERAR ATIVO VISUAL (Gemini Imagen)</button>
                                     </div>
                                 )}
-                                {msg.role === 'agent' && title === 'O Produtor Criativo' && onGeneratePost && (
+                                {msg.role === 'agent' && title === 'O Produtor Criativo' && onGeneratePost && !msg.content.startsWith('🛡️') && !msg.content.startsWith('🛠️') && !msg.content.startsWith('❌') && (
                                     <div className="mt-3 pt-3 border-t border-slate-600">
                                         <p className="text-[10px] text-slate-400 mb-2 font-bold uppercase">Entrega de Ativo:</p>
                                         <button onClick={() => onGeneratePost(msg.content)} className="flex items-center gap-2 text-xs bg-green-600 hover:bg-green-700 text-slate-50 px-3 py-2 rounded-lg font-bold transition-all shadow-lg hover:scale-105 active:scale-95"><CheckCircle2 className="w-3 h-3" /> DEVOLVER PARA SOCIAL MEDIA</button>
