@@ -1164,10 +1164,10 @@ app.get('/api/war-room/feed', (_req, res) => {
       const tokenExpiresAt = new Date(Date.now() + (tokenRes.data.expires_in * 1000));
 
       if (campaignId) {
-        await pool.execute('DELETE FROM social_tokens WHERE campaign_id = ? AND provider = ?', [campaignId, 'meta']);
+        await pool.execute('DELETE FROM social_tokens WHERE campaign_id = ? AND provider = ?', [String(campaignId), 'meta']);
         await pool.execute(
           'INSERT INTO social_tokens (id, campaign_id, provider, access_token, refresh_token, expires_at, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          [crypto.randomUUID(), campaignId, 'meta', accessToken, refreshToken || null, tokenExpiresAt, 'active']
+          [crypto.randomUUID(), String(campaignId), 'meta', accessToken, refreshToken || null, tokenExpiresAt, 'active']
         );
       }
 
@@ -1204,10 +1204,10 @@ app.get('/api/war-room/feed', (_req, res) => {
     let dbError = null;
     if (campaignId) {
         try {
-            await pool.execute('DELETE FROM social_tokens WHERE campaign_id = ? AND provider = ?', [campaignId, provider]);
+            await pool.execute('DELETE FROM social_tokens WHERE campaign_id = ? AND provider = ?', [String(campaignId), String(provider)]);
             await pool.execute(
               'INSERT INTO social_tokens (id, campaign_id, provider, access_token, refresh_token, expires_at, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
-              [crypto.randomUUID(), campaignId, provider, 'SIMULATED_TOKEN_' + Math.random().toString(36).substring(7), null, null, 'active']
+              [crypto.randomUUID(), String(campaignId), String(provider), 'SIMULATED_TOKEN_' + Math.random().toString(36).substring(7), null, null, 'active']
             );
         } catch (err) {
             dbError = err;
@@ -1250,6 +1250,288 @@ app.get('/api/war-room/feed', (_req, res) => {
       </html>
     `);
   });
+
+  // --- Helper de Geração de Imagem Compartilhado ---
+  const describeCandidateImage = async (base64Image: string): Promise<string> => {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) return '';
+
+    try {
+      let mimeType = 'image/png';
+      let base64Data = base64Image;
+
+      // Se contiver a URL data: extrai
+      if (base64Image.startsWith('data:')) {
+        const matches = base64Image.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,(.+)$/);
+        if (matches && matches.length >= 3) {
+          mimeType = matches[1];
+          base64Data = matches[2];
+        } else {
+          // Se não der match no regex complexo, tenta um split simples
+          const parts = base64Image.split(';base64,');
+          if (parts.length === 2) {
+            mimeType = parts[0].replace('data:', '');
+            base64Data = parts[1];
+          }
+        }
+      }
+
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+      const imagePart = {
+        inlineData: {
+          data: base64Data,
+          mimeType: mimeType
+        },
+      };
+
+      const promptText = `Describe physical features of this person in English for image generation consistency (e.g. skin tone, age group, hair color/style, beard/glasses). 
+Keep it extremely concise (max 15 words) and descriptive, starting directly like: "A smiling 45-year-old Brazilian man, short dark hair, wearing thin glasses".
+Do not use names, do not analyze mood, just physical visual attributes.`;
+
+      const result = await model.generateContent([promptText, imagePart]);
+      const response = await result.response;
+      return response.text().trim();
+    } catch (err: any) {
+      console.warn('[ImageGen] Falha ao analisar foto do candidato via Gemini Vision:', err.message);
+      return '';
+    }
+  };
+
+  const generateImageHelper = async (
+    prompt: string,
+    campaignId: string | undefined,
+    _userId: string | undefined,
+    referenceImage?: string
+  ): Promise<{ imageUrl: string | null; imageBase64: string | null }> => {
+    const geminiKey = process.env.GEMINI_API_KEY;
+    const openaiKey = process.env.OPENAI_API_KEY;
+
+    // Buscar informações da campanha/candidato no banco de dados para contextualizar a imagem
+    let candidateName = '';
+    let cityName = '';
+    if (campaignId) {
+      try {
+        const [campRows]: any = await pool.execute('SELECT candidate_name, city FROM campaigns WHERE id = ?', [campaignId]);
+        if (campRows && campRows.length > 0) {
+          candidateName = campRows[0].candidate_name || '';
+          cityName = campRows[0].city || '';
+        }
+      } catch (dbErr: any) {
+        console.warn('[ImageGenHelper] Falha ao obter dados da campanha no banco:', dbErr.message);
+      }
+    }
+
+    // Buscar foto e características visuais do candidato da tabela 'settings' do Supabase
+    let candidateDescription = '';
+
+    // 1. Se o usuário enviou uma imagem de referência específica nesta chamada, nós a analisamos na hora!
+    if (referenceImage) {
+      try {
+        console.log('[ImageGenHelper] Analisando imagem de referência enviada pelo usuário via Gemini Vision...');
+        const refDesc = await describeCandidateImage(referenceImage);
+        if (refDesc) {
+          candidateDescription = refDesc;
+          console.log('[ImageGenHelper] Descrição da imagem de referência gerada:', candidateDescription);
+        }
+      } catch (refErr: any) {
+        console.warn('[ImageGenHelper] Falha ao analisar imagem de referência:', refErr.message);
+      }
+    }
+
+    // 2. Se não houver descrição da imagem de referência enviada, busca as configurações gerais
+    if (!candidateDescription && supabaseAdmin && campaignId) {
+      try {
+        const { data } = await supabaseAdmin
+          .from('settings')
+          .select('campaign_details')
+          .eq('id', campaignId)
+          .maybeSingle();
+
+        if (data && data.campaign_details) {
+          const details = data.campaign_details;
+          
+          // A. Priorizar características visuais informadas manualmente pelo usuário
+          candidateDescription = details.candidateVisualFeatures || '';
+
+          // B. Se não houver descrição manual, mas houver foto, geramos/usamos a descrição multimodal
+          if (!candidateDescription && details.candidatePhotoUrl) {
+            if (details.cachedCandidateDescription) {
+              candidateDescription = details.cachedCandidateDescription;
+            } else {
+              console.log('[ImageGenHelper] Gerando descrição visual da foto do candidato via Gemini Vision...');
+              const description = await describeCandidateImage(details.candidatePhotoUrl);
+              if (description) {
+                candidateDescription = description;
+                // Salvar de volta no cache do JSON no Supabase de forma assíncrona para as próximas chamadas
+                details.cachedCandidateDescription = description;
+                await supabaseAdmin
+                  .from('settings')
+                  .update({ campaign_details: details, updated_at: new Date().toISOString() })
+                  .eq('id', campaignId);
+                console.log('[ImageGenHelper] Descrição visual do candidato salva no cache da campanha.');
+              }
+            }
+          }
+        }
+      } catch (err: any) {
+        console.warn('[ImageGenHelper] Falha ao obter foto/características do candidato:', err.message);
+      }
+    }
+
+    let optimizedPrompt = prompt;
+
+    // Otimizar o prompt usando Gemini para criar uma descrição ideal para campanha política fotorrealista e profissional
+    if (geminiKey) {
+      try {
+        console.log('[ImageGenHelper] Otimizando prompt com Gemini para contexto de campanha política...');
+        const campaignContext = candidateName 
+          ? `Candidato(a): "${candidateName}"${cityName ? ` na cidade de "${cityName}"` : ''}.` 
+          : `Campanha política brasileira${cityName ? ` na cidade de "${cityName}"` : ''}.`;
+        
+        const visualConsistencyContext = candidateDescription
+          ? `\nCandidate consistency reference: The candidate's visual features are: "${candidateDescription}". ALWAYS depict the candidate matching this exact physical description in the visual scene to ensure consistent faces and features across generated campaign assets!`
+          : '';
+
+        const optimizerSystemPrompt = `Você é um diretor de criação especializado em marketing e campanhas políticas de altíssimo nível.
+Sua missão é traduzir descrições e roteiros de imagens (que podem ser genéricos ou textos longos de redes sociais) em um PROMPT DE GERAÇÃO DE IMAGEM perfeito, detalhado e profissional em INGLÊS para o Gemini Imagen 4.
+
+Contexto do Candidato/Campanha: ${campaignContext} ${visualConsistencyContext}
+
+Regras Cruciais para o Prompt que Você Gerar:
+1. O prompt final deve ser em INGLÊS.
+2. Formato e Estilo: Fotorrealismo impecável. Descreva uma fotografia de campanha autêntica e de alta qualidade: "High-quality political campaign professional photography, warm natural sunlight, shot on 35mm lens, realistic textures, cinematic composition".
+3. Evite "look de IA barata": Diga explicitamente para ter "highly realistic skin textures, authentic expressions, natural posture, clean lighting, no plastic looks, realistic hands and fingers".
+4. O Candidato(a) ${candidateName ? `(${candidateName})` : ''}: Represente como uma figura inspiradora e empática, vestindo uma roupa de campanha clássica e elegante (como camisa social azul-clara, branca ou amarela de mangas dobradas), interagindo calorosamente com moradores de um bairro real no Brasil. O candidato deve passar credibilidade, otimismo e liderança.
+5. Eleitores/Apoiadores: Uma multidão ou grupo de pessoas reais e sorridentes, de origens diversas (jovens, idosos, trabalhadores locais), segurando bandeiras ou conversando, gerando um sentimento de forte conexão comunitária e esperança.
+6. Texto na Imagem: Se o texto original solicitar explicitamente nomes ou slogans, adicione uma instrução para renderizar um texto extremamente simples e elegante em português brasileiro, cercado por aspas triplas ou duplas no prompt, ex: 'with text "NOME" written in bold modern white typography'. Caso contrário, não adicione nenhum texto para evitar borrões da IA.
+7. Se for uma arte de feed ou folheto/flyer, descreva como um design profissional de agência: "A clean modern political flyer graphic layout with a professional photo of...".
+
+Por favor, retorne APENAS o prompt final em inglês. Não inclua nenhuma introdução, aspas envolvendo todo o texto ou explicação.`;
+
+        const optimizerResponse = await callGeminiREST(`${optimizerSystemPrompt}\n\nTexto original a ser transformado em imagem:\n"${prompt}"`);
+        let text = optimizerResponse.text().trim();
+        
+        // Limpar blocos de código markdown ou aspas extras que a IA possa ter retornado
+        text = text.replace(/```[a-zA-Z]*\n?/g, '').replace(/```/g, '').trim();
+        if (text.startsWith('"') && text.endsWith('"')) {
+          text = text.slice(1, -1);
+        }
+        if (text.startsWith("'") && text.endsWith("'")) {
+          text = text.slice(1, -1);
+        }
+        
+        if (text) {
+          optimizedPrompt = text;
+          console.log('[ImageGenHelper] Prompt otimizado para Imagen 4:', optimizedPrompt);
+        }
+      } catch (optErr: any) {
+        console.warn('[ImageGenHelper] Erro na otimização de prompt, usando prompt original:', optErr.message);
+      }
+    }
+
+    // Garante que o prompt contém instruções estritas sobre o português se houver qualquer texto
+    let ptPrompt = optimizedPrompt.toLowerCase().includes('portuguese') || optimizedPrompt.toLowerCase().includes('português')
+      ? optimizedPrompt
+      : `ESTRITAMENTE EM PORTUGUÊS DO BRASIL: Qualquer palavra ou texto na imagem deve ser em português brasileiro. Prompt: ${optimizedPrompt}`;
+
+    // Garantir limite de tamanho estrito de 900 caracteres exigido por APIs de imagem como Imagen 4
+    if (ptPrompt.length > 900) {
+      ptPrompt = ptPrompt.substring(0, 900);
+    }
+
+    let imageUrl: string | null = null;
+    let imageBase64: string | null = null;
+    let geminiErrorDetail = '';
+    let dalleErrorDetail = '';
+
+    // 1. Tentar primeiro o Gemini Imagen 4
+    if (geminiKey) {
+      try {
+        console.log('[ImageGenHelper] Tentando Gemini Imagen 4 para prompt:', ptPrompt);
+        const response = await axios.post(
+          `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${geminiKey}`,
+          {
+            instances: [{ prompt: ptPrompt }],
+            parameters: {
+              sampleCount: 1,
+              aspectRatio: "1:1",
+              personGeneration: "allow_adult"
+            }
+          },
+          {
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+
+        const b64 = response.data?.predictions?.[0]?.bytesBase64Encoded;
+        if (b64) {
+          imageBase64 = b64;
+          try {
+            // Garantir que a pasta uploads existe antes de escrever
+            const uploadsDir = path.join(process.cwd(), 'uploads');
+            if (!fs.existsSync(uploadsDir)) {
+              console.log('[ImageGenHelper] Criando diretório de uploads...');
+              fs.mkdirSync(uploadsDir, { recursive: true });
+            }
+
+            const filename = `ai-image-${Date.now()}-${Math.floor(Math.random() * 1000)}.png`;
+            const uploadPath = path.join(uploadsDir, filename);
+            fs.writeFileSync(uploadPath, Buffer.from(b64, 'base64'));
+            imageUrl = `/uploads/${filename}`;
+            console.log('[ImageGenHelper] Gemini Imagen 4 gerado com sucesso no disco:', imageUrl);
+          } catch (writeErr: any) {
+            console.warn('[ImageGenHelper] Falha ao escrever arquivo no disco, usando apenas Base64:', writeErr.message);
+          }
+        } else {
+          geminiErrorDetail = 'API Gemini não retornou predictions.';
+          console.warn('[ImageGenHelper] Gemini Imagen 4 não retornou predictions.');
+        }
+      } catch (geminiErr: any) {
+        geminiErrorDetail = geminiErr?.response?.data?.error?.message || geminiErr.message || 'Erro desconhecido na API Gemini Imagen';
+        console.warn('[ImageGenHelper] Falha no Gemini Imagen 4:', geminiErrorDetail);
+      }
+    }
+
+    // Se o Gemini gerou base64 mas o disco falhou, usar como data URL diretamente
+    if (!imageUrl && imageBase64) {
+      imageUrl = `data:image/png;base64,${imageBase64}`;
+      console.log('[ImageGenHelper] Usando base64 como data URL (sem arquivo em disco)');
+    }
+
+    // 2. Fallback para DALL-E se falhou ou se chave Gemini não configurada
+    if (!imageUrl && openaiKey) {
+      try {
+        console.log('[ImageGenHelper] Tentando DALL-E 3 Fallback para prompt:', ptPrompt);
+        const response = await axios.post(
+          'https://api.openai.com/v1/images/generations',
+          {
+            model: "dall-e-3",
+            prompt: ptPrompt,
+            n: 1,
+            size: "1024x1024"
+          },
+          {
+            headers: { 'Authorization': `Bearer ${openaiKey}` }
+          }
+        );
+        imageUrl = response.data?.data?.[0]?.url;
+        console.log('[ImageGenHelper] DALL-E 3 fallback gerado com sucesso:', imageUrl);
+      } catch (dalleErr: any) {
+        dalleErrorDetail = dalleErr?.response?.data?.error?.message || dalleErr.message || 'Erro desconhecido na API DALL-E 3';
+        console.warn('[ImageGenHelper] Falha no fallback DALL-E 3:', dalleErrorDetail);
+      }
+    }
+
+    if (!imageUrl && !imageBase64) {
+      throw new Error(`Nenhum provedor conseguiu gerar a imagem. Gemini Error: ${geminiErrorDetail || 'Chave Ausente'} | DALL-E Error: ${dalleErrorDetail || 'Chave Ausente'}`);
+    }
+
+    return { imageUrl, imageBase64 };
+  };
 
   // --- Endpoints de IA e Agentes ---
 
@@ -1316,6 +1598,34 @@ app.get('/api/war-room/feed', (_req, res) => {
               }
             }
             toolOutput = { territorial_alerts: alerts };
+          }
+
+          if (tool.function.name === 'generate_dalle_image') {
+            console.log('[Agent Tool] Executando generate_dalle_image real para o agente...');
+            try {
+              const imageResult = await generateImageHelper(args.prompt || prompt, campaignId, userId);
+              if (imageResult && imageResult.imageUrl) {
+                // Salvar no histórico de imagem (para que apareça na ordem correta)
+                try {
+                  await pool.execute(
+                    'INSERT INTO agent_chat_history (campaign_id, agent_id, role, content, metadata) VALUES (?, ?, ?, ?, ?)',
+                    [campaignId || null, agentId || null, 'agent', `![ATIVO](${imageResult.imageUrl})`, JSON.stringify({ type: 'image' })]
+                  );
+                } catch (histErr: any) {
+                  console.warn('[Agent Tool] Falha ao salvar histórico de imagem da tool:', histErr.message);
+                }
+                
+                toolOutput = { 
+                  success: true, 
+                  message: 'Imagem gerada com sucesso!', 
+                  imageUrl: imageResult.imageUrl 
+                };
+              } else {
+                toolOutput = { success: false, error: 'Não foi possível gerar a imagem.' };
+              }
+            } catch (err: any) {
+              toolOutput = { success: false, error: err.message };
+            }
           }
 
           toolResults.push({ tool_call_id: tool.id, output: toolOutput });
@@ -1426,289 +1736,18 @@ app.get('/api/war-room/feed', (_req, res) => {
     }
   });
 
-  const describeCandidateImage = async (base64Image: string): Promise<string> => {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) return '';
 
-    try {
-      let mimeType = 'image/png';
-      let base64Data = base64Image;
-
-      // Se contiver a URL data: extrai
-      if (base64Image.startsWith('data:')) {
-        const matches = base64Image.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,(.+)$/);
-        if (matches && matches.length >= 3) {
-          mimeType = matches[1];
-          base64Data = matches[2];
-        } else {
-          // Se não der match no regex complexo, tenta um split simples
-          const parts = base64Image.split(';base64,');
-          if (parts.length === 2) {
-            mimeType = parts[0].replace('data:', '');
-            base64Data = parts[1];
-          }
-        }
-      }
-
-      const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-
-      const imagePart = {
-        inlineData: {
-          data: base64Data,
-          mimeType: mimeType
-        },
-      };
-
-      const promptText = `Describe physical features of this person in English for image generation consistency (e.g. skin tone, age group, hair color/style, beard/glasses). 
-Keep it extremely concise (max 15 words) and descriptive, starting directly like: "A smiling 45-year-old Brazilian man, short dark hair, wearing thin glasses".
-Do not use names, do not analyze mood, just physical visual attributes.`;
-
-      const result = await model.generateContent([promptText, imagePart]);
-      const response = await result.response;
-      return response.text().trim();
-    } catch (err: any) {
-      console.warn('[ImageGen] Falha ao analisar foto do candidato via Gemini Vision:', err.message);
-      return '';
-    }
-  };
 
   app.post('/api/agents/generate-image', requireAuth, async (req: any, res: any) => {
     try {
-      const { prompt, campaignId, agentId, userId, referenceImage } = req.body;
+      const { prompt, campaignId, agentId = 'creative', userId, referenceImage } = req.body;
       
       const creditCheck = await checkAndConsumeAICredit(userId, campaignId);
       if (!creditCheck.allowed) {
         return res.status(403).json({ error: creditCheck.error });
       }
 
-      const geminiKey = process.env.GEMINI_API_KEY;
-      const openaiKey = process.env.OPENAI_API_KEY;
-
-      // Buscar informações da campanha/candidato no banco de dados para contextualizar a imagem
-      let candidateName = '';
-      let cityName = '';
-      if (campaignId) {
-        try {
-          const [campRows]: any = await pool.execute('SELECT candidate_name, city FROM campaigns WHERE id = ?', [campaignId]);
-          if (campRows && campRows.length > 0) {
-            candidateName = campRows[0].candidate_name || '';
-            cityName = campRows[0].city || '';
-          }
-        } catch (dbErr: any) {
-          console.warn('[ImageGen] Falha ao obter dados da campanha no banco:', dbErr.message);
-        }
-      }
-
-      // Buscar foto e características visuais do candidato da tabela 'settings' do Supabase
-      let candidateDescription = '';
-
-      // 1. Se o usuário enviou uma imagem de referência específica nesta chamada, nós a analisamos na hora!
-      if (referenceImage) {
-        try {
-          console.log('[ImageGen] Analisando imagem de referência enviada pelo usuário via Gemini Vision...');
-          const refDesc = await describeCandidateImage(referenceImage);
-          if (refDesc) {
-            candidateDescription = refDesc;
-            console.log('[ImageGen] Descrição da imagem de referência gerada:', candidateDescription);
-          }
-        } catch (refErr: any) {
-          console.warn('[ImageGen] Falha ao analisar imagem de referência:', refErr.message);
-        }
-      }
-
-      // 2. Se não houver descrição da imagem de referência enviada, busca as configurações gerais
-      if (!candidateDescription && supabaseAdmin && campaignId) {
-        try {
-          const { data } = await supabaseAdmin
-            .from('settings')
-            .select('campaign_details')
-            .eq('id', campaignId)
-            .maybeSingle();
-
-          if (data && data.campaign_details) {
-            const details = data.campaign_details;
-            
-            // A. Priorizar características visuais informadas manualmente pelo usuário
-            candidateDescription = details.candidateVisualFeatures || '';
-
-            // B. Se não houver descrição manual, mas houver foto, geramos/usamos a descrição multimodal
-            if (!candidateDescription && details.candidatePhotoUrl) {
-              if (details.cachedCandidateDescription) {
-                candidateDescription = details.cachedCandidateDescription;
-              } else {
-                console.log('[ImageGen] Gerando descrição visual da foto do candidato via Gemini Vision...');
-                const description = await describeCandidateImage(details.candidatePhotoUrl);
-                if (description) {
-                  candidateDescription = description;
-                  // Salvar de volta no cache do JSON no Supabase de forma assíncrona para as próximas chamadas
-                  details.cachedCandidateDescription = description;
-                  await supabaseAdmin
-                    .from('settings')
-                    .update({ campaign_details: details, updated_at: new Date().toISOString() })
-                    .eq('id', campaignId);
-                  console.log('[ImageGen] Descrição visual do candidato salva no cache da campanha.');
-                }
-              }
-            }
-          }
-        } catch (err: any) {
-          console.warn('[ImageGen] Falha ao obter foto/características do candidato:', err.message);
-        }
-      }
-
-      let optimizedPrompt = prompt;
-
-      // Otimizar o prompt usando Gemini para criar uma descrição ideal para campanha política fotorrealista e profissional
-      if (geminiKey) {
-        try {
-          console.log('[ImageGen] Otimizando prompt com Gemini para contexto de campanha política...');
-          const campaignContext = candidateName 
-            ? `Candidato(a): "${candidateName}"${cityName ? ` na cidade de "${cityName}"` : ''}.` 
-            : `Campanha política brasileira${cityName ? ` na cidade de "${cityName}"` : ''}.`;
-          
-          const visualConsistencyContext = candidateDescription
-            ? `\nCandidate consistency reference: The candidate's visual features are: "${candidateDescription}". ALWAYS depict the candidate matching this exact physical description in the visual scene to ensure consistent faces and features across generated campaign assets!`
-            : '';
-
-          const optimizerSystemPrompt = `Você é um diretor de criação especializado em marketing e campanhas políticas de altíssimo nível.
-Sua missão é traduzir descrições e roteiros de imagens (que podem ser genéricos ou textos longos de redes sociais) em um PROMPT DE GERAÇÃO DE IMAGEM perfeito, detalhado e profissional em INGLÊS para o Gemini Imagen 4.
-
-Contexto do Candidato/Campanha: ${campaignContext} ${visualConsistencyContext}
-
-Regras Cruciais para o Prompt que Você Gerar:
-1. O prompt final deve ser em INGLÊS.
-2. Formato e Estilo: Fotorrealismo impecável. Descreva uma fotografia de campanha autêntica e de alta qualidade: "High-quality political campaign professional photography, warm natural sunlight, shot on 35mm lens, realistic textures, cinematic composition".
-3. Evite "look de IA barata": Diga explicitamente para ter "highly realistic skin textures, authentic expressions, natural posture, clean lighting, no plastic looks, realistic hands and fingers".
-4. O Candidato(a) ${candidateName ? `(${candidateName})` : ''}: Represente como uma figura inspiradora e empática, vestindo uma roupa de campanha clássica e elegante (como camisa social azul-clara, branca ou amarela de mangas dobradas), interagindo calorosamente com moradores de um bairro real no Brasil. O candidato deve passar credibilidade, otimismo e liderança.
-5. Eleitores/Apoiadores: Uma multidão ou grupo de pessoas reais e sorridentes, de origens diversas (jovens, idosos, trabalhadores locais), segurando bandeiras ou conversando, gerando um sentimento de forte conexão comunitária e esperança.
-6. Texto na Imagem: Se o texto original solicitar explicitamente nomes ou slogans, adicione uma instrução para renderizar um texto extremamente simples e elegante em português brasileiro, cercado por aspas triplas ou duplas no prompt, ex: 'with text "NOME" written in bold modern white typography'. Caso contrário, não adicione nenhum texto para evitar borrões da IA.
-7. Se for uma arte de feed ou folheto/flyer, descreva como um design profissional de agência: "A clean modern political flyer graphic layout with a professional photo of...".
-
-Por favor, retorne APENAS o prompt final em inglês. Não inclua nenhuma introdução, aspas envolvendo todo o texto ou explicação.`;
-
-          const optimizerResponse = await callGeminiREST(`${optimizerSystemPrompt}\n\nTexto original a ser transformado em imagem:\n"${prompt}"`);
-          let text = optimizerResponse.text().trim();
-          
-          // Limpar blocos de código markdown ou aspas extras que a IA possa ter retornado
-          text = text.replace(/```[a-zA-Z]*\n?/g, '').replace(/```/g, '').trim();
-          if (text.startsWith('"') && text.endsWith('"')) {
-            text = text.slice(1, -1);
-          }
-          if (text.startsWith("'") && text.endsWith("'")) {
-            text = text.slice(1, -1);
-          }
-          
-          if (text) {
-            optimizedPrompt = text;
-            console.log('[ImageGen] Prompt otimizado para Imagen 4:', optimizedPrompt);
-          }
-        } catch (optErr: any) {
-          console.warn('[ImageGen] Erro na otimização de prompt, usando prompt original:', optErr.message);
-        }
-      }
-
-      // Garante que o prompt contém instruções estritas sobre o português se houver qualquer texto
-      let ptPrompt = optimizedPrompt.toLowerCase().includes('portuguese') || optimizedPrompt.toLowerCase().includes('português')
-        ? optimizedPrompt
-        : `ESTRITAMENTE EM PORTUGUÊS DO BRASIL: Qualquer palavra ou texto na imagem deve ser em português brasileiro. Prompt: ${optimizedPrompt}`;
-
-      // Garantir limite de tamanho estrito de 900 caracteres exigido por APIs de imagem como Imagen 4
-      if (ptPrompt.length > 900) {
-        ptPrompt = ptPrompt.substring(0, 900);
-      }
-
-      let imageUrl: string | null = null;
-      let imageBase64: string | null = null;
-      let geminiErrorDetail = '';
-      let dalleErrorDetail = '';
-
-      // 1. Tentar primeiro o Gemini Imagen 4
-      if (geminiKey) {
-        try {
-          console.log('[ImageGen] Tentando Gemini Imagen 4 para prompt:', ptPrompt);
-          const response = await axios.post(
-            `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${geminiKey}`,
-            {
-              instances: [{ prompt: ptPrompt }],
-              parameters: {
-                sampleCount: 1,
-                aspectRatio: "1:1",
-                personGeneration: "allow_adult"
-              }
-            },
-            {
-              headers: {
-                'Content-Type': 'application/json'
-              }
-            }
-          );
-
-          const b64 = response.data?.predictions?.[0]?.bytesBase64Encoded;
-          if (b64) {
-            imageBase64 = b64;
-            try {
-              // Garantir que a pasta uploads existe antes de escrever (super importante para Docker/Easypanel)
-              const uploadsDir = path.join(process.cwd(), 'uploads');
-              if (!fs.existsSync(uploadsDir)) {
-                console.log('[ImageGen] Criando diretório de uploads...');
-                fs.mkdirSync(uploadsDir, { recursive: true });
-              }
-
-              const filename = `ai-image-${Date.now()}-${Math.floor(Math.random() * 1000)}.png`;
-              const uploadPath = path.join(uploadsDir, filename);
-              fs.writeFileSync(uploadPath, Buffer.from(b64, 'base64'));
-              imageUrl = `/uploads/${filename}`;
-              console.log('[ImageGen] Gemini Imagen 4 gerado com sucesso no disco:', imageUrl);
-            } catch (writeErr: any) {
-              console.warn('[ImageGen] Falha ao escrever arquivo no disco, usando apenas Base64:', writeErr.message);
-              // Não falhamos a requisição pois temos a base64 na memória
-            }
-          } else {
-            geminiErrorDetail = 'API Gemini não retornou predictions.';
-            console.warn('[ImageGen] Gemini Imagen 4 não retornou predictions.');
-          }
-        } catch (geminiErr: any) {
-          geminiErrorDetail = geminiErr?.response?.data?.error?.message || geminiErr.message || 'Erro desconhecido na API Gemini Imagen';
-          console.warn('[ImageGen] Falha no Gemini Imagen 4:', geminiErrorDetail);
-        }
-      }
-
-      // Se o Gemini gerou base64 mas o disco falhou, usar como data URL diretamente
-      if (!imageUrl && imageBase64) {
-        imageUrl = `data:image/png;base64,${imageBase64}`;
-        console.log('[ImageGen] Usando base64 como data URL (sem arquivo em disco)');
-      }
-
-      // 2. Fallback para DALL-E se falhou ou se chave Gemini não configurada
-      if (!imageUrl && openaiKey) {
-        try {
-          console.log('[ImageGen] Tentando DALL-E 3 Fallback para prompt:', ptPrompt);
-          const response = await axios.post(
-            'https://api.openai.com/v1/images/generations',
-            {
-              model: "dall-e-3",
-              prompt: ptPrompt,
-              n: 1,
-              size: "1024x1024"
-            },
-            {
-              headers: { 'Authorization': `Bearer ${openaiKey}` }
-            }
-          );
-          imageUrl = response.data?.data?.[0]?.url;
-          console.log('[ImageGen] DALL-E 3 fallback gerado com sucesso:', imageUrl);
-        } catch (dalleErr: any) {
-          dalleErrorDetail = dalleErr?.response?.data?.error?.message || dalleErr.message || 'Erro desconhecido na API DALL-E 3';
-          console.warn('[ImageGen] Falha no fallback DALL-E 3:', dalleErrorDetail);
-        }
-      }
-
-      if (!imageUrl && !imageBase64) {
-        return res.status(500).json({ 
-          error: `Nenhum provedor conseguiu gerar a imagem. Gemini Error: ${geminiErrorDetail || 'Chave Ausente'} | DALL-E Error: ${dalleErrorDetail || 'Chave Ausente'}` 
-        });
-      }
+      const { imageUrl, imageBase64 } = await generateImageHelper(prompt, campaignId, userId, referenceImage);
 
       // Salvar no histórico (não-crítico: erro não aborta resposta)
       try {
@@ -2170,7 +2209,7 @@ Por favor, retorne APENAS o prompt final em inglês. Não inclua nenhuma introdu
 
   app.post('/api/external/v1/voters', validateApiKey, async (req: any, res) => {
     try {
-      const { name, phone, email, neighborhood, city, observations, birthDate, gps } = req.body;
+      const { name, phone, email, neighborhood, city, observations, birthDate } = req.body;
       const id = crypto.randomUUID();
       await pool.execute(
         'INSERT INTO contacts (id, campaign_id, name, phone, email, neighborhood, municipio, observacoes, birth_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',

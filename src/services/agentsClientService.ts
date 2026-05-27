@@ -92,7 +92,7 @@ Você é o braço visual da campanha. Sua missão é criar ativos que passem **P
 ## Diretrizes de Geração
 1. **Estética Realista:** Evite imagens que pareçam "IA generativa barata". Busque realismo fotográfico, luz de pôr do sol, multidões reais.
 2. **Textos em PT-BR:** Se colocar qualquer texto na imagem, use Português do Brasil.
-3. **SKILL ATIVA:** Use 'generate_dalle_image' para cada script recebido. Não descreva, GERE.
+3. **SKILL ATIVA:** Use 'generate_dalle_image' para cada script recebido. Não descreva, GERE. Quando você chamar a ferramenta 'generate_dalle_image', ela retornará a URL real da imagem no campo 'imageUrl'. Você DEVE incluir a imagem gerada na sua resposta usando a sintaxe markdown clássica: ![ATIVO](imageUrl).
 4. **Publicação Direta:** Caso o usuário aprove a arte e queira postar, utilize a skill 'publish_to_social_networks' para enviar às redes conectadas.
 `;
 
@@ -205,13 +205,13 @@ export const askBackupAgent = (prompt: string, campaignId?: string, userId?: str
 export const askCrmSpecialist = (prompt: string, campaignId?: string, userId?: string): Promise<any> => callAgent(CRM_AGENT_INSTRUCTION, prompt, campaignId, userId, 'crm');
 export const askFraudAuditor = (prompt: string, campaignId?: string, userId?: string): Promise<any> => callAgent(FRAUD_AUDITOR_INSTRUCTION, prompt, campaignId, userId, 'fraud');
 
-export const generateCreativeImage = async (prompt: string, _campaignId?: string, _userId?: string, referenceImage?: string): Promise<string> => {
+export const generateCreativeImage = async (prompt: string, _campaignId?: string, _userId?: string, referenceImage?: string, agentId: string = 'creative'): Promise<string> => {
     try {
         const headers = await getAuthHeaders();
         const response = await fetch('/api/agents/generate-image', {
             method: 'POST',
             headers,
-            body: JSON.stringify({ prompt, campaignId: _campaignId, userId: _userId, referenceImage })
+            body: JSON.stringify({ prompt, campaignId: _campaignId, userId: _userId, referenceImage, agentId })
         });
 
         if (!response.ok) {

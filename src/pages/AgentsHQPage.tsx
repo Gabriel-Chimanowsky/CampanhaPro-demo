@@ -4,7 +4,6 @@ import { supabase } from '../lib/supabaseClient';
 import { askStrategist, askGrowthHacker, askSocialMedia, askFieldCommander, askCreativeProducer, askBackupAgent, askFraudAuditor, runFullPipeline, savePipelineResult, getPipelineHistory, PipelineResult, generateCreativeImage, createProductionOrder, publishToSocialMedia } from '../services/agentsClientService';
 import { createBackup, restoreBackup, BackupData } from '../services/backupService';
 import { useAuth } from '../contexts/AuthContext';
-import { useProfilePermissions } from '../contexts/PermissionsContext';
 import { useAutoPipeline, AutoPipelineNotification } from '../hooks/useAutoPipeline';
 import Button from '../components/ui/Button';
 import { AlertCircle } from 'lucide-react';
@@ -516,6 +515,7 @@ interface AgentRoomProps {
 const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, campaignId, examples, icon, agentCall, placeholder, initialPrompt, onClearInitial, onGeneratePost, onHandoff, onExecuteAction, onPublish }) => {
     const [input, setInput] = useState('');
     const { histories, setHistory, addMessage } = useAgentStore();
+    const { user } = useAuth();
     const history = histories[agentId] || [];
     const [isLoading, setIsLoading] = useState(false);
     const [pendingOrders, setPendingOrders] = useState<any[]>([]);
@@ -551,7 +551,7 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
                 const headers = { 'Authorization': `Bearer ${session?.access_token}` };
                 const histRes = await fetch(`/api/agents/history/${agentId}?campaignId=${campaignId}`, { headers });
                 const histData = await histRes.json();
-                if (histData.history && history.length === 0) {
+                if (histData.history) {
                     setHistory(agentId, histData.history.map((h: any) => ({ id: h.id, role: h.role, content: h.content })));
                 }
                 const ordersRes = await fetch(`/api/agents/production-orders?campaignId=${campaignId}&targetAgent=${agentId}`, { headers });
@@ -605,9 +605,11 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
         setIsLoading(true);
         try {
             // Se houver uma imagem de referência anexada no chat pelo usuário, envia ela na chamada
-            const resultUrl = await generateCreativeImage(content, campaignId, String(user?.id || 'unknown'), referenceImage || undefined);
+            const resultUrl = await generateCreativeImage(content, campaignId, String(user?.id || 'unknown'), referenceImage || undefined, agentId);
             if (resultUrl) {
                 setGeneratedImages(prev => ({ ...prev, [msgKey]: resultUrl }));
+                // Adiciona a imagem gerada imediatamente ao chat local do Zustand!
+                addMessage(agentId, { role: 'agent', content: `![ATIVO](${resultUrl})` });
             } else {
                 alert('Geração concluída mas a URL da imagem ficou vazia. Tente novamente.');
             }
@@ -650,7 +652,7 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
         !content.startsWith('🛡️') &&
         !content.startsWith('🛠️') &&
         !content.startsWith('❌') &&
-        content.trim().length > 60;
+        content.trim().length > 10;
 
     // Renderiza texto com **bold** básico
     const renderText = (text: string) => {
@@ -768,8 +770,19 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
                         {history.slice(-20).map((msg, sliceIdx) => {
                         const absoluteIdx = history.length - 20 + sliceIdx < 0 ? sliceIdx : history.length - Math.min(20, history.length) + sliceIdx;
                         const msgKey = getMsgKey(msg, absoluteIdx);
-                        const imgUrl = generatedImages[msgKey];
+                        
+                        // Extrai a imagem em formato markdown ![alt](url) se houver no conteúdo da mensagem
+                        let extractedImgUrl = '';
+                        const imgRegex = /!\[(.*?)\]\((.*?)\)/;
+                        const match = msg.content.match(imgRegex);
+                        if (match) {
+                            extractedImgUrl = match[2];
+                        }
+                        
+                        const imgUrl = generatedImages[msgKey] || extractedImgUrl;
                         const isThisCardLoading = loadingCardKey === msgKey;
+                        const cleanContent = msg.content.replace(/!\[(.*?)\]\((.*?)\)/g, '').trim();
+
                         return (
                         <div key={msgKey} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-300 relative group`}>
                             <div className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-sm relative ${msg.role === 'user' ? 'bg-blue-600 text-slate-50 rounded-br-sm' : 'bg-slate-700/50 backdrop-blur-sm text-slate-100 border border-slate-600/50 rounded-bl-sm'}`}>
@@ -793,9 +806,11 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
                                     {msg.content.startsWith('🛡️') || msg.content.startsWith('🛠️') ? (
                                         <div className="flex items-center gap-3 py-1 opacity-80">
                                             <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-ping" />
-                                            <span className="text-[11px] font-medium text-indigo-300 italic">{msg.content}</span>
+                                            <span className="text-[11px] font-medium text-indigo-300 italic">{cleanContent}</span>
                                         </div>
-                                    ) : renderText(msg.content)}
+                                    ) : (
+                                        cleanContent ? renderText(cleanContent) : null
+                                    )}
                                 </div>
 
                                 {/* Imagem gerada inline */}
@@ -809,7 +824,7 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
                                     </div>
                                 )}
                                 {imgUrl && !isThisCardLoading && (
-                                    <div className="mt-4 animate-in fade-in zoom-in duration-500">
+                                    <div className={`${cleanContent ? 'mt-4' : 'mt-1'} animate-in fade-in zoom-in duration-500`}>
                                         <p className="text-xs font-bold text-indigo-400 uppercase tracking-tighter mb-2 flex items-center gap-1">
                                             <SparklesIcon className="w-3 h-3" /> Ativo Visual Gerado
                                         </p>
