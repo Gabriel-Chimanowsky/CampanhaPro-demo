@@ -71,6 +71,19 @@ const SupremeAdminPage: React.FC = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showCreateUserModal, setShowCreateUserModal] = useState(false);
+    const [showEditUserModal, setShowEditUserModal] = useState(false);
+    const [editUserForm, setEditUserForm] = useState({
+        id: '',
+        name: '',
+        email: '',
+        password: '',
+        type: 'Colaborador' as any,
+        campaign_id: '',
+        ai_credits: 100,
+        ai_used: 0,
+        role: 'active' as any
+    });
+    const [isSavingUser, setIsSavingUser] = useState(false);
     const [showConfigModal, setShowConfigModal] = useState<string | null>(null);
     const [passwordModal, setPasswordModal] = useState<{ isOpen: boolean; email: string }>({ isOpen: false, email: '' });
     const [manualPassword, setManualPassword] = useState('');
@@ -292,17 +305,78 @@ const SupremeAdminPage: React.FC = () => {
         }
     };
 
-    const updateConfig = async (campaignId: string, updates: Partial<CampaignConfig>) => {
+    const updateConfig = async (campaignId: string, updates: any) => {
         try {
-            const { error } = await supabase
-                .from('campaign_configs')
-                .update(updates)
-                .eq('id', campaignId);
+            const token = localStorage.getItem('campanhapro-mysql-token');
+            const body: any = {};
+            if (updates.status !== undefined) body.status = updates.status;
+            if (updates.maintenanceStatus !== undefined || updates.maintenance_status !== undefined) {
+                body.maintenance_status = updates.maintenanceStatus || updates.maintenance_status;
+            }
+            if (updates.features !== undefined) body.features = updates.features;
+            if (updates.limits !== undefined) {
+                body.limits = {
+                    ai_calls: updates.limits.aiCalls !== undefined ? updates.limits.aiCalls : (updates.limits.ai_calls !== undefined ? updates.limits.ai_calls : 999999),
+                    team_members: updates.limits.teamMembers !== undefined ? updates.limits.teamMembers : (updates.limits.team_members !== undefined ? updates.limits.team_members : 999999),
+                    visits: updates.limits.visits !== undefined ? updates.limits.visits : 999999
+                };
+            }
+            if (updates.customFields !== undefined || updates.custom_fields !== undefined) {
+                body.customFields = updates.customFields || updates.custom_fields;
+            }
             
-            if (error) throw error;
+            const response = await fetch(`/api/admin/campaigns/${campaignId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(body)
+            });
+            if (!response.ok) throw new Error('Erro ao atualizar campanha via API administrativa');
             fetchAllData();
         } catch (error) {
+            console.error("updateConfig Error:", error);
+            alert("Erro ao atualizar configurações da campanha.");
+        }
+    };
+
+    const handleEditUserSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsSavingUser(true);
+        try {
+            const token = localStorage.getItem('campanhapro-mysql-token');
+            const response = await fetch(`/api/admin/users/${editUserForm.id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    name: editUserForm.name,
+                    email: editUserForm.email,
+                    password: editUserForm.password || undefined,
+                    type: editUserForm.type,
+                    campaign_id: editUserForm.campaign_id,
+                    role: editUserForm.role,
+                    ai_credits: editUserForm.ai_credits,
+                    ai_used: editUserForm.ai_used
+                })
+            });
+
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.error || 'Erro desconhecido');
+            }
+
+            alert('Usuário atualizado com sucesso.');
+            setShowEditUserModal(false);
+            fetchAllData();
+        } catch (error: any) {
             console.error(error);
+            alert(`Erro ao atualizar usuário: ${error.message}`);
+        } finally {
+            setIsSavingUser(false);
         }
     };
 
@@ -482,6 +556,7 @@ const SupremeAdminPage: React.FC = () => {
                                             <th className="px-6 py-4">ID / Candidato</th>
                                             <th className="px-6 py-4">Plano</th>
                                             <th className="px-6 py-4">Features</th>
+                                            <th className="px-6 py-4">Faturamento</th>
                                             <th className="px-6 py-4">Status</th>
                                             <th className="px-6 py-4 text-right">Controle</th>
                                         </tr>
@@ -490,6 +565,7 @@ const SupremeAdminPage: React.FC = () => {
                                         {campaigns.map(c => {
                                             const campaignId = c.campaign_id || c.campaignId;
                                             const config = campaignConfigs[campaignId || ''] || {};
+                                            const mStatus = config.maintenanceStatus || (config as any).maintenance_status || 'paid';
                                             return (
                                                 <tr key={c.id} className="hover:bg-white/5 transition-colors group">
                                                     <td className="px-6 py-5">
@@ -508,6 +584,21 @@ const SupremeAdminPage: React.FC = () => {
                                                             ))}
                                                             {(config.features?.length || 0) > 3 && <span className="text-[8px] text-slate-500 font-bold">+{config.features!.length - 3}</span>}
                                                         </div>
+                                                    </td>
+                                                    <td className="px-6 py-5">
+                                                        {mStatus === 'overdue' ? (
+                                                            <span className="text-rose-500 text-[10px] font-black uppercase flex items-center gap-1.5 bg-rose-500/10 px-2 py-1 rounded-full w-fit">
+                                                                Atrasado
+                                                            </span>
+                                                        ) : mStatus === 'pending' ? (
+                                                            <span className="text-amber-500 text-[10px] font-black uppercase flex items-center gap-1.5 bg-amber-500/10 px-2 py-1 rounded-full w-fit">
+                                                                Pendente
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-emerald-500 text-[10px] font-black uppercase flex items-center gap-1.5 bg-emerald-500/10 px-2 py-1 rounded-full w-fit">
+                                                                Pago
+                                                            </span>
+                                                        )}
                                                     </td>
                                                     <td className="px-6 py-5">
                                                         {c.role === 'blocked' ? (
@@ -595,6 +686,7 @@ const SupremeAdminPage: React.FC = () => {
                                             <tr>
                                                 <th className="px-6 py-4">Usuário</th>
                                                 <th className="px-6 py-4">Status / Role</th>
+                                                <th className="px-6 py-4">Créditos IA</th>
                                                 <th className="px-6 py-4">Campanha</th>
                                                 <th className="px-6 py-4 text-right">Gestão de Credencial</th>
                                             </tr>
@@ -617,9 +709,44 @@ const SupremeAdminPage: React.FC = () => {
                                                         </div>
                                                     </td>
                                                     <td className="px-6 py-4">
+                                                        <div className="flex flex-col">
+                                                            <span className="text-xs text-indigo-400 font-bold font-mono">
+                                                                {(u as any).aiUsed !== undefined ? (u as any).aiUsed : 0} / {(u as any).aiCredits !== undefined ? (u as any).aiCredits : 100}
+                                                            </span>
+                                                            <div className="w-24 bg-slate-800 h-1 rounded overflow-hidden mt-1">
+                                                                <div 
+                                                                    className="bg-indigo-500 h-full" 
+                                                                    style={{ 
+                                                                        width: `${Math.min(100, (((u as any).aiUsed || 0) / ((u as any).aiCredits || 100)) * 100)}%` 
+                                                                    }} 
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4">
                                                         <p className="text-xs text-slate-400">ID: {(u.campaign_id || u.campaignId)?.substring(0, 8)}</p>
                                                     </td>
                                                     <td className="px-6 py-4 text-right space-x-2">
+                                                        <Button 
+                                                            variant="ghost" 
+                                                            className="text-xs h-7 px-3 border-indigo-500/50 text-indigo-400 hover:bg-indigo-500/10"
+                                                            onClick={() => {
+                                                                setEditUserForm({
+                                                                    id: u.id || '',
+                                                                    name: u.name || '',
+                                                                    email: u.email || '',
+                                                                    password: '',
+                                                                    type: u.type || 'Colaborador',
+                                                                    campaign_id: u.campaign_id || u.campaignId || '',
+                                                                    ai_credits: (u as any).aiCredits !== undefined && (u as any).aiCredits !== null ? (u as any).aiCredits : 100,
+                                                                    ai_used: (u as any).aiUsed !== undefined && (u as any).aiUsed !== null ? (u as any).aiUsed : 0,
+                                                                    role: u.role || 'active'
+                                                                });
+                                                                setShowEditUserModal(true);
+                                                            }}
+                                                        >
+                                                            Editar
+                                                        </Button>
                                                         <Button 
                                                             variant="ghost" 
                                                             className="text-xs h-7 px-3 border-emerald-500/50 text-emerald-500 hover:bg-emerald-500/10"
@@ -1031,6 +1158,22 @@ const SupremeAdminPage: React.FC = () => {
                             </div>
                         </div>
 
+                        {/* Maintenance Status Section */}
+                        <div className="space-y-4">
+                            <h4 className="text-[10px] font-black uppercase text-indigo-400 border-b border-indigo-500/20 pb-1">Status de Manutenção (Faturamento)</h4>
+                            <select 
+                                className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 outline-none focus:ring-1 focus:ring-indigo-500 text-xs text-slate-200"
+                                value={campaignConfigs[showConfigModal]?.maintenanceStatus || (campaignConfigs[showConfigModal] as any)?.maintenance_status || 'paid'}
+                                onChange={(e) => {
+                                    updateConfig(showConfigModal, { maintenanceStatus: e.target.value });
+                                }}
+                            >
+                                <option value="paid">Pago (Ativo)</option>
+                                <option value="pending">Pendente (Aviso)</option>
+                                <option value="overdue">Atrasado (Suspensão)</option>
+                            </select>
+                        </div>
+
                         {/* Features Section */}
                         <div className="space-y-4">
                             <h4 className="text-[10px] font-black uppercase text-indigo-400 border-b border-indigo-500/20 pb-1">Funcionalidades Liberadas</h4>
@@ -1127,6 +1270,122 @@ const SupremeAdminPage: React.FC = () => {
                     </div>
                     <div className="pt-4">
                         <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-500">Gerar Credencial Global</Button>
+                    </div>
+                </form>
+            </Modal>
+
+            {/* Edit User Modal */}
+            <Modal isOpen={showEditUserModal} onClose={() => setShowEditUserModal(false)} title="EDITAR USUÁRIO: SUPREME CONTROL">
+                <form onSubmit={handleEditUserSubmit} className="space-y-4 p-4 text-slate-200 max-h-[600px] overflow-y-auto custom-scrollbar">
+                    <Input 
+                        label="Nome Completo"
+                        value={editUserForm.name} 
+                        onChange={e => setEditUserForm({...editUserForm, name: e.target.value})}
+                        required
+                    />
+                    <Input 
+                        label="Email"
+                        type="email"
+                        value={editUserForm.email} 
+                        onChange={e => setEditUserForm({...editUserForm, email: e.target.value})}
+                        required
+                    />
+                    <Input 
+                        label="Nova Senha (deixe em branco para não alterar)"
+                        type="password"
+                        placeholder="Mínimo 6 caracteres se preenchido"
+                        value={editUserForm.password} 
+                        onChange={e => setEditUserForm({...editUserForm, password: e.target.value})}
+                    />
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold uppercase text-slate-500">Perfil</label>
+                            <select 
+                                className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 outline-none focus:ring-1 focus:ring-indigo-500 text-xs text-slate-200"
+                                value={editUserForm.type}
+                                onChange={e => setEditUserForm({...editUserForm, type: e.target.value as any})}
+                            >
+                                <option value="Admin">Admin (Candidato)</option>
+                                <option value="Coordenador">Coordenador</option>
+                                <option value="Líder">Líder</option>
+                                <option value="Apoiador">Apoiador</option>
+                                <option value="Colaborador">Colaborador</option>
+                                <option value="Pesquisador">Pesquisador</option>
+                                <option value="Suporte">Suporte Técnico</option>
+                                <option value="Manutenção">Manutenção de Dados</option>
+                            </select>
+                        </div>
+                        
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold uppercase text-slate-500">Status</label>
+                            <select 
+                                className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 outline-none focus:ring-1 focus:ring-indigo-500 text-xs text-slate-200"
+                                value={editUserForm.role}
+                                onChange={e => setEditUserForm({...editUserForm, role: e.target.value as any})}
+                            >
+                                <option value="active">Ativo (Liberado)</option>
+                                <option value="blocked">Bloqueado (Suspenso)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase text-slate-500">Associar à Campanha</label>
+                        <select 
+                            className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 outline-none focus:ring-1 focus:ring-indigo-500 text-xs text-slate-200"
+                            value={editUserForm.campaign_id}
+                            onChange={e => setEditUserForm({...editUserForm, campaign_id: e.target.value})}
+                        >
+                            <option value="">Sem Campanha (PLATFORM_CORE)</option>
+                            {campaigns.map(c => (
+                                <option key={c.id} value={c.campaign_id || c.campaignId}>
+                                    {c.name} ({c.plan})
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold uppercase text-slate-500">Créditos de IA</label>
+                            <input 
+                                type="number" 
+                                className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 outline-none focus:ring-1 focus:ring-indigo-500 text-xs text-slate-200"
+                                value={editUserForm.ai_credits}
+                                onChange={e => setEditUserForm({...editUserForm, ai_credits: parseInt(e.target.value) || 0})}
+                                required
+                            />
+                        </div>
+                        
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold uppercase text-slate-500">Créditos IA Usados</label>
+                            <input 
+                                type="number" 
+                                className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 outline-none focus:ring-1 focus:ring-indigo-500 text-xs text-slate-200"
+                                value={editUserForm.ai_used}
+                                onChange={e => setEditUserForm({...editUserForm, ai_used: parseInt(e.target.value) || 0})}
+                                required
+                            />
+                        </div>
+                    </div>
+
+                    <div className="pt-4 flex justify-end gap-3 border-t border-slate-800">
+                        <Button 
+                            type="button" 
+                            variant="secondary" 
+                            onClick={() => setShowEditUserModal(false)}
+                            className="text-xs"
+                        >
+                            Cancelar
+                        </Button>
+                        <Button 
+                            type="submit" 
+                            disabled={isSavingUser}
+                            className="bg-indigo-600 hover:bg-indigo-500 text-xs"
+                        >
+                            {isSavingUser ? 'SALVANDO ALTERAÇÕES...' : 'Confirmar Atualização'}
+                        </Button>
                     </div>
                 </form>
             </Modal>

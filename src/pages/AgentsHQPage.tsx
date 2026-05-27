@@ -41,6 +41,7 @@ const AgentsHQPage: React.FC = () => {
     }, [isHydrated, activeTab]);
     const [currentUsage, setCurrentUsage] = useState(0);
     const [isLimitExceeded, setIsLimitExceeded] = useState(false);
+    const [credits, setCredits] = useState({ used: 0, total: 100 });
     const [pendingContext, setPendingContext] = useState<string | null>(null);
     const [autoPipelineEnabled, setAutoPipelineEnabled] = useState(true);
     const [notifications, setNotifications] = useState<AutoPipelineNotification[]>([]);
@@ -133,36 +134,45 @@ const AgentsHQPage: React.FC = () => {
         if (!campaignId) return;
 
         const fetchData = async () => {
-            const { count, error } = await supabase
-                .from('agent_outputs')
-                .select('*', { count: 'exact', head: true })
-                .eq('campaign_id', campaignId);
-            
-            if (error) {
-                console.error("Erro ao buscar contagem:", error);
-                return;
-            }
+            try {
+                const { data: profile, error } = await supabase
+                    .from('users')
+                    .select('ai_credits, ai_used')
+                    .eq('id', user?.id)
+                    .single();
+                
+                if (error) {
+                    console.error("Erro ao buscar créditos:", error);
+                    return;
+                }
 
-            const countVal = count || 0;
-            setCurrentUsage(countVal);
-            if (config?.limits.ai_calls && countVal >= config.limits.ai_calls) {
-                setIsLimitExceeded(true);
-            } else {
-                setIsLimitExceeded(false);
+                if (profile) {
+                    const used = profile.ai_used || 0;
+                    const total = profile.ai_credits !== null && profile.ai_credits !== undefined ? profile.ai_credits : 100;
+                    setCredits({ used, total });
+                    setCurrentUsage(used);
+                    if (used >= total) {
+                        setIsLimitExceeded(true);
+                    } else {
+                        setIsLimitExceeded(false);
+                    }
+                }
+            } catch (err) {
+                console.error("Erro ao carregar créditos de IA:", err);
             }
         };
 
         fetchData();
 
-        const channelId = `agent-outputs-${campaignId}`;
+        const channelId = `user-credits-${user?.id}`;
         const channel = supabase.channel(channelId)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'agent_outputs', filter: `campaign_id=eq.${campaignId}` }, fetchData)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'users', filter: `id=eq.${user?.id}` }, fetchData)
             .subscribe();
 
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [user?.campaignId, config?.limits.ai_calls]);
+    }, [user?.id]);
 
     useEffect(() => {
         const handleMessage = (event: MessageEvent) => {
@@ -393,8 +403,8 @@ const AgentsHQPage: React.FC = () => {
                     <div className="flex items-center gap-3">
                         <AlertCircle className="w-5 h-5 text-red-400" />
                         <div>
-                            <p className="text-sm font-bold text-red-400">Limite de IA Atingido ({currentUsage}/{config?.limits.ai_calls})</p>
-                            <p className="text-xs text-red-400/70">O limite de chamadas de IA foi atingido. Contate o Gestor Supremo para expansão.</p>
+                            <p className="text-sm font-bold text-red-400">Limite de IA Atingido ({credits.used}/{credits.total})</p>
+                            <p className="text-xs text-red-400/70">O limite de chamadas de IA foi atingido para o seu usuário. Contate o Gestor Supremo para expansão.</p>
                         </div>
                     </div>
                 </div>
@@ -408,6 +418,10 @@ const AgentsHQPage: React.FC = () => {
                     <p className="text-slate-400 mt-1">Sistema Multi-Agente "Voto Inteligente"</p>
                 </div>
                 <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-500/10 text-indigo-400 rounded-full text-xs font-bold border border-indigo-500/20 shadow-lg shadow-indigo-500/5">
+                        <Ticket className="w-3.5 h-3.5" />
+                        Créditos: {credits.used} / {credits.total}
+                    </div>
                     <button
                         onClick={() => setAutoPipelineEnabled((prev: boolean) => !prev)}
                         title={autoPipelineEnabled ? 'Automação ativa — clique para pausar' : 'Automação pausada — clique para ativar'}

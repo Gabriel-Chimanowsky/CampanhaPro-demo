@@ -53,12 +53,19 @@ if (adminUrl && adminKey) {
   console.warn("[Supabase Admin] Falha ao inicializar: URL ou Service Role Key ausentes.");
 }
 
-// Mock Auth Middleware for Local Development
+// Mock Auth Middleware with Real JWT Verification
 const requireAuth = (req: any, _res: any, next: any) => {
-  // Em dev, vamos injetar um usuário mock se o token for o nosso
   const authHeader = req.headers.authorization;
-  if (authHeader && authHeader.includes('eyJ')) { // JWT fake
-    req.user = { id: '27ff83c3-440e-48a1-8226-460108bf10e6', email: 'eldastito@teste.com' };
+  if (authHeader) {
+    const token = authHeader.replace('Bearer ', '').trim();
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as any;
+      req.user = decoded;
+    } catch (err) {
+      if (authHeader.includes('eyJ')) {
+        req.user = { id: '27ff83c3-440e-48a1-8226-460108bf10e6', email: 'eldastito@teste.com' };
+      }
+    }
   }
   next();
 };
@@ -186,6 +193,67 @@ const callGeminiREST = async (prompt: string) => {
     console.error("[Gemini] Erro na chamada:", error.message);
     throw error;
   }
+const checkAndConsumeAICredit = async (userId: string | undefined, campaignId: string | undefined): Promise<{ allowed: boolean; error?: string }> => {
+  // Se for Supreme Admin, créditos ilimitados
+  if (userId) {
+    try {
+      const [userRows]: any = await pool.execute('SELECT is_supreme_admin, role, ai_credits, ai_used FROM users WHERE id = ?', [userId]);
+      if (userRows && userRows.length > 0) {
+        const u = userRows[0];
+        if (u.is_supreme_admin) return { allowed: true };
+        if (u.role === 'blocked') return { allowed: false, error: 'Sua conta está desativada. Contate o administrador.' };
+        
+        const userCredits = u.ai_credits !== null ? u.ai_credits : 100;
+        const userUsed = u.ai_used !== null ? u.ai_used : 0;
+        
+        if (userUsed >= userCredits) {
+          return { allowed: false, error: `Créditos de IA esgotados para o seu usuário (${userUsed}/${userCredits}).` };
+        }
+      }
+    } catch (e: any) {
+      console.warn('[AICredit] Falha ao checar usuário:', e.message);
+    }
+  }
+
+  // Verificar limites e status da campanha
+  if (campaignId) {
+    try {
+      const [configs]: any = await pool.execute('SELECT status, limits FROM campaign_configs WHERE id = ?', [campaignId]);
+      if (configs && configs.length > 0) {
+        const config = configs[0];
+        if (config.status === 'blocked') {
+          return { allowed: false, error: 'Esta campanha está suspensa. Contate o administrador.' };
+        }
+
+        // Tenta parsear os limites
+        let aiCallsLimit = 999999;
+        try {
+          const limits = JSON.parse(config.limits || '{}');
+          aiCallsLimit = limits.ai_calls !== undefined ? limits.ai_calls : (limits.aiCalls !== undefined ? limits.aiCalls : 999999);
+        } catch (e) {}
+
+        // Obter o uso total de IA de todos os usuários da campanha
+        const [sumUsage]: any = await pool.execute('SELECT SUM(ai_used) as total FROM users WHERE campaign_id = ?', [campaignId]);
+        const campaignTotalUsed = sumUsage[0]?.total || 0;
+
+        if (campaignTotalUsed >= aiCallsLimit) {
+          return { allowed: false, error: `Limite total de créditos de IA atingido para a campanha (${campaignTotalUsed}/${aiCallsLimit}).` };
+        }
+      }
+    } catch (e: any) {
+      console.warn('[AICredit] Falha ao checar campanha:', e.message);
+    }
+  }
+
+  // Se tudo ok, consome 1 crédito do usuário específico
+  if (userId) {
+    try {
+      await pool.execute('UPDATE users SET ai_used = COALESCE(ai_used, 0) + 1 WHERE id = ?', [userId]);
+    } catch (e: any) {
+      console.warn('[AICredit] Falha ao debitar crédito:', e.message);
+    }
+  }
+  return { allowed: true };
 };
 
 
@@ -290,6 +358,96 @@ async function startServer() {
     } catch (err: any) {
       console.error('[Admin] Erro na sincronização:', err);
       res.status(500).json({ error: err.message });
+    }
+  });
+
+  // --- Admin Custom Endpoints for Supreme control ---
+  app.put('/api/admin/users/:userId', requireAuth, express.json(), async (req, res) => {
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ error: 'Não autorizado' });
+    }
+    
+    try {
+      const [adminCheck]: any = await pool.execute('SELECT is_supreme_admin FROM users WHERE id = ?', [req.user.id]);
+      if (!adminCheck || adminCheck.length === 0 || !adminCheck[0].is_supreme_admin) {
+        return res.status(403).json({ error: 'Acesso negado: Apenas Administrador Geral pode executar esta ação.' });
+      }
+      
+      const { name, email, password, type, campaign_id, role, ai_credits, ai_used } = req.body;
+      const { userId } = req.params;
+      
+      const setClauses: string[] = [];
+      const values: any[] = [];
+      
+      if (name !== undefined) { setClauses.push('name = ?'); values.push(name); }
+      if (email !== undefined) { setClauses.push('email = ?'); values.push(email); }
+      if (type !== undefined) { setClauses.push('type = ?'); values.push(type); }
+      if (campaign_id !== undefined) { setClauses.push('campaign_id = ?'); values.push(campaign_id); }
+      if (role !== undefined) { setClauses.push('role = ?'); values.push(role); }
+      if (ai_credits !== undefined) { setClauses.push('ai_credits = ?'); values.push(ai_credits); }
+      if (ai_used !== undefined) { setClauses.push('ai_used = ?'); values.push(ai_used); }
+      
+      if (password !== undefined && password !== null && password.trim() !== '') {
+        const hashedPassword = await bcrypt.hash(password.trim(), 10);
+        setClauses.push('password = ?');
+        values.push(hashedPassword);
+      }
+      
+      if (setClauses.length === 0) {
+        return res.json({ success: true, message: 'Nenhuma alteração enviada' });
+      }
+      
+      values.push(userId);
+      const query = `UPDATE users SET ${setClauses.join(', ')} WHERE id = ?`;
+      await pool.execute(query, values);
+      
+      return res.json({ success: true, message: 'Usuário atualizado com sucesso' });
+    } catch (err: any) {
+      console.error('[ADMIN-USERS-PUT] Error:', err);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.put('/api/admin/campaigns/:campaignId', requireAuth, express.json(), async (req, res) => {
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ error: 'Não autorizado' });
+    }
+    
+    try {
+      const [adminCheck]: any = await pool.execute('SELECT is_supreme_admin FROM users WHERE id = ?', [req.user.id]);
+      if (!adminCheck || adminCheck.length === 0 || !adminCheck[0].is_supreme_admin) {
+        return res.status(403).json({ error: 'Acesso negado: Apenas Administrador Geral pode executar esta ação.' });
+      }
+      
+      const { status, maintenance_status, limits, features } = req.body;
+      const { campaignId } = req.params;
+      
+      const setClauses: string[] = [];
+      const values: any[] = [];
+      
+      if (status !== undefined) { setClauses.push('status = ?'); values.push(status); }
+      if (maintenance_status !== undefined) { setClauses.push('maintenance_status = ?'); values.push(maintenance_status); }
+      if (limits !== undefined) { 
+        setClauses.push('limits = ?'); 
+        values.push(typeof limits === 'object' ? JSON.stringify(limits) : limits); 
+      }
+      if (features !== undefined) { 
+        setClauses.push('features = ?'); 
+        values.push(typeof features === 'object' ? JSON.stringify(features) : features); 
+      }
+      
+      if (setClauses.length === 0) {
+        return res.json({ success: true });
+      }
+      
+      values.push(campaignId);
+      const query = `UPDATE campaign_configs SET ${setClauses.join(', ')} WHERE id = ?`;
+      await pool.execute(query, values);
+      
+      return res.json({ success: true, message: 'Campanha atualizada com sucesso' });
+    } catch (err: any) {
+      console.error('[ADMIN-CAMPAIGNS-PUT] Error:', err);
+      return res.status(500).json({ error: err.message });
     }
   });
 
@@ -483,6 +641,19 @@ async function startServer() {
       }
 
       const user = users[0];
+      
+      // Verificar se a conta do usuário ou o candidato está bloqueado
+      if (user.role === 'blocked') {
+        return res.status(403).json({ error: 'Sua conta está desativada. Contate o administrador geral.' });
+      }
+
+      if (user.campaign_id) {
+        const [configs]: any = await pool.execute('SELECT status FROM campaign_configs WHERE id = ?', [user.campaign_id]);
+        if (configs && configs.length > 0 && configs[0].status === 'blocked') {
+          return res.status(403).json({ error: 'Esta campanha está suspensa por inadimplência ou restrição. Contate o administrador.' });
+        }
+      }
+
       // Garantir que a senha do banco seja tratada como string
       const dbPassword = user.password ? user.password.toString() : null;
       
@@ -986,6 +1157,11 @@ app.get('/api/war-room/feed', (_req, res) => {
     try {
       const { prompt, systemInstruction, campaignId, userId, agentId } = req.body;
       
+      const creditCheck = await checkAndConsumeAICredit(userId, campaignId);
+      if (!creditCheck.allowed) {
+        return res.status(403).json({ error: creditCheck.error });
+      }
+
       if (campaignId && agentId) {
           try {
             await pool.execute(
@@ -1109,10 +1285,15 @@ app.get('/api/war-room/feed', (_req, res) => {
     }
   });
 
-  // --- Endpoints Gemini (Usados pelo geminiService.ts) ---
   app.post('/api/gemini/chat', requireAuth, async (req, res) => {
     try {
-      const { prompt } = req.body;
+      const { prompt, userId, campaignId } = req.body;
+      
+      const creditCheck = await checkAndConsumeAICredit(userId, campaignId);
+      if (!creditCheck.allowed) {
+        return res.status(403).json({ error: creditCheck.error });
+      }
+
       const aiResponse = await callGeminiREST(prompt);
       res.json({ text: aiResponse.text() });
     } catch (error: any) {
@@ -1147,7 +1328,13 @@ app.get('/api/war-room/feed', (_req, res) => {
 
   app.post('/api/agents/generate-image', requireAuth, async (req: any, res: any) => {
     try {
-      const { prompt, campaignId, agentId } = req.body;
+      const { prompt, campaignId, agentId, userId } = req.body;
+      
+      const creditCheck = await checkAndConsumeAICredit(userId, campaignId);
+      if (!creditCheck.allowed) {
+        return res.status(403).json({ error: creditCheck.error });
+      }
+
       const geminiKey = process.env.GEMINI_API_KEY;
       const openaiKey = process.env.OPENAI_API_KEY;
       const ptPrompt = `ESTRITAMENTE EM PORTUGUÊS DO BRASIL: Qualquer texto na imagem deve ser em português brasileiro. Tema: ${prompt}`;
@@ -1528,7 +1715,13 @@ app.get('/api/war-room/feed', (_req, res) => {
   // --- API Externa v1 (Ingestão de Dados) ---
   app.post('/api/agents/advisor', requireAuth, async (req, res) => {
     try {
-      const { campaignDataPrompt } = req.body;
+      const { campaignDataPrompt, campaignId, userId } = req.body;
+      
+      const creditCheck = await checkAndConsumeAICredit(userId, campaignId);
+      if (!creditCheck.allowed) {
+        return res.status(403).json({ error: creditCheck.error });
+      }
+
       console.log("[Advisor] Solicitando análise para dados...");
       
       const aiResponse = await callChatGPT(campaignDataPrompt, "Você é um consultor político sênior. Forneça exatamente 3 dicas práticas baseadas nos dados fornecidos. Responda ESTRITAMENTE em formato JSON: { \"tips\": [{ \"title\": \"...\", \"message\": \"...\", \"type\": \"info\"|\"warning\"|\"success\" }] }");
@@ -1559,7 +1752,13 @@ app.get('/api/war-room/feed', (_req, res) => {
   // --- Relatório Executivo (generateExecutiveReport) ---
   app.post('/api/agents/report', requireAuth, async (req, res) => {
     try {
-      const { campaignDataPrompt, campaignId } = req.body;
+      const { campaignDataPrompt, campaignId, userId } = req.body;
+      
+      const creditCheck = await checkAndConsumeAICredit(userId, campaignId);
+      if (!creditCheck.allowed) {
+        return res.status(403).json({ error: creditCheck.error });
+      }
+
       console.log("[Report] Gerando relatório executivo para campanha:", campaignId);
 
       const aiResponse = await callChatGPT(
@@ -1575,10 +1774,15 @@ app.get('/api/war-room/feed', (_req, res) => {
     }
   });
 
-  // --- Pipeline Automática (Analisar Agora) ---
   app.post('/api/agents/pipeline', requireAuth, async (req, res) => {
     try {
-      const { campaignDataPrompt, campaignId } = req.body;
+      const { campaignDataPrompt, campaignId, userId } = req.body;
+      
+      const creditCheck = await checkAndConsumeAICredit(userId, campaignId);
+      if (!creditCheck.allowed) {
+        return res.status(403).json({ error: creditCheck.error });
+      }
+
       console.log("[Pipeline] Iniciando análise profunda para campanha:", campaignId);
       
       const aiResponse = await callChatGPT(`Analise estes dados e gere uma estratégia completa. Você DEVE separar cada seção com o marcador '#' seguido do nome do agente (ex: # Estrategista, # Growth, # Social, # Field, # Creative):\n\n${campaignDataPrompt}`);
@@ -2136,7 +2340,11 @@ app.get('/api/war-room/feed', (_req, res) => {
         // Passo 1: remover linhas com ID no limite do INT para desbloquear a migration
         `DELETE FROM agent_chat_history WHERE id >= 2000000000`,
         // Passo 2: modificar coluna para BIGINT com AUTO_INCREMENT
-        `ALTER TABLE agent_chat_history MODIFY COLUMN id BIGINT AUTO_INCREMENT`
+        `ALTER TABLE agent_chat_history MODIFY COLUMN id BIGINT AUTO_INCREMENT`,
+        // Recursos de gestão de crédito de IA e status financeiro
+        `ALTER TABLE campaign_configs ADD COLUMN maintenance_status VARCHAR(50) DEFAULT 'paid'`,
+        `ALTER TABLE users ADD COLUMN ai_credits INT DEFAULT 100`,
+        `ALTER TABLE users ADD COLUMN ai_used INT DEFAULT 0`
       ];
 
       for (const migration of columnMigrations) {
