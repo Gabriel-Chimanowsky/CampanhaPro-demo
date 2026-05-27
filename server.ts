@@ -987,10 +987,14 @@ app.get('/api/war-room/feed', (_req, res) => {
       const { prompt, systemInstruction, campaignId, userId, agentId } = req.body;
       
       if (campaignId && agentId) {
-          await pool.execute(
-            'INSERT INTO agent_chat_history (campaign_id, agent_id, role, content) VALUES (?, ?, ?, ?)',
-            [campaignId, agentId, 'user', prompt]
-          );
+          try {
+            await pool.execute(
+              'INSERT INTO agent_chat_history (campaign_id, agent_id, role, content) VALUES (?, ?, ?, ?)',
+              [campaignId, agentId, 'user', prompt]
+            );
+          } catch (histErr: any) {
+            console.warn('[Agent Chat] Falha ao salvar histórico (user):', histErr.message);
+          }
       }
 
       const aiResponse = await callChatGPT(prompt, systemInstruction, AGENT_TOOLS);
@@ -1078,16 +1082,24 @@ app.get('/api/war-room/feed', (_req, res) => {
       }
 
       if (campaignId && agentId) {
-          await pool.execute(
-            'INSERT INTO agent_chat_history (campaign_id, agent_id, role, content, metadata) VALUES (?, ?, ?, ?, ?)',
-            [campaignId, agentId, 'agent', textResult, JSON.stringify({ tool_calls: aiResponse.tool_calls })]
-          );
+          try {
+            await pool.execute(
+              'INSERT INTO agent_chat_history (campaign_id, agent_id, role, content, metadata) VALUES (?, ?, ?, ?, ?)',
+              [campaignId, agentId, 'agent', textResult, JSON.stringify({ tool_calls: aiResponse.tool_calls })]
+            );
+          } catch (histErr: any) {
+            console.warn('[Agent Chat] Falha ao salvar histórico (agent):', histErr.message);
+          }
 
           // Log de Compliance para geração de chat
-          await pool.execute(
-            'INSERT INTO ai_compliance_logs (campaign_id, agent_id, action_type, input_summary, output_summary, ai_disclosure_required, human_approved, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            [campaignId, agentId, 'chat_generation', prompt.substring(0, 200), textResult.substring(0, 200), true, false, userId]
-          );
+          try {
+            await pool.execute(
+              'INSERT INTO ai_compliance_logs (campaign_id, agent_id, action_type, input_summary, output_summary, ai_disclosure_required, human_approved, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+              [campaignId, agentId, 'chat_generation', prompt.substring(0, 200), textResult.substring(0, 200), true, false, userId]
+            );
+          } catch (compErr: any) {
+            console.warn('[Agent Chat] Falha ao salvar compliance log:', compErr.message);
+          }
       }
 
       res.json({ text: textResult, tool_calls: aiResponse.tool_calls });
@@ -2043,6 +2055,9 @@ app.get('/api/war-room/feed', (_req, res) => {
         `ALTER TABLE agent_outputs ADD COLUMN input LONGTEXT NULL`,
         `ALTER TABLE agent_outputs ADD COLUMN output LONGTEXT NULL`,
         // Fix overflow INT -> BIGINT na agent_chat_history (Duplicate entry '2147483647')
+        // Passo 1: remover linhas com ID no limite do INT para desbloquear a migration
+        `DELETE FROM agent_chat_history WHERE id >= 2000000000`,
+        // Passo 2: modificar coluna para BIGINT com AUTO_INCREMENT
         `ALTER TABLE agent_chat_history MODIFY COLUMN id BIGINT AUTO_INCREMENT`
       ];
 
