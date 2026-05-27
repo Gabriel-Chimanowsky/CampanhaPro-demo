@@ -229,6 +229,29 @@ class MySQLQueryBuilder {
   private convertKeysToCamel(obj: any): any {
     if (obj === null || obj === undefined) return obj;
     if (Array.isArray(obj)) return obj.map(v => this.convertKeysToCamel(v));
+    if (typeof obj === 'string') {
+      if (obj.includes('via.placeholder.com')) {
+        // Se for um array de URLs stringificado em JSON
+        if (obj.trim().startsWith('[') && obj.trim().endsWith(']')) {
+          try {
+            const arr = JSON.parse(obj);
+            if (Array.isArray(arr)) {
+              const cleaned = arr.map(item => 
+                typeof item === 'string' && item.includes('via.placeholder.com')
+                  ? 'https://images.unsplash.com/photo-1540910419892-4a36d2c3266c'
+                  : item
+              );
+              return JSON.stringify(cleaned);
+            }
+          } catch (e) {
+            // Fallback para string comum se falhar
+          }
+        }
+        // Substituição direta
+        return 'https://images.unsplash.com/photo-1540910419892-4a36d2c3266c';
+      }
+      return obj;
+    }
     if (typeof obj === 'object' && !(obj instanceof Date)) {
       return Object.keys(obj).reduce((acc: any, key) => {
         const camelKey = key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
