@@ -155,7 +155,11 @@ const cleanJSON = (text: string) => text.replace(/```json/g, '').replace(/```/g,
 
 const callChatGPT = async (prompt: string, systemInstruction?: string, tools?: any[]) => {
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error("GEMINI_API_KEY não configurada.");
+  const openaiKey = process.env.OPENAI_API_KEY;
+  
+  if (!apiKey && !openaiKey) {
+    throw new Error("Nenhuma chave de API (GEMINI_API_KEY ou OPENAI_API_KEY) está configurada.");
+  }
 
   const messages: any[] = [];
   if (systemInstruction) messages.push({ role: 'system', content: systemInstruction });
@@ -164,65 +168,129 @@ const callChatGPT = async (prompt: string, systemInstruction?: string, tools?: a
   const body: any = { model: AI_MODEL, messages, temperature: 0.7 };
   if (tools && tools.length > 0) { body.tools = tools; body.tool_choice = "auto"; }
 
-  let retries = 3;
-  let delay = 1500;
-  while (retries > 0) {
+  // 1. Tentar primeiro com o Gemini
+  if (apiKey) {
+    let retries = 3;
+    let delay = 1500;
+    while (retries > 0) {
+      try {
+        console.log(`[AI Chat] Tentando chamada Gemini (${AI_MODEL})...`);
+        const response = await axios.post('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', body, {
+          headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
+        });
+
+        const result = response.data.choices[0].message;
+        return {
+          text: () => result.content || "",
+          tool_calls: result.tool_calls,
+          response: { text: () => result.content || "" }
+        };
+      } catch (error: any) {
+        const status = error?.response?.status;
+        const msg = error?.response?.data?.error?.message || error.message || '';
+        console.warn(`[AI Chat] Erro na chamada do Gemini (${status || 'Network'}):`, msg);
+
+        if (status === 429 && retries > 1) {
+          console.warn(`[Gemini Rate Limit] 429 detectado em callChatGPT. Aguardando ${delay}ms para tentar novamente. Tentativas restantes: ${retries - 1}`);
+          await new Promise(r => setTimeout(r, delay));
+          retries--;
+          delay *= 2; // backoff exponencial
+        } else {
+          // Quebra para acionar o fallback imediatamente se esgotaram as retentativas ou se for outro tipo de erro
+          break;
+        }
+      }
+    }
+  }
+
+  // 2. Fallback automático para OpenAI GPT-4o-mini se o Gemini falhou ou se a chave dele não estiver configurada
+  if (openaiKey) {
     try {
-      const response = await axios.post('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', body, {
-        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
+      console.log('[AI Chat] Iniciando Fallback automático de chat para OpenAI (gpt-4o-mini)...');
+      // No fallback rodamos em modo compatível e limpo, sem ferramentas personalizadas do Gemini
+      const response = await axios.post('https://api.openai.com/v1/chat/completions', {
+        model: 'gpt-4o-mini',
+        messages: messages,
+        temperature: 0.7
+      }, {
+        headers: { 'Authorization': `Bearer ${openaiKey}`, 'Content-Type': 'application/json' }
       });
 
       const result = response.data.choices[0].message;
       return {
         text: () => result.content || "",
-        tool_calls: result.tool_calls,
+        tool_calls: undefined, // Em modo fallback, processamos texto puro
         response: { text: () => result.content || "" }
       };
-    } catch (error: any) {
-      const status = error?.response?.status;
-      if (status === 429 && retries > 1) {
-        console.warn(`[Gemini Rate Limit] 429 detectado em callChatGPT. Aguardando ${delay}ms para tentar novamente. Tentativas restantes: ${retries - 1}`);
-        await new Promise(r => setTimeout(r, delay));
-        retries--;
-        delay *= 2; // backoff exponencial
-      } else {
-        throw error;
-      }
+    } catch (openaiErr: any) {
+      console.error('[AI Chat] Falha também no Fallback da OpenAI:', openaiErr?.response?.data || openaiErr.message);
+      throw openaiErr;
     }
   }
-  throw new Error("Limite de requisições do Gemini atingido após várias tentativas.");
+
+  throw new Error("O Gemini esgotou a cota e nenhum provedor de fallback (OpenAI) pôde processar a requisição.");
 };
 
 const callGeminiREST = async (prompt: string) => {
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error("GEMINI_API_KEY não configurada.");
+  const openaiKey = process.env.OPENAI_API_KEY;
+  
+  if (!apiKey && !openaiKey) {
+    throw new Error("Nenhuma chave de API configurada.");
+  }
 
-  let retries = 3;
-  let delay = 1500;
-  while (retries > 0) {
-    try {
-      const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: GEMINI_MODEL_NAME });
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      return {
-        text: () => response.text(),
-        response: { text: () => response.text() }
-      };
-    } catch (error: any) {
-      const isRateLimit = error?.status === 429 || error?.message?.includes('429') || error?.response?.status === 429;
-      if (isRateLimit && retries > 1) {
-        console.warn(`[Gemini Rate Limit] 429 detectado em callGeminiREST. Aguardando ${delay}ms para tentar novamente. Tentativas restantes: ${retries - 1}`);
-        await new Promise(r => setTimeout(r, delay));
-        retries--;
-        delay *= 2; // backoff exponencial
-      } else {
-        console.error("[Gemini] Erro na chamada:", error.message);
-        throw error;
+  // 1. Tentar primeiro com o Gemini REST
+  if (apiKey) {
+    let retries = 3;
+    let delay = 1500;
+    while (retries > 0) {
+      try {
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({ model: GEMINI_MODEL_NAME });
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        return {
+          text: () => response.text(),
+          response: { text: () => response.text() }
+        };
+      } catch (error: any) {
+        const isRateLimit = error?.status === 429 || error?.message?.includes('429') || error?.response?.status === 429;
+        if (isRateLimit && retries > 1) {
+          console.warn(`[Gemini Rate Limit] 429 detectado em callGeminiREST. Aguardando ${delay}ms para tentar novamente. Tentativas restantes: ${retries - 1}`);
+          await new Promise(r => setTimeout(r, delay));
+          retries--;
+          delay *= 2; // backoff exponencial
+        } else {
+          break;
+        }
       }
     }
   }
-  throw new Error("Limite de requisições do Gemini atingido em callGeminiREST.");
+
+  // 2. Fallback para OpenAI gpt-4o-mini se o Gemini falhou ou não estava configurado
+  if (openaiKey) {
+    try {
+      console.log('[AI REST] Iniciando Fallback automático para OpenAI (gpt-4o-mini)...');
+      const response = await axios.post('https://api.openai.com/v1/chat/completions', {
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.7
+      }, {
+        headers: { 'Authorization': `Bearer ${openaiKey}`, 'Content-Type': 'application/json' }
+      });
+
+      const result = response.data.choices[0].message.content || "";
+      return {
+        text: () => result,
+        response: { text: () => result }
+      };
+    } catch (openaiErr: any) {
+      console.error('[AI REST] Falha no Fallback da OpenAI:', openaiErr.message);
+      throw openaiErr;
+    }
+  }
+
+  throw new Error("O Gemini falhou/esgotou a cota e nenhum provedor de fallback (OpenAI) pôde processar a requisição.");
 };
 const checkAndConsumeAICredit = async (userId: string | undefined, campaignId: string | undefined): Promise<{ allowed: boolean; error?: string }> => {
   // Se for Supreme Admin, créditos ilimitados
