@@ -1333,11 +1333,24 @@ app.get('/api/war-room/feed', (_req, res) => {
     if (!apiKey) return '';
 
     try {
-      // Extrair o base64 limpo e o mime type
-      const matches = base64Image.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,(.+)$/);
-      if (!matches || matches.length < 3) return '';
-      const mimeType = matches[1];
-      const base64Data = matches[2];
+      let mimeType = 'image/png';
+      let base64Data = base64Image;
+
+      // Se contiver a URL data: extrai
+      if (base64Image.startsWith('data:')) {
+        const matches = base64Image.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,(.+)$/);
+        if (matches && matches.length >= 3) {
+          mimeType = matches[1];
+          base64Data = matches[2];
+        } else {
+          // Se não der match no regex complexo, tenta um split simples
+          const parts = base64Image.split(';base64,');
+          if (parts.length === 2) {
+            mimeType = parts[0].replace('data:', '');
+            base64Data = parts[1];
+          }
+        }
+      }
 
       const genAI = new GoogleGenerativeAI(apiKey);
       const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
@@ -1393,7 +1406,7 @@ Do not use names, do not analyze mood, just physical visual attributes.`;
       let candidateDescription = '';
       if (supabaseAdmin && campaignId) {
         try {
-          const { data, error } = await supabaseAdmin
+          const { data } = await supabaseAdmin
             .from('settings')
             .select('campaign_details')
             .eq('id', campaignId)
