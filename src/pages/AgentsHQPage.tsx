@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Bot, TrendingUp, Share2, Map, Send, Loader2, LayoutDashboard, Ticket, ArrowRight, CheckCircle2, Link as LinkIcon, ShieldCheck, Sparkles as SparklesIcon, History, Shield, Zap, X, BellRing, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { askStrategist, askGrowthHacker, askSocialMedia, askFieldCommander, askCreativeProducer, askBackupAgent, askFraudAuditor, runFullPipeline, savePipelineResult, getPipelineHistory, PipelineResult, generateCreativeImage, createProductionOrder, publishToSocialMedia } from '../services/agentsClientService';
@@ -14,7 +14,6 @@ import { useAgentStore } from '../stores/useAgentStore';
 
 const AgentsHQPage: React.FC = () => {
     const { user } = useAuth();
-    const { config } = useProfilePermissions();
     const { activeTab, setActiveTab } = useAgentStore();
     const [isHydrated, setIsHydrated] = useState(false);
 
@@ -39,7 +38,6 @@ const AgentsHQPage: React.FC = () => {
             console.log("[AgentsHQ] Store hidratado. Aba ativa:", activeTab);
         }
     }, [isHydrated, activeTab]);
-    const [currentUsage, setCurrentUsage] = useState(0);
     const [isLimitExceeded, setIsLimitExceeded] = useState(false);
     const [credits, setCredits] = useState({ used: 0, total: 100 });
     const [pendingContext, setPendingContext] = useState<string | null>(null);
@@ -150,7 +148,6 @@ const AgentsHQPage: React.FC = () => {
                     const used = profile.ai_used || 0;
                     const total = profile.ai_credits !== null && profile.ai_credits !== undefined ? profile.ai_credits : 100;
                     setCredits({ used, total });
-                    setCurrentUsage(used);
                     if (used >= total) {
                         setIsLimitExceeded(true);
                     } else {
@@ -485,7 +482,7 @@ const AgentsHQPage: React.FC = () => {
                 </button>
             </div>
 
-            <div className="bg-slate-800 rounded-xl border border-slate-700 p-6 min-h-[500px]">
+            <div className="bg-slate-800 rounded-xl border border-slate-700 p-6 min-h-[500px] flex flex-col">
                 {!isHydrated ? (
                     <div className="flex flex-col items-center justify-center h-64 text-slate-400">
                         <Loader2 className="w-8 h-8 animate-spin mb-4 text-blue-400" />
@@ -522,6 +519,18 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
     const history = histories[agentId] || [];
     const [isLoading, setIsLoading] = useState(false);
     const [pendingOrders, setPendingOrders] = useState<any[]>([]);
+    const scrollRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (scrollRef.current) {
+            // Scroll safely after rendering frame
+            setTimeout(() => {
+                if (scrollRef.current) {
+                    scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+                }
+            }, 100);
+        }
+    }, [history, isLoading]);
 
     useEffect(() => {
         const loadInitialData = async () => {
@@ -665,7 +674,7 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
                 </div>
             )}
 
-            <div className="flex-1 overflow-y-auto mb-4 space-y-4 pr-2 max-h-[400px]">
+            <div className="flex-1 overflow-y-auto mb-4 space-y-4 pr-2 max-h-[400px] flex flex-col justify-start" ref={scrollRef}>
                 {pendingOrders.length > 0 && (
                     <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 mb-6">
                         <div className="flex items-center gap-2 mb-3 text-blue-400 font-bold text-sm uppercase tracking-wider"><BellRing className="w-4 h-4" /> ⚡ Ordens de Produção Pendentes</div>

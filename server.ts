@@ -1344,7 +1344,7 @@ app.get('/api/war-room/feed', (_req, res) => {
       let imageUrl: string | null = null;
       let imageBase64: string | null = null;
 
-      // 1. Tentar primeiro o Gemini Imagen 4
+      // 1. Tentar primeiro o Gemini Imagen 3
       if (geminiKey) {
         try {
           console.log('[ImageGen] Tentando Gemini Imagen 4 para prompt:', ptPrompt);
