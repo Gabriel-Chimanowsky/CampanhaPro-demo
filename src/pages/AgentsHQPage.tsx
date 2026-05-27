@@ -519,10 +519,14 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
     const history = histories[agentId] || [];
     const [isLoading, setIsLoading] = useState(false);
     const [pendingOrders, setPendingOrders] = useState<any[]>([]);
-    const [generatedImages, setGeneratedImages] = useState<Record<number, string>>({});
+    const [generatedImages, setGeneratedImages] = useState<Record<string, string>>({});
+    const [loadingCardKey, setLoadingCardKey] = useState<string | null>(null);
     const [lightboxImage, setLightboxImage] = useState<string | null>(null);
     const [lightboxRefText, setLightboxRefText] = useState('');
     const lightboxInputRef = useRef<HTMLInputElement>(null);
+
+    // Chave estável por mensagem (usa id do banco ou índice absoluto)
+    const getMsgKey = (msg: any, absoluteIdx: number) => msg.id ? String(msg.id) : String(absoluteIdx);
     const scrollRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -591,13 +595,14 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
         }
     };
 
-    const handleExecuteAction = async (msgIdx: number, content: string) => {
+    const handleExecuteAction = async (msgKey: string, content: string) => {
         if (!onExecuteAction) return;
+        setLoadingCardKey(msgKey);
         setIsLoading(true);
         try {
             const resultUrl = await onExecuteAction(content, agentId);
             if (resultUrl) {
-                setGeneratedImages(prev => ({ ...prev, [msgIdx]: resultUrl }));
+                setGeneratedImages(prev => ({ ...prev, [msgKey]: resultUrl }));
             } else {
                 alert('Geração concluída mas a URL da imagem ficou vazia. Tente novamente.');
             }
@@ -606,7 +611,50 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
             alert(`Erro ao gerar ativo visual: ${error.message || error}`);
         } finally {
             setIsLoading(false);
+            setLoadingCardKey(null);
         }
+    };
+
+    // Download seguro via Blob (funciona com data URLs e URLs normais)
+    const handleDownload = async (url: string) => {
+        try {
+            if (url.startsWith('data:')) {
+                const res = await fetch(url);
+                const blob = await res.blob();
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = `ativo-visual-${Date.now()}.png`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(a.href);
+            } else {
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `ativo-visual-${Date.now()}.png`;
+                a.target = '_blank';
+                a.click();
+            }
+        } catch (e) {
+            window.open(url, '_blank');
+        }
+    };
+
+    // Mensagem merece botões de ação só se for conteúdo real
+    const isActionable = (content: string) =>
+        !content.startsWith('🛡️') &&
+        !content.startsWith('🛠️') &&
+        !content.startsWith('❌') &&
+        content.trim().length > 60;
+
+    // Renderiza texto com **bold** básico
+    const renderText = (text: string) => {
+        const parts = text.split(/(\*\*.*?\*\*)/g);
+        return parts.map((part, i) =>
+            part.startsWith('**') && part.endsWith('**')
+                ? <strong key={i} className="font-semibold text-slate-100">{part.slice(2, -2)}</strong>
+                : <span key={i}>{part}</span>
+        );
     };
 
     return (
@@ -629,26 +677,22 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
                 )}
             </div>
             
-            {/* Galeria de Ativos Gerados nesta Sessão */}
+            {/* Galeria de Ativos desta Sessão — compacta, no topo */}
             {agentId === 'creative' && Object.keys(generatedImages).length > 0 && (
-                <div className="mb-6 animate-in fade-in zoom-in duration-500">
+                <div className="mb-4 animate-in fade-in zoom-in duration-500">
                     <p className="text-[10px] font-bold text-slate-500 uppercase mb-2 tracking-widest flex items-center gap-2">
-                        <SparklesIcon className="w-3 h-3 text-yellow-400" /> Ativos Criativos desta Sessão
+                        <SparklesIcon className="w-3 h-3 text-yellow-400" /> Ativos desta Sessão
                     </p>
-                    <div className="grid grid-cols-3 gap-3">
-                        {Object.entries(generatedImages).slice(-3).map(([, url], i) => (
+                    <div className="flex gap-2 flex-wrap">
+                        {Object.entries(generatedImages).map(([, url], i) => (
                             <div
                                 key={i}
-                                className="aspect-square rounded-lg border border-slate-700 overflow-hidden bg-slate-900 cursor-pointer relative group"
+                                className="w-14 h-14 rounded-lg border border-slate-700 overflow-hidden bg-slate-900 cursor-pointer relative group flex-shrink-0"
                                 onClick={() => { setLightboxImage(url); setLightboxRefText(''); }}
                             >
-                                <img
-                                    src={url}
-                                    className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-all group-hover:scale-105"
-                                    onError={(e) => { (e.target as HTMLImageElement).closest('div')!.style.display = 'none'; }}
-                                />
-                                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40">
-                                    <ZoomIn className="w-6 h-6 text-white drop-shadow-lg" />
+                                <img src={url} className="w-full h-full object-cover group-hover:scale-110 transition-all" onError={(e) => { (e.target as HTMLImageElement).closest('div')!.style.display = 'none'; }} />
+                                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/50">
+                                    <ZoomIn className="w-4 h-4 text-white" />
                                 </div>
                             </div>
                         ))}
@@ -677,7 +721,7 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
                 </div>
             )}
 
-            <div className="flex-1 overflow-y-auto mb-4 space-y-4 pr-2 max-h-[400px] flex flex-col justify-start" ref={scrollRef}>
+            <div className="flex-1 min-h-0 overflow-y-auto mb-4 space-y-4 pr-2" ref={scrollRef}>
                 {pendingOrders.length > 0 && (
                     <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 mb-6">
                         <div className="flex items-center gap-2 mb-3 text-blue-400 font-bold text-sm uppercase tracking-wider"><BellRing className="w-4 h-4" /> ⚡ Ordens de Produção Pendentes</div>
@@ -708,16 +752,29 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
                         </div>
                     </div>
                 ) : (
-                    history.slice(-10).map((msg, idx) => (
-                        <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-300 relative group`}>
+                    <>
+                        {history.length > 20 && (
+                            <div className="text-center py-2">
+                                <span className="text-[11px] text-slate-500 bg-slate-800 px-3 py-1 rounded-full border border-slate-700">
+                                    ⋯ {history.length - 20} mensagens anteriores não exibidas
+                                </span>
+                            </div>
+                        )}
+                        {history.slice(-20).map((msg, sliceIdx) => {
+                        const absoluteIdx = history.length - 20 + sliceIdx < 0 ? sliceIdx : history.length - Math.min(20, history.length) + sliceIdx;
+                        const msgKey = getMsgKey(msg, absoluteIdx);
+                        const imgUrl = generatedImages[msgKey];
+                        const isThisCardLoading = loadingCardKey === msgKey;
+                        return (
+                        <div key={msgKey} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-300 relative group`}>
                             <div className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-sm relative ${msg.role === 'user' ? 'bg-blue-600 text-slate-50 rounded-br-sm' : 'bg-slate-700/50 backdrop-blur-sm text-slate-100 border border-slate-600/50 rounded-bl-sm'}`}>
                                 {msg.role === 'agent' && title === 'O Produtor Criativo' && (
-                                    <button 
+                                    <button
                                         onClick={async () => {
                                             if (!confirm("Excluir este card permanentemente?")) return;
                                             try {
                                                 if (msg.id) await supabase.from('agent_chat_history').delete().eq('id', msg.id);
-                                                const newHistory = history.filter((_, i) => i !== idx);
+                                                const newHistory = history.filter((_, i) => i !== absoluteIdx);
                                                 setHistory(agentId, newHistory);
                                             } catch (e) { console.error(e); }
                                         }}
@@ -733,67 +790,75 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
                                             <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-ping" />
                                             <span className="text-[11px] font-medium text-indigo-300 italic">{msg.content}</span>
                                         </div>
-                                    ) : msg.content}
+                                    ) : renderText(msg.content)}
                                 </div>
 
-                                {/* Imagem gerada para este card - renderizada inline no chat */}
-                                {generatedImages[idx] && (
+                                {/* Imagem gerada inline */}
+                                {isThisCardLoading && (
+                                    <div className="mt-4 flex items-center gap-3 p-4 bg-slate-800/80 rounded-xl border border-indigo-500/30">
+                                        <Loader2 className="w-5 h-5 animate-spin text-indigo-400 shrink-0" />
+                                        <div>
+                                            <p className="text-xs font-bold text-indigo-400">Gerando ativo visual...</p>
+                                            <p className="text-[10px] text-slate-500 mt-0.5">Gemini Imagen 4 em processo — pode levar até 30s</p>
+                                        </div>
+                                    </div>
+                                )}
+                                {imgUrl && !isThisCardLoading && (
                                     <div className="mt-4 animate-in fade-in zoom-in duration-500">
                                         <p className="text-xs font-bold text-indigo-400 uppercase tracking-tighter mb-2 flex items-center gap-1">
                                             <SparklesIcon className="w-3 h-3" /> Ativo Visual Gerado
                                         </p>
                                         <div
-                                            className="rounded-xl overflow-hidden border border-indigo-500/40 shadow-xl shadow-indigo-900/30 cursor-pointer relative group"
-                                            onClick={() => { setLightboxImage(generatedImages[idx]); setLightboxRefText(''); }}
-                                            title="Clique para abrir, baixar ou referenciar no chat"
+                                            className="rounded-xl overflow-hidden border border-indigo-500/40 shadow-xl shadow-indigo-900/30 cursor-pointer relative group/img"
+                                            onClick={() => { setLightboxImage(imgUrl); setLightboxRefText(''); }}
+                                            title="Clique para expandir, baixar ou referenciar no chat"
                                         >
                                             <img
-                                                src={generatedImages[idx]}
+                                                src={imgUrl}
                                                 alt="Ativo Visual"
-                                                className="w-full h-auto block group-hover:brightness-90 transition-all"
+                                                className="w-full h-auto block group-hover/img:brightness-90 transition-all"
                                                 onError={(e) => {
                                                     const el = e.target as HTMLImageElement;
-                                                    el.parentElement!.innerHTML = '<div class="p-4 text-center text-red-400 text-xs">❌ Erro ao renderizar imagem. URL pode ter expirado.</div>';
+                                                    el.parentElement!.innerHTML = '<div class="p-4 text-center text-red-400 text-xs">❌ Erro ao carregar imagem.</div>';
                                                 }}
                                             />
-                                            <div className="absolute inset-0 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/50 gap-2">
+                                            <div className="absolute inset-0 flex flex-col items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity bg-black/50 gap-2">
                                                 <ZoomIn className="w-7 h-7 text-white drop-shadow-xl" />
-                                                <span className="text-white text-xs font-bold drop-shadow">Clique para expandir</span>
+                                                <span className="text-white text-xs font-bold">Clique para expandir</span>
                                             </div>
                                         </div>
                                     </div>
                                 )}
 
-                                {msg.role === 'agent' && title === 'O Comandante de Campo' && onGeneratePost && !msg.content.startsWith('🛡️') && !msg.content.startsWith('🛠️') && !msg.content.startsWith('❌') && (
+                                {/* Botões de ação */}
+                                {msg.role === 'agent' && title === 'O Comandante de Campo' && onGeneratePost && isActionable(msg.content) && (
                                     <div className="mt-3 pt-3 border-t border-slate-600">
                                         <p className="text-[10px] text-slate-400 mb-2 font-bold uppercase">Ação da Linha de Montagem:</p>
                                         <button onClick={() => onGeneratePost(msg.content)} className="flex items-center gap-2 text-xs bg-purple-600 hover:bg-purple-700 text-slate-50 px-3 py-2 rounded-lg font-bold transition-all shadow-lg hover:scale-105 active:scale-95"><Share2 className="w-3 h-3" /> GERAR POST VIRAL AGORA</button>
                                     </div>
                                 )}
-                                {msg.role === 'agent' && title === 'O Social Media' && onHandoff && !msg.content.startsWith('🛡️') && !msg.content.startsWith('🛠️') && !msg.content.startsWith('❌') && (
+                                {msg.role === 'agent' && title === 'O Social Media' && onHandoff && isActionable(msg.content) && (
                                     <div className="mt-3 pt-3 border-t border-slate-600">
                                         <p className="text-[10px] text-slate-400 mb-2 font-bold uppercase">Integração Google Flow:</p>
                                         <button onClick={() => onHandoff(msg.content)} className="flex items-center gap-2 text-xs bg-yellow-600 hover:bg-yellow-700 text-slate-50 px-3 py-2 rounded-lg font-bold transition-all shadow-lg hover:scale-105 active:scale-95"><SparklesIcon className="w-3 h-3" /> ENVIAR SCRIPT PARA PRODUÇÃO</button>
                                     </div>
                                 )}
-                                {/* Botão GERAR ATIVO — só aparece se ainda não há imagem gerada para este card */}
-                                {msg.role === 'agent' && title === 'O Produtor Criativo' && onExecuteAction && !msg.content.startsWith('🛡️') && !msg.content.startsWith('🛠️') && !msg.content.startsWith('❌') && !generatedImages[idx] && (
+                                {msg.role === 'agent' && title === 'O Produtor Criativo' && onExecuteAction && isActionable(msg.content) && !imgUrl && !isThisCardLoading && (
                                     <div className="mt-3 pt-3 border-t border-slate-600">
                                         <p className="text-[10px] text-slate-400 mb-2 font-bold uppercase">Execução Automática:</p>
-                                        <button onClick={() => handleExecuteAction(idx, msg.content)} disabled={isLoading} className="flex items-center gap-2 text-xs bg-indigo-600 hover:bg-indigo-700 text-slate-50 px-3 py-2 rounded-lg font-bold transition-all shadow-lg hover:scale-105 active:scale-95 disabled:opacity-50"><SparklesIcon className="w-3 h-3" /> 🚀 GERAR ATIVO VISUAL (Gemini Imagen)</button>
+                                        <button onClick={() => handleExecuteAction(msgKey, msg.content)} disabled={isLoading} className="flex items-center gap-2 text-xs bg-indigo-600 hover:bg-indigo-700 text-slate-50 px-3 py-2 rounded-lg font-bold transition-all shadow-lg hover:scale-105 active:scale-95 disabled:opacity-50"><SparklesIcon className="w-3 h-3" /> 🚀 GERAR ATIVO VISUAL (Gemini Imagen)</button>
                                     </div>
                                 )}
-                                {msg.role === 'agent' && title === 'O Produtor Criativo' && onGeneratePost && !msg.content.startsWith('🛡️') && !msg.content.startsWith('🛠️') && !msg.content.startsWith('❌') && (
+                                {msg.role === 'agent' && title === 'O Produtor Criativo' && onGeneratePost && isActionable(msg.content) && (
                                     <div className="mt-3 pt-3 border-t border-slate-600">
                                         <p className="text-[10px] text-slate-400 mb-2 font-bold uppercase">Entrega de Ativo:</p>
                                         <button onClick={() => onGeneratePost(msg.content)} className="flex items-center gap-2 text-xs bg-green-600 hover:bg-green-700 text-slate-50 px-3 py-2 rounded-lg font-bold transition-all shadow-lg hover:scale-105 active:scale-95"><CheckCircle2 className="w-3 h-3" /> DEVOLVER PARA SOCIAL MEDIA</button>
                                     </div>
                                 )}
-                                {/* Publicar nas redes — aparece só quando há imagem gerada OU para outros agentes */}
-                                {msg.role === 'agent' && onPublish && !msg.content.startsWith('🛡️') && !msg.content.startsWith('❌') && generatedImages[idx] && (
+                                {msg.role === 'agent' && onPublish && imgUrl && (
                                     <div className="mt-3 pt-3 border-t border-slate-600/50">
                                         <button
-                                            onClick={() => onPublish(msg.content.replace(/\*\*/g, '').trim(), generatedImages[idx])}
+                                            onClick={() => onPublish(msg.content.replace(/\*\*/g, '').trim(), imgUrl)}
                                             className="w-full flex items-center justify-center gap-2 text-[10px] bg-emerald-600 hover:bg-emerald-500 text-slate-50 py-2 rounded-lg font-bold transition-all shadow-md active:scale-95"
                                         >
                                             <Send className="w-3 h-3" /> PUBLICAR NAS REDES CONECTADAS
@@ -802,7 +867,9 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
                                 )}
                             </div>
                         </div>
-                    ))
+                        );
+                    })}
+                    </>
                 )}
                 {isLoading && (
                     <div className="flex justify-start">
@@ -834,9 +901,8 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
                             <div className="flex items-center gap-2">
                                 {/* Download */}
                                 <a
-                                    href={lightboxImage}
-                                    download={`ativo-visual-${Date.now()}.png`}
-                                    onClick={(e) => e.stopPropagation()}
+                                    href="#"
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDownload(lightboxImage!); }}
                                     className="flex items-center gap-1.5 text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg font-bold transition-all shadow-md hover:scale-105 active:scale-95"
                                 >
                                     <Download className="w-3.5 h-3.5" /> Baixar Imagem
