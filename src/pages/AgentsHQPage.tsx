@@ -520,6 +520,7 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
     const [isLoading, setIsLoading] = useState(false);
     const [pendingOrders, setPendingOrders] = useState<any[]>([]);
     const [generatedImages, setGeneratedImages] = useState<Record<string, string>>({});
+    const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
     const [loadingCardKey, setLoadingCardKey] = useState<string | null>(null);
     const [lightboxImage, setLightboxImage] = useState<string | null>(null);
     const [lightboxRefText, setLightboxRefText] = useState('');
@@ -834,26 +835,33 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
                                 {imgUrl && !isThisCardLoading && (
                                     <div className={`${cleanContent ? 'mt-4' : 'mt-1'} animate-in fade-in zoom-in duration-500`}>
                                         <p className="text-xs font-bold text-indigo-400 uppercase tracking-tighter mb-2 flex items-center gap-1">
-                                            <SparklesIcon className="w-3 h-3" /> Ativo Visual Gerado
+                                            <SparklesIcon className="w-3 h-3 text-yellow-400" /> Ativo Visual Gerado
                                         </p>
                                         <div
                                             className="rounded-xl overflow-hidden border border-indigo-500/40 shadow-xl shadow-indigo-900/30 cursor-pointer relative group/img"
-                                            onClick={() => { setLightboxImage(imgUrl); setLightboxRefText(''); }}
-                                            title="Clique para expandir, baixar ou referenciar no chat"
+                                            onClick={() => { if (!imageErrors[msgKey]) { setLightboxImage(imgUrl); setLightboxRefText(''); } }}
+                                            title={imageErrors[msgKey] ? "Erro ao carregar imagem" : "Clique para expandir, baixar ou referenciar no chat"}
                                         >
-                                            <img
-                                                src={imgUrl}
-                                                alt="Ativo Visual"
-                                                className="w-full h-auto block group-hover/img:brightness-90 transition-all"
-                                                onError={(e) => {
-                                                    const el = e.target as HTMLImageElement;
-                                                    el.parentElement!.innerHTML = '<div class="p-4 text-center text-red-400 text-xs">❌ Erro ao carregar imagem.</div>';
-                                                }}
-                                            />
-                                            <div className="absolute inset-0 flex flex-col items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity bg-black/50 gap-2">
-                                                <ZoomIn className="w-7 h-7 text-white drop-shadow-xl" />
-                                                <span className="text-white text-xs font-bold">Clique para expandir</span>
-                                            </div>
+                                            {imageErrors[msgKey] ? (
+                                                <div className="p-4 text-center text-red-400 text-xs bg-slate-900/80 border border-red-500/20 rounded-xl">
+                                                    ❌ Erro ao carregar imagem.
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    <img
+                                                        src={imgUrl}
+                                                        alt="Ativo Visual"
+                                                        className="w-full h-auto block group-hover/img:brightness-90 transition-all"
+                                                        onError={() => {
+                                                            setImageErrors(prev => ({ ...prev, [msgKey]: true }));
+                                                        }}
+                                                    />
+                                                    <div className="absolute inset-0 flex flex-col items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity bg-black/50 gap-2">
+                                                        <ZoomIn className="w-7 h-7 text-white drop-shadow-xl" />
+                                                        <span className="text-white text-xs font-bold">Clique para expandir</span>
+                                                    </div>
+                                                </>
+                                            )}
                                         </div>
                                     </div>
                                 )}
