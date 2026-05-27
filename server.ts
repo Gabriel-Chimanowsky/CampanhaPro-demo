@@ -1382,7 +1382,17 @@ Regras Cruciais para o Prompt que Você Gerar:
 Por favor, retorne APENAS o prompt final em inglês. Não inclua nenhuma introdução, aspas envolvendo todo o texto ou explicação.`;
 
           const optimizerResponse = await callGeminiREST(`${optimizerSystemPrompt}\n\nTexto original a ser transformado em imagem:\n"${prompt}"`);
-          const text = optimizerResponse.text().trim();
+          let text = optimizerResponse.text().trim();
+          
+          // Limpar blocos de código markdown ou aspas extras que a IA possa ter retornado
+          text = text.replace(/```[a-zA-Z]*\n?/g, '').replace(/```/g, '').trim();
+          if (text.startsWith('"') && text.endsWith('"')) {
+            text = text.slice(1, -1);
+          }
+          if (text.startsWith("'") && text.endsWith("'")) {
+            text = text.slice(1, -1);
+          }
+          
           if (text) {
             optimizedPrompt = text;
             console.log('[ImageGen] Prompt otimizado para Imagen 4:', optimizedPrompt);
@@ -1393,9 +1403,14 @@ Por favor, retorne APENAS o prompt final em inglês. Não inclua nenhuma introdu
       }
 
       // Garante que o prompt contém instruções estritas sobre o português se houver qualquer texto
-      const ptPrompt = optimizedPrompt.toLowerCase().includes('portuguese') || optimizedPrompt.toLowerCase().includes('português')
+      let ptPrompt = optimizedPrompt.toLowerCase().includes('portuguese') || optimizedPrompt.toLowerCase().includes('português')
         ? optimizedPrompt
         : `ESTRITAMENTE EM PORTUGUÊS DO BRASIL: Qualquer palavra ou texto na imagem deve ser em português brasileiro. Prompt: ${optimizedPrompt}`;
+
+      // Garantir limite de tamanho estrito de 900 caracteres exigido por APIs de imagem como Imagen 4
+      if (ptPrompt.length > 900) {
+        ptPrompt = ptPrompt.substring(0, 900);
+      }
 
       let imageUrl: string | null = null;
       let imageBase64: string | null = null;
@@ -1418,8 +1433,7 @@ Por favor, retorne APENAS o prompt final em inglês. Não inclua nenhuma introdu
             },
             {
               headers: {
-                'Content-Type': 'application/json',
-                'x-goog-api-key': geminiKey
+                'Content-Type': 'application/json'
               }
             }
           );
@@ -1462,14 +1476,13 @@ Por favor, retorne APENAS o prompt final em inglês. Não inclua nenhuma introdu
 
       // 2. Fallback para DALL-E se falhou ou se chave Gemini não configurada
       if (!imageUrl && openaiKey) {
-
         try {
           console.log('[ImageGen] Tentando DALL-E 3 Fallback para prompt:', ptPrompt);
           const response = await axios.post(
             'https://api.openai.com/v1/images/generations',
             {
               model: "dall-e-3",
-              prompt: ptPrompt.substring(0, 1000),
+              prompt: ptPrompt,
               n: 1,
               size: "1024x1024"
             },
@@ -1480,29 +1493,8 @@ Por favor, retorne APENAS o prompt final em inglês. Não inclua nenhuma introdu
           imageUrl = response.data?.data?.[0]?.url;
           console.log('[ImageGen] DALL-E 3 fallback gerado com sucesso:', imageUrl);
         } catch (dalleErr: any) {
-          dalleErrorDetail = dalleErr?.response?.data?.error?.message || dalleErr.message || 'Erro desconhecido na API DALL-E';
-          console.warn('[ImageGen] Falha no fallback DALL-E 3, tentando DALL-E 2...', dalleErrorDetail);
-          
-          try {
-            console.log('[ImageGen] Tentando DALL-E 2 Fallback para prompt:', ptPrompt);
-            const response = await axios.post(
-              'https://api.openai.com/v1/images/generations',
-              {
-                model: "dall-e-2",
-                prompt: ptPrompt.substring(0, 1000),
-                n: 1,
-                size: "1024x1024"
-              },
-              {
-                headers: { 'Authorization': `Bearer ${openaiKey}` }
-              }
-            );
-            imageUrl = response.data?.data?.[0]?.url;
-            console.log('[ImageGen] DALL-E 2 fallback gerado com sucesso:', imageUrl);
-          } catch (dalle2Err: any) {
-            dalleErrorDetail = dalle2Err?.response?.data?.error?.message || dalle2Err.message || 'Erro desconhecido na API DALL-E 2';
-            console.warn('[ImageGen] Falha no fallback DALL-E 2:', dalleErrorDetail);
-          }
+          dalleErrorDetail = dalleErr?.response?.data?.error?.message || dalleErr.message || 'Erro desconhecido na API DALL-E 3';
+          console.warn('[ImageGen] Falha no fallback DALL-E 3:', dalleErrorDetail);
         }
       }
 
