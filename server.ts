@@ -464,6 +464,30 @@ async function startServer() {
     }
   });
 
+  // Rota para criar tabelas faltando sem reiniciar o servidor
+  app.get('/api/admin/create-missing-tables', async (_req, res) => {
+    const created: string[] = [];
+    const failed: string[] = [];
+    const missingTables = [
+      { name: 'platform_stats', sql: `CREATE TABLE IF NOT EXISTS platform_stats (id VARCHAR(50) PRIMARY KEY, campaign_id VARCHAR(50) NULL, total_tokens BIGINT DEFAULT 0, total_cost DECIMAL(10,4) DEFAULT 0, last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4` },
+      { name: 'ai_usage', sql: `CREATE TABLE IF NOT EXISTS ai_usage (id CHAR(36) PRIMARY KEY, campaign_id CHAR(36), user_id CHAR(36), model VARCHAR(255), prompt_tokens INT DEFAULT 0, response_tokens INT DEFAULT 0, total_tokens INT DEFAULT 0, estimated_cost DECIMAL(10,6) DEFAULT 0, endpoint VARCHAR(255), timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4` },
+    ];
+    for (const t of missingTables) {
+      try {
+        await pool.execute(t.sql);
+        // Insert default global row for platform_stats
+        if (t.name === 'platform_stats') {
+          await pool.execute(`INSERT IGNORE INTO platform_stats (id, total_tokens, total_cost) VALUES ('global', 0, 0.0000)`);
+        }
+        created.push(t.name);
+      } catch (e: any) {
+        failed.push(`${t.name}: ${e.message}`);
+      }
+    }
+    res.json({ created, failed });
+  });
+
+
   // --- Admin Custom Endpoints for Supreme control ---
   app.put('/api/admin/users/:userId', requireAuth, express.json(), async (req, res) => {
     if (!req.user || !req.user.id) {
@@ -2773,7 +2797,8 @@ Por favor, retorne APENAS o prompt final em inglês. Não inclua nenhuma introdu
         { name: 'instagram_webhook_logs', sql: `CREATE TABLE IF NOT EXISTS instagram_webhook_logs (id CHAR(36) PRIMARY KEY, campaign_id CHAR(36), event VARCHAR(100), raw_payload LONGTEXT, status VARCHAR(50), processed_engagements INT DEFAULT 0, matched_leads INT DEFAULT 0, error_message TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;` },
         { name: 'ai_compliance_logs', sql: `CREATE TABLE IF NOT EXISTS ai_compliance_logs (id CHAR(36) PRIMARY KEY, campaign_id CHAR(36), agent_id VARCHAR(100), action_type VARCHAR(100), input_summary TEXT, output_summary TEXT, ai_disclosure_required TINYINT(1) DEFAULT 1, human_approved TINYINT(1) DEFAULT 0, risk_level VARCHAR(50), created_by CHAR(36), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;` },
         { name: 'backups', sql: `CREATE TABLE IF NOT EXISTS backups (id CHAR(36) PRIMARY KEY, campaign_id CHAR(36), name VARCHAR(255), status VARCHAR(50) DEFAULT 'completed', size_kb INT DEFAULT 0, data LONGTEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, INDEX idx_backups_campaign (campaign_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;` },
-        { name: 'ai_usage', sql: `CREATE TABLE IF NOT EXISTS ai_usage (id CHAR(36) PRIMARY KEY, campaign_id CHAR(36), user_id CHAR(36), model VARCHAR(255), prompt_tokens INT DEFAULT 0, response_tokens INT DEFAULT 0, total_tokens INT DEFAULT 0, estimated_cost DECIMAL(10,6) DEFAULT 0, endpoint VARCHAR(255), timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;` }
+        { name: 'ai_usage', sql: `CREATE TABLE IF NOT EXISTS ai_usage (id CHAR(36) PRIMARY KEY, campaign_id CHAR(36), user_id CHAR(36), model VARCHAR(255), prompt_tokens INT DEFAULT 0, response_tokens INT DEFAULT 0, total_tokens INT DEFAULT 0, estimated_cost DECIMAL(10,6) DEFAULT 0, endpoint VARCHAR(255), timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;` },
+        { name: 'platform_stats', sql: `CREATE TABLE IF NOT EXISTS platform_stats (id VARCHAR(50) PRIMARY KEY, campaign_id VARCHAR(50) NULL, total_tokens BIGINT DEFAULT 0, total_cost DECIMAL(10,4) DEFAULT 0, last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;` }
       ];
 
       for (const table of tables) {

@@ -397,6 +397,16 @@ CREATE TABLE IF NOT EXISTS ai_usage (
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 27. Estatísticas Globais da Plataforma (platform_stats)
+DROP TABLE IF EXISTS platform_stats;
+CREATE TABLE IF NOT EXISTS platform_stats (
+    id VARCHAR(50) PRIMARY KEY,
+    campaign_id VARCHAR(50) NULL,
+    total_tokens BIGINT DEFAULT 0,
+    total_cost DECIMAL(10,4) DEFAULT 0,
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
 -- DADOS INICIAIS (SEED)
 INSERT IGNORE INTO campaign_configs (id, status, features, limits) 
 VALUES ('455d21f3-f254-4b96-b49c-e70192c3fe27', 'active', '{}', '{}');
