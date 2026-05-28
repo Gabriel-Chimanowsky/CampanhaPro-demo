@@ -620,7 +620,7 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
         if (isLimitExceeded) {
             addMessage(agentId, {
                 role: 'agent',
-                content: '🚫 **Créditos esgotados.** Você atingiu o limite de chamadas de IA desta campanha.\n\nPor favor, entre em contato com o Administrador para liberar mais créditos e continuar usando os agentes.'
+                content: '🚫 **Créditos insuficientes.** Você atingiu o limite de chamadas de IA desta campanha.\n\nPor favor, entre em contato com o Administrador para liberar mais créditos e continuar usando os agentes.'
             });
             setInput('');
             setAttachedMedia(null);

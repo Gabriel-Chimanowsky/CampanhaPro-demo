@@ -1446,18 +1446,25 @@ Por favor, retorne APENAS o prompt final em inglês. Não inclua nenhuma introdu
     let geminiErrorDetail = '';
     let dalleErrorDetail = '';
 
-    // 1. Tentar primeiro o Gemini Imagen 4
+    // 1. Tentar primeiro o Gemini 2.5 Flash Image (Nano Banana)
     if (geminiKey) {
       try {
-        console.log('[ImageGenHelper] Tentando Gemini Imagen 4 para prompt:', ptPrompt);
+        console.log('[ImageGenHelper] Tentando Gemini 2.5 Flash Image (Nano Banana) para prompt:', ptPrompt);
         const response = await axios.post(
-          `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${geminiKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${geminiKey}`,
           {
-            instances: [{ prompt: ptPrompt }],
-            parameters: {
-              sampleCount: 1,
-              aspectRatio: "1:1",
-              personGeneration: "allow_adult"
+            contents: [
+              {
+                role: "user",
+                parts: [
+                  {
+                    text: ptPrompt
+                  }
+                ]
+              }
+            ],
+            generationConfig: {
+              response_modalities: ["TEXT", "IMAGE"]
             }
           },
           {
@@ -1467,7 +1474,9 @@ Por favor, retorne APENAS o prompt final em inglês. Não inclua nenhuma introdu
           }
         );
 
-        const b64 = response.data?.predictions?.[0]?.bytesBase64Encoded;
+        const parts = response.data?.candidates?.[0]?.content?.parts || [];
+        const imagePart = parts.find((p: any) => p.inlineData && p.inlineData.mimeType && p.inlineData.mimeType.startsWith('image/'));
+        const b64 = imagePart?.inlineData?.data;
         if (b64) {
           imageBase64 = b64;
           try {
@@ -1482,17 +1491,17 @@ Por favor, retorne APENAS o prompt final em inglês. Não inclua nenhuma introdu
             const uploadPath = path.join(uploadsDir, filename);
             fs.writeFileSync(uploadPath, Buffer.from(b64, 'base64'));
             imageUrl = `/uploads/${filename}`;
-            console.log('[ImageGenHelper] Gemini Imagen 4 gerado com sucesso no disco:', imageUrl);
+            console.log('[ImageGenHelper] Gemini 2.5 Flash Image (Nano Banana) gerado com sucesso no disco:', imageUrl);
           } catch (writeErr: any) {
             console.warn('[ImageGenHelper] Falha ao escrever arquivo no disco, usando apenas Base64:', writeErr.message);
           }
         } else {
-          geminiErrorDetail = 'API Gemini não retornou predictions.';
-          console.warn('[ImageGenHelper] Gemini Imagen 4 não retornou predictions.');
+          geminiErrorDetail = 'API Gemini 2.5 Flash Image não retornou imagem.';
+          console.warn('[ImageGenHelper] Gemini 2.5 Flash Image não retornou imagem.');
         }
       } catch (geminiErr: any) {
-        geminiErrorDetail = geminiErr?.response?.data?.error?.message || geminiErr.message || 'Erro desconhecido na API Gemini Imagen';
-        console.warn('[ImageGenHelper] Falha no Gemini Imagen 4:', geminiErrorDetail);
+        geminiErrorDetail = geminiErr?.response?.data?.error?.message || geminiErr.message || 'Erro desconhecido na API Gemini 2.5 Flash Image';
+        console.warn('[ImageGenHelper] Falha no Gemini 2.5 Flash Image:', geminiErrorDetail);
       }
     }
 
