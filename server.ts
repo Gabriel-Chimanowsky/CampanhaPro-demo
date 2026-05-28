@@ -1097,7 +1097,23 @@ app.get('/api/war-room/feed', (_req, res) => {
         return res.status(404).json({ error: 'Usuário não encontrado.' });
       }
 
-      res.json(userData);
+      // Buscar o telefone do Administrador Supremo no banco para servir de suporte!
+      let supportPhone = '5521999947477'; // Fallback padrão
+      try {
+        const [admins]: any = await pool.execute(
+          'SELECT phone FROM users WHERE is_supreme_admin = 1 OR email = "eldastito@gmail.com" LIMIT 1'
+        );
+        if (admins && admins.length > 0 && admins[0].phone) {
+          supportPhone = admins[0].phone.replace(/\D/g, '');
+        }
+      } catch (err) {
+        console.warn('[GetMe] Falha ao buscar telefone do suporte:', err);
+      }
+
+      res.json({
+        ...userData,
+        supportPhone
+      });
     } catch (error: any) {
       console.error('[GetMe] Erro ao obter perfil:', error.message);
       res.status(500).json({ error: error.message });
