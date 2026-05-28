@@ -59,6 +59,8 @@ const SupremeAdminPage: React.FC = () => {
     // Campaigns Data
     const [campaigns, setCampaigns] = useState<AuthenticatedUser[]>([]);
     const [campaignConfigs, setCampaignConfigs] = useState<Record<string, CampaignConfig>>({});
+    const [campaignSearch, setCampaignSearch] = useState('');
+    const [campaignSort, setCampaignSort] = useState<'name' | 'plan' | 'status'>('name');
     
     // Global Users Data
     const [globalUsers, setGlobalUsers] = useState<AuthenticatedUser[]>([]);
@@ -391,6 +393,17 @@ const SupremeAdminPage: React.FC = () => {
         return matchesSearch && matchesType;
     });
 
+    const filteredCampaigns = campaigns.filter(c => {
+        const matchesSearch = c.name.toLowerCase().includes(campaignSearch.toLowerCase()) || 
+                              (c.email && c.email.toLowerCase().includes(campaignSearch.toLowerCase()));
+        return matchesSearch;
+    }).sort((a, b) => {
+        if (campaignSort === 'name') return a.name.localeCompare(b.name);
+        if (campaignSort === 'plan') return (a.plan || '').localeCompare(b.plan || '');
+        if (campaignSort === 'status') return (a.role || '').localeCompare(b.role || '');
+        return 0;
+    });
+
     return (
         <div className="min-h-screen bg-slate-950 text-slate-200 font-sans">
             {isLoading && (
@@ -402,49 +415,49 @@ const SupremeAdminPage: React.FC = () => {
                 </div>
             )}
             {/* Header */}
-            <header className="bg-slate-900/80 backdrop-blur-md border-b border-slate-700/50 p-4 sticky top-0 z-50 flex justify-between items-center">
+            <header className="bg-slate-950/70 backdrop-blur-md border-b border-slate-800/80 p-4 sticky top-0 z-50 flex justify-between items-center shadow-lg shadow-black/10">
                 <div className="flex items-center gap-4">
-                    <div className="bg-gradient-to-br from-red-600 to-rose-900 p-2.5 rounded-xl shadow-lg shadow-red-900/20">
-                        <ShieldAlert className="w-6 h-6 text-slate-50" />
+                    <div className="bg-gradient-to-br from-red-600 to-rose-600 p-2.5 rounded-2xl shadow-xl shadow-red-500/10 border border-red-500/20 animate-pulse" style={{ animationDuration: '4s' }}>
+                        <ShieldAlert className="w-5 h-5 text-slate-50" />
                     </div>
                     <div>
-                        <h1 className="text-lg font-black text-slate-50 tracking-widest uppercase italic">SUPREME CONTROL</h1>
-                        <div className="flex items-center gap-2">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                            <p className="text-[10px] text-slate-500 font-mono tracking-tighter">GLOBAL_CORE_OPERATIONAL</p>
+                        <h1 className="text-base font-black tracking-[0.2em] text-slate-50 bg-gradient-to-r from-slate-50 via-slate-200 to-slate-400 bg-clip-text text-transparent uppercase italic">SUPREME CONTROL</h1>
+                        <div className="flex items-center gap-2 mt-0.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" style={{ animationDuration: '2s' }} />
+                            <p className="text-[9px] text-slate-400 font-mono uppercase tracking-[0.15em] font-semibold">Global Core Operational</p>
                         </div>
                     </div>
                 </div>
 
                 <div className="flex items-center gap-6">
-                    <nav className="hidden md:flex bg-slate-800/50 p-1 rounded-lg border border-slate-700/50">
+                    <nav className="hidden md:flex bg-slate-900/60 p-1 rounded-xl border border-slate-800/80 backdrop-blur-md">
                         <button 
                             onClick={() => setActiveTab('overview')}
-                            className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${activeTab === 'overview' ? 'bg-indigo-600 text-slate-50 shadow-lg' : 'text-slate-400 hover:text-slate-50'}`}
+                            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all duration-300 ${activeTab === 'overview' ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-slate-50 shadow-lg shadow-indigo-500/20' : 'text-slate-400 hover:text-slate-200'}`}
                         >
                             Visão Geral
                         </button>
                         <button 
                             onClick={() => setActiveTab('campaigns')}
-                            className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${activeTab === 'campaigns' ? 'bg-indigo-600 text-slate-50 shadow-lg' : 'text-slate-400 hover:text-slate-50'}`}
+                            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all duration-300 ${activeTab === 'campaigns' ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-slate-50 shadow-lg shadow-indigo-500/20' : 'text-slate-400 hover:text-slate-200'}`}
                         >
                             Campanhas
                         </button>
                         <button 
                             onClick={() => setActiveTab('users')}
-                            className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${activeTab === 'users' ? 'bg-indigo-600 text-slate-50 shadow-lg' : 'text-slate-400 hover:text-slate-50'}`}
+                            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all duration-300 ${activeTab === 'users' ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-slate-50 shadow-lg shadow-indigo-500/20' : 'text-slate-400 hover:text-slate-200'}`}
                         >
                             Usuários
                         </button>
                         <button 
                             onClick={() => setActiveTab('financial')}
-                            className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${activeTab === 'financial' ? 'bg-indigo-600 text-slate-50 shadow-lg' : 'text-slate-400 hover:text-slate-50'}`}
+                            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all duration-300 ${activeTab === 'financial' ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-slate-50 shadow-lg shadow-indigo-500/20' : 'text-slate-400 hover:text-slate-200'}`}
                         >
                             Financeiro & IA
                         </button>
                         <button 
                             onClick={() => setActiveTab('platform')}
-                            className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${activeTab === 'platform' ? 'bg-indigo-600 text-slate-50 shadow-lg' : 'text-slate-400 hover:text-slate-50'}`}
+                            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all duration-300 ${activeTab === 'platform' ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-slate-50 shadow-lg shadow-indigo-500/20' : 'text-slate-400 hover:text-slate-200'}`}
                         >
                             Configurações
                         </button>
@@ -481,57 +494,102 @@ const SupremeAdminPage: React.FC = () => {
                                     { label: 'Bloqueios Ativos', val: globalUsers.filter(u => u.role === 'blocked').length, icon: Ban, color: 'text-rose-400', bg: 'bg-rose-500/10' },
                                     { label: 'Integridade Sistema', val: '99.9%', icon: ShieldAlert, color: 'text-emerald-400', bg: 'bg-emerald-500/10' }
                                 ].map((stat, i) => (
-                                    <Card key={i} className="bg-slate-900/50 border-slate-700/50 p-6 relative overflow-hidden group">
-                                        <div className={`absolute top-0 right-0 p-4 ${stat.bg} rounded-bl-3xl opacity-20 group-hover:scale-110 transition-transform`}>
-                                            <stat.icon className={`w-8 h-8 ${stat.color}`} />
+                                    <motion.div
+                                        key={i}
+                                        whileHover={{ y: -4, scale: 1.01 }}
+                                        className="relative bg-gradient-to-b from-slate-900/80 to-slate-950/80 border border-slate-800/80 rounded-2xl p-6 overflow-hidden backdrop-blur-xl shadow-xl hover:shadow-indigo-500/5 hover:border-slate-700/80 transition-all duration-300 group"
+                                    >
+                                        <div className={`absolute top-0 right-0 p-4 ${stat.bg} rounded-bl-3xl opacity-25 group-hover:scale-110 transition-transform duration-300`}>
+                                            <stat.icon className={`w-8 h-8 ${stat.color} filter drop-shadow-[0_0_8px_rgba(99,102,241,0.3)]`} />
                                         </div>
-                                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{stat.label}</p>
-                                        <p className="text-3xl font-black text-slate-50 mt-2 font-mono tracking-tighter">{stat.val}</p>
-                                    </Card>
+                                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none">{stat.label}</p>
+                                        <p className="text-3xl font-black text-slate-50 mt-3 font-mono tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-slate-50 to-slate-300">{stat.val}</p>
+                                        <div className="absolute bottom-0 left-0 h-[2px] w-0 bg-gradient-to-r from-indigo-500 to-purple-500 group-hover:w-full transition-all duration-300" />
+                                    </motion.div>
                                 ))}
                             </div>
 
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                                <Card className="bg-slate-900 border-slate-700/50 overflow-hidden">
-                                    <div className="p-4 border-b border-slate-700/50 bg-slate-800/30 flex justify-between items-center">
-                                        <h3 className="text-xs font-black uppercase tracking-widest flex items-center gap-2">
-                                            <Layers className="w-4 h-4 text-indigo-400" /> Atividade Recente do Sistema
+                                <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl overflow-hidden backdrop-blur-xl shadow-xl">
+                                    <div className="p-4 border-b border-slate-800/60 bg-slate-950/40 flex justify-between items-center">
+                                        <h3 className="text-xs font-black uppercase tracking-widest flex items-center gap-2 text-slate-200">
+                                            <Layers className="w-4 h-4 text-indigo-400 animate-pulse" /> Atividade Recente do Sistema
                                         </h3>
                                     </div>
-                                    <div className="p-4 space-y-4">
+                                    <div className="p-5 space-y-3">
                                         {campaigns.slice(0, 5).map((c, idx) => (
-                                            <div key={idx} className="flex items-center justify-between p-3 bg-slate-950/50 rounded-lg border border-slate-700/50 text-sm">
+                                            <motion.div 
+                                                key={idx} 
+                                                whileHover={{ x: 2 }}
+                                                className="flex items-center justify-between p-3 bg-slate-950/40 hover:bg-slate-950/80 rounded-xl border border-slate-800/50 text-sm transition-colors duration-200"
+                                            >
                                                 <div className="flex items-center gap-3">
-                                                    <div className="w-8 h-8 bg-indigo-500/20 rounded flex items-center justify-center text-indigo-400 font-bold">
+                                                    <div className="w-8 h-8 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 rounded-lg flex items-center justify-center text-indigo-400 font-black border border-indigo-500/10">
                                                         {c.name.charAt(0)}
                                                     </div>
                                                     <div>
-                                                        <p className="font-bold text-slate-50">{c.name}</p>
-                                                        <p className="text-[10px] text-slate-500">{c.email}</p>
+                                                        <p className="font-bold text-slate-100 tracking-tight">{c.name}</p>
+                                                        <p className="text-[10px] text-slate-500 font-mono">{c.email}</p>
                                                     </div>
                                                 </div>
-                                                <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded uppercase font-mono">Log_{idx + 400}</span>
-                                            </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[9px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-md font-mono font-bold tracking-tight">ONLINE</span>
+                                                    <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded uppercase font-mono border border-slate-700/30">Log_{idx + 400}</span>
+                                                </div>
+                                            </motion.div>
                                         ))}
                                     </div>
-                                </Card>
+                                </div>
 
-                                <Card className="bg-slate-900 border-slate-700/50 overflow-hidden">
-                                    <div className="p-4 border-b border-slate-700/50 bg-slate-800/30">
-                                        <h3 className="text-xs font-black uppercase tracking-widest flex items-center gap-2">
-                                            <Cpu className="w-4 h-4 text-emerald-400" /> Recursos de Infraestrutura
+                                <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl overflow-hidden backdrop-blur-xl shadow-xl">
+                                    <div className="p-4 border-b border-slate-800/60 bg-slate-950/40">
+                                        <h3 className="text-xs font-black uppercase tracking-widest flex items-center gap-2 text-slate-200">
+                                            <Cpu className="w-4 h-4 text-emerald-400 animate-spin" style={{ animationDuration: '6s' }} /> Recursos de Infraestrutura
                                         </h3>
                                     </div>
-                                    <div className="p-8 flex flex-col items-center justify-center text-center space-y-4">
-                                        <div className="w-32 h-32 rounded-full border-8 border-slate-800 border-t-emerald-500 flex items-center justify-center relative">
-                                            <span className="text-2xl font-black text-slate-50">82%</span>
+                                    <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                                        <div className="flex flex-col items-center justify-center text-center py-4 bg-slate-950/20 rounded-xl border border-slate-800/40">
+                                            <div className="w-28 h-28 rounded-full border-8 border-slate-900 border-t-emerald-500 border-r-emerald-500/50 flex items-center justify-center relative shadow-lg shadow-emerald-500/5">
+                                                <span className="text-2xl font-black text-slate-50 font-mono tracking-tighter">74%</span>
+                                            </div>
+                                            <div className="mt-4">
+                                                <p className="font-black text-slate-200 text-xs uppercase tracking-widest">Cluster Gemini</p>
+                                                <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-tight flex items-center gap-1 mt-1 justify-center">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Operacional · Estável
+                                                </p>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <p className="font-bold text-slate-50 text-sm">Carga do Cluster Gemini</p>
-                                            <p className="text-xs text-slate-500">Multimodal Pipeline Status: Stable</p>
+                                        <div className="space-y-4">
+                                            <div className="space-y-1.5">
+                                                <div className="flex justify-between text-[10px] uppercase font-black tracking-widest text-slate-400">
+                                                    <span>Uso de CPU</span>
+                                                    <span className="font-mono text-indigo-400">42.8%</span>
+                                                </div>
+                                                <div className="w-full bg-slate-950 h-2 rounded-full overflow-hidden border border-slate-800/50">
+                                                    <motion.div initial={{ width: 0 }} animate={{ width: '42.8%' }} transition={{ duration: 1 }} className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full" />
+                                                </div>
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <div className="flex justify-between text-[10px] uppercase font-black tracking-widest text-slate-400">
+                                                    <span>Uso de Memória</span>
+                                                    <span className="font-mono text-emerald-400">5.4GB / 8GB</span>
+                                                </div>
+                                                <div className="w-full bg-slate-950 h-2 rounded-full overflow-hidden border border-slate-800/50">
+                                                    <motion.div initial={{ width: 0 }} animate={{ width: '67.5%' }} transition={{ duration: 1 }} className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full" />
+                                                </div>
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <div className="flex justify-between text-[10px] uppercase font-black tracking-widest text-slate-400">
+                                                    <span>Latência API</span>
+                                                    <span className="font-mono text-amber-400">142ms</span>
+                                                </div>
+                                                <div className="w-full bg-slate-950 h-2 rounded-full overflow-hidden border border-slate-800/50">
+                                                    <motion.div initial={{ width: 0 }} animate={{ width: '25%' }} transition={{ duration: 1 }} className="h-full bg-gradient-to-r from-amber-500 to-orange-500 rounded-full" />
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
-                                </Card>
+                                </div>
                             </div>
                         </motion.div>
                     )}
@@ -543,14 +601,43 @@ const SupremeAdminPage: React.FC = () => {
                             animate={{ opacity: 1 }}
                             className="space-y-6"
                         >
-                            <div className="flex justify-between items-end">
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                                 <div>
-                                    <h2 className="text-2xl font-black text-slate-50 tracking-tighter">GESTOR DE CAMPANHAS</h2>
+                                    <h2 className="text-2xl font-black text-slate-50 tracking-tighter uppercase italic">GESTOR DE CAMPANHAS</h2>
                                     <p className="text-xs text-slate-500 uppercase tracking-widest font-mono">Provisionamento e Bloqueio de Candidatos</p>
                                 </div>
                                 <Button onClick={() => setShowCreateModal(true)} className="bg-indigo-600 hover:bg-indigo-500 flex items-center gap-2">
                                     <Plus className="w-4 h-4" /> Nova Campanha
                                 </Button>
+                            </div>
+
+                            {/* Search and Sort Toolbar */}
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900/50 p-4 rounded-xl border border-slate-700/30 backdrop-blur-md">
+                                <div className="relative flex-1 max-w-md">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                                    <input 
+                                        type="text" 
+                                        placeholder="Buscar campanha ou e-mail..."
+                                        className="w-full bg-slate-950 border border-slate-700/50 rounded-lg pl-10 pr-4 py-2 text-xs outline-none focus:ring-1 focus:ring-indigo-500 transition-all text-slate-200"
+                                        value={campaignSearch}
+                                        onChange={(e) => setCampaignSearch(e.target.value)}
+                                    />
+                                </div>
+                                <div className="flex gap-3">
+                                    <div className="flex items-center gap-2">
+                                        <Filter className="w-3.5 h-3.5 text-indigo-400" />
+                                        <span className="text-[10px] uppercase font-bold text-slate-500">Ordenar por</span>
+                                    </div>
+                                    <select 
+                                        className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs outline-none text-slate-200"
+                                        value={campaignSort}
+                                        onChange={(e) => setCampaignSort(e.target.value as any)}
+                                    >
+                                        <option value="name">Nome do Candidato</option>
+                                        <option value="plan">Plano Contratado</option>
+                                        <option value="status">Status da Conta</option>
+                                    </select>
+                                </div>
                             </div>
 
                             <Card className="bg-slate-900 border-slate-700/50 overflow-hidden">
@@ -566,7 +653,7 @@ const SupremeAdminPage: React.FC = () => {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-white/5">
-                                        {campaigns.map(c => {
+                                        {filteredCampaigns.map(c => {
                                             const campaignId = c.campaign_id || c.campaignId;
                                             const config = campaignConfigs[campaignId || ''] || {};
                                             const mStatus = config.maintenanceStatus || (config as any).maintenance_status || 'paid';
@@ -832,61 +919,72 @@ const SupremeAdminPage: React.FC = () => {
 
                             {/* Charts Grid */}
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                <Card className="bg-slate-900 border-slate-700/50 p-6 h-[400px]">
-                                    <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
-                                        <Activity className="w-4 h-4 text-indigo-400" /> Fluxo de Consumo por Modelo
+                                <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 h-[400px] backdrop-blur-xl shadow-xl flex flex-col justify-between">
+                                    <h3 className="text-xs font-black text-slate-300 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+                                        <Activity className="w-4 h-4 text-indigo-400 animate-pulse" /> Fluxo de Consumo de Tokens (Linha do Tempo)
                                     </h3>
-                                    <ResponsiveContainer width="100%" height="85%">
-                                        <AreaChart data={aiUsageData.slice().reverse()}>
-                                            <defs>
-                                                <linearGradient id="colorTokens" x1="0" y1="0" x2="0" y2="1">
-                                                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
-                                                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
-                                                </linearGradient>
-                                            </defs>
-                                            <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" />
-                                            <XAxis 
-                                                dataKey="timestamp" 
-                                                hide 
-                                            />
-                                            <YAxis stroke="#94a3b8" fontSize={10} />
-                                            <Tooltip 
-                                                contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px' }}
-                                                itemStyle={{ fontSize: '12px' }}
-                                            />
-                                            <Area type="monotone" dataKey="total_tokens" stroke="#6366f1" fillOpacity={1} fill="url(#colorTokens)" />
-                                        </AreaChart>
-                                    </ResponsiveContainer>
-                                </Card>
+                                    <div className="flex-1 w-full min-h-0">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <AreaChart data={aiUsageData.slice().reverse()} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                                <defs>
+                                                    <linearGradient id="colorTokens" x1="0" y1="0" x2="0" y2="1">
+                                                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4}/>
+                                                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                                                    </linearGradient>
+                                                </defs>
+                                                <CartesianGrid strokeDasharray="3 3" stroke="#ffffff0a" />
+                                                <XAxis 
+                                                    dataKey="timestamp" 
+                                                    hide 
+                                                />
+                                                <YAxis stroke="#64748b" fontSize={9} />
+                                                <Tooltip 
+                                                    contentStyle={{ backgroundColor: '#090d16', border: '1px solid #1e293b', borderRadius: '12px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.5)' }}
+                                                    itemStyle={{ fontSize: '11px', color: '#f8fafc' }}
+                                                    labelStyle={{ fontSize: '10px', color: '#64748b' }}
+                                                />
+                                                <Area type="monotone" dataKey="total_tokens" stroke="#6366f1" strokeWidth={2} fillOpacity={1} fill="url(#colorTokens)" />
+                                            </AreaChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                </div>
 
-                                <Card className="bg-slate-900 border-slate-700/50 p-6 h-[400px]">
-                                    <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
-                                        <TrendingIcon className="w-4 h-4 text-emerald-400" /> Matriz de Custos por Campanha
+                                <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 h-[400px] backdrop-blur-xl shadow-xl flex flex-col justify-between">
+                                    <h3 className="text-xs font-black text-slate-300 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+                                        <TrendingIcon className="w-4 h-4 text-emerald-400 animate-bounce" style={{ animationDuration: '3s' }} /> Matriz de Custos Estimados por Campanha
                                     </h3>
-                                    <ResponsiveContainer width="100%" height="85%">
-                                        <BarChart data={campaigns.map(c => {
-                                            const campaignId = c.campaign_id || c.campaignId;
-                                            const campaignUsage = aiUsageData.filter((u: any) => (u.campaign_id ?? u.campaignId) === campaignId);
-                                            return {
-                                                name: c.name.substring(0, 10),
-                                                cost: campaignUsage.reduce((acc: number, curr: any) => acc + (curr.estimated_cost ?? curr.estimatedCost ?? 0), 0),
-                                                tokens: campaignUsage.reduce((acc: number, curr: any) => acc + (curr.total_tokens ?? curr.totalTokens ?? 0), 0)
-                                            };
-                                        }).filter(c => c.tokens > 0)}>
-                                            <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" />
-                                            <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} />
-                                            <YAxis stroke="#94a3b8" fontSize={10} />
-                                            <Tooltip 
-                                                contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px' }}
-                                            />
-                                            <Bar dataKey="cost" fill="#10b981" radius={[4, 4, 0, 0]}>
-                                                {campaigns.map((_, index) => (
-                                                    <Cell key={`cell-${index}`} fillOpacity={0.8} />
-                                                ))}
-                                            </Bar>
-                                        </BarChart>
-                                    </ResponsiveContainer>
-                                </Card>
+                                    <div className="flex-1 w-full min-h-0">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <BarChart data={campaigns.map(c => {
+                                                const campaignId = c.campaign_id || c.campaignId;
+                                                const campaignUsage = aiUsageData.filter((u: any) => (u.campaign_id ?? u.campaignId) === campaignId);
+                                                return {
+                                                    name: c.name.substring(0, 12),
+                                                    cost: campaignUsage.reduce((acc: number, curr: any) => acc + (curr.estimated_cost ?? curr.estimatedCost ?? 0), 0),
+                                                    tokens: campaignUsage.reduce((acc: number, curr: any) => acc + (curr.total_tokens ?? curr.totalTokens ?? 0), 0)
+                                                };
+                                            }).filter(c => c.tokens > 0)} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                                <defs>
+                                                    <linearGradient id="colorCost" x1="0" y1="0" x2="0" y2="1">
+                                                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
+                                                        <stop offset="95%" stopColor="#10b981" stopOpacity={0.2}/>
+                                                    </linearGradient>
+                                                </defs>
+                                                <CartesianGrid strokeDasharray="3 3" stroke="#ffffff0a" />
+                                                <XAxis dataKey="name" stroke="#64748b" fontSize={9} />
+                                                <YAxis stroke="#64748b" fontSize={9} />
+                                                <Tooltip 
+                                                    contentStyle={{ backgroundColor: '#090d16', border: '1px solid #1e293b', borderRadius: '12px' }}
+                                                />
+                                                <Bar dataKey="cost" fill="url(#colorCost)" radius={[6, 6, 0, 0]}>
+                                                    {campaigns.map((_, index) => (
+                                                        <Cell key={`cell-${index}`} fillOpacity={0.9} />
+                                                    ))}
+                                                </Bar>
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                </div>
                             </div>
 
                             {/* Detailed Logs */}
