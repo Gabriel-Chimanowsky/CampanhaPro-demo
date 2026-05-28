@@ -1079,6 +1079,31 @@ app.get('/api/war-room/feed', (_req, res) => {
 
   app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
 
+  // --- Perfil do Usuário ---
+  app.get('/api/users/me', requireAuth, async (req: any, res: any) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: 'Não autorizado.' });
+      }
+
+      const [users]: any = await pool.execute(
+        'SELECT id, name, email, role, is_supreme_admin, ai_credits, ai_used, campaign_id FROM users WHERE id = ?',
+        [userId]
+      );
+      const userData = users[0];
+
+      if (!userData) {
+        return res.status(404).json({ error: 'Usuário não encontrado.' });
+      }
+
+      res.json(userData);
+    } catch (error: any) {
+      console.error('[GetMe] Erro ao obter perfil:', error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // --- Campanhas ---
   app.get('/api/campaigns', requireAuth, async (req, res) => {
     try {
