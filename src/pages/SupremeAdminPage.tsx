@@ -992,12 +992,12 @@ const SupremeAdminPage: React.FC = () => {
 
                             {/* Charts Grid */}
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 h-[400px] backdrop-blur-xl shadow-xl flex flex-col justify-between">
+                                <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 backdrop-blur-xl shadow-xl flex flex-col">
                                     <h3 className="text-xs font-black text-slate-300 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
                                         <Activity className="w-4 h-4 text-indigo-400 animate-pulse" /> Fluxo de Consumo de Tokens (Linha do Tempo)
                                     </h3>
-                                    <div className="flex-1 w-full min-h-0">
-                                        <ResponsiveContainer width="100%" height="100%">
+                                    <div style={{ width: '100%', height: 300 }}>
+                                        <ResponsiveContainer width="100%" height={300}>
                                             <AreaChart data={aiUsageData.slice().reverse()} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                                                 <defs>
                                                     <linearGradient id="colorTokens" x1="0" y1="0" x2="0" y2="1">
@@ -1022,12 +1022,12 @@ const SupremeAdminPage: React.FC = () => {
                                     </div>
                                 </div>
 
-                                <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 h-[400px] backdrop-blur-xl shadow-xl flex flex-col justify-between">
+                                <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 backdrop-blur-xl shadow-xl flex flex-col">
                                     <h3 className="text-xs font-black text-slate-300 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
                                         <TrendingIcon className="w-4 h-4 text-emerald-400 animate-bounce" style={{ animationDuration: '3s' }} /> Matriz de Custos Estimados por Campanha
                                     </h3>
-                                    <div className="flex-1 w-full min-h-0">
-                                        <ResponsiveContainer width="100%" height="100%">
+                                    <div style={{ width: '100%', height: 300 }}>
+                                        <ResponsiveContainer width="100%" height={300}>
                                             <BarChart data={campaigns.map(c => {
                                                 const campaignId = c.campaign_id || c.campaignId;
                                                 const campaignUsage = aiUsageData.filter((u: any) => (u.campaign_id ?? u.campaignId) === campaignId);
