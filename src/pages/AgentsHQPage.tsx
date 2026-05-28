@@ -549,6 +549,7 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     
     const [suggestions, setSuggestions] = useState<string[]>([]);
+    const [errorModal, setErrorModal] = useState<{ title: string; message: string } | null>(null);
     const strategistHistory = histories['strategist'] || [];
     
     const getMsgKey = (msg: any, absoluteIdx: number) => msg.id ? String(msg.id) : String(absoluteIdx);
@@ -682,11 +683,17 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
                 addMessage(agentId, { role: 'agent', content: `![ATIVO](${resultUrl})` });
                 window.dispatchEvent(new Event('refresh-credits'));
             } else {
-                alert('Geração concluída mas a URL da imagem ficou vazia. Tente novamente.');
+                setErrorModal({
+                    title: 'Erro na Geração',
+                    message: 'Geração concluída mas a URL da imagem ficou vazia. Tente novamente.'
+                });
             }
         } catch (error: any) {
             console.error("Erro na geração da imagem:", error);
-            alert(`Erro ao gerar ativo visual: ${error.message || error}`);
+            setErrorModal({
+                title: 'Geração de Ativo Interrompida',
+                message: error.message || String(error)
+            });
         } finally {
             setIsLoading(false);
             setLoadingCardKey(null);
@@ -1088,6 +1095,31 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
                                 </button>
                             </div>
                             <p className="text-[10px] text-slate-600 mt-1.5">Enter para enviar · Esc para fechar</p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Error Dialog Modal */}
+            {errorModal && (
+                <div className="fixed inset-0 z-[99999] bg-black/80 backdrop-blur-md flex items-center justify-center p-4"
+                     onClick={() => setErrorModal(null)}>
+                    <div className="relative w-full max-w-md bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl p-6 animate-in fade-in zoom-in duration-200"
+                         onClick={(e) => e.stopPropagation()}>
+                        <div className="flex flex-col items-center text-center">
+                            <div className="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-500 mb-4 animate-bounce">
+                                <AlertCircle className="w-6 h-6" />
+                            </div>
+                            <h3 className="text-base font-bold text-slate-50 mb-2">{errorModal.title}</h3>
+                            <div className="text-xs text-slate-400 bg-slate-950/50 border border-slate-800 rounded-xl p-3 mb-6 whitespace-pre-wrap leading-relaxed select-all">
+                                {errorModal.message}
+                            </div>
+                            <button
+                                onClick={() => setErrorModal(null)}
+                                className="w-full bg-slate-800 hover:bg-slate-700 text-slate-100 hover:text-white px-4 py-2.5 rounded-xl text-xs font-bold transition-all border border-slate-700"
+                            >
+                                Entendi
+                            </button>
                         </div>
                     </div>
                 </div>
