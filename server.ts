@@ -299,14 +299,17 @@ const checkAndConsumeAICredit = async (userId: string | undefined, campaignId: s
       const [userRows]: any = await pool.execute('SELECT is_supreme_admin, role, ai_credits, ai_used FROM users WHERE id = ?', [userId]);
       if (userRows && userRows.length > 0) {
         const u = userRows[0];
-        if (u.is_supreme_admin) return { allowed: true };
         if (u.role === 'blocked') return { allowed: false, error: 'Sua conta está desativada. Contate o administrador.' };
         
         const userCredits = u.ai_credits !== null ? u.ai_credits : 100;
         const userUsed = u.ai_used !== null ? u.ai_used : 0;
         
-        if (userUsed >= userCredits) {
-          return { allowed: false, error: `Créditos de IA esgotados para o seu usuário (${userUsed}/${userCredits}).` };
+        // Se for Supreme Admin e não tiver limite definido (null ou <= 0), créditos ilimitados
+        const isSupreme = !!u.is_supreme_admin;
+        const limitActive = u.ai_credits !== null && u.ai_credits > 0;
+        
+        if (userUsed >= userCredits && (!isSupreme || limitActive)) {
+          return { allowed: false, error: '🚫 **Créditos insuficientes.**' };
         }
       }
     } catch (e: any) {
@@ -336,7 +339,7 @@ const checkAndConsumeAICredit = async (userId: string | undefined, campaignId: s
         const campaignTotalUsed = sumUsage[0]?.total || 0;
 
         if (campaignTotalUsed >= aiCallsLimit) {
-          return { allowed: false, error: `Limite total de créditos de IA atingido para a campanha (${campaignTotalUsed}/${aiCallsLimit}).` };
+          return { allowed: false, error: '🚫 **Créditos insuficientes.**' };
         }
       }
     } catch (e: any) {
@@ -1446,25 +1449,22 @@ Por favor, retorne APENAS o prompt final em inglês. Não inclua nenhuma introdu
     let geminiErrorDetail = '';
     let dalleErrorDetail = '';
 
-    // 1. Tentar primeiro o Gemini 2.5 Flash Image (Nano Banana)
+    // 1. Tentar primeiro o Imagen 3 (Nano Banana)
     if (geminiKey) {
       try {
-        console.log('[ImageGenHelper] Tentando Gemini 2.5 Flash Image (Nano Banana) para prompt:', ptPrompt);
+        console.log('[ImageGenHelper] Tentando Imagen 3 (Nano Banana) para prompt:', ptPrompt);
         const response = await axios.post(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${geminiKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${geminiKey}`,
           {
-            contents: [
+            instances: [
               {
-                role: "user",
-                parts: [
-                  {
-                    text: ptPrompt
-                  }
-                ]
+                prompt: ptPrompt
               }
             ],
-            generationConfig: {
-              response_modalities: ["TEXT", "IMAGE"]
+            parameters: {
+              sampleCount: 1,
+              outputMimeType: "image/png",
+              aspectRatio: "1:1"
             }
           },
           {
@@ -1474,9 +1474,8 @@ Por favor, retorne APENAS o prompt final em inglês. Não inclua nenhuma introdu
           }
         );
 
-        const parts = response.data?.candidates?.[0]?.content?.parts || [];
-        const imagePart = parts.find((p: any) => p.inlineData && p.inlineData.mimeType && p.inlineData.mimeType.startsWith('image/'));
-        const b64 = imagePart?.inlineData?.data;
+        const predictions = response.data?.predictions || [];
+        const b64 = predictions[0]?.bytesBase64Encoded || response.data?.generatedImages?.[0]?.image?.imageBytes;
         if (b64) {
           imageBase64 = b64;
           try {
@@ -1491,17 +1490,17 @@ Por favor, retorne APENAS o prompt final em inglês. Não inclua nenhuma introdu
             const uploadPath = path.join(uploadsDir, filename);
             fs.writeFileSync(uploadPath, Buffer.from(b64, 'base64'));
             imageUrl = `/uploads/${filename}`;
-            console.log('[ImageGenHelper] Gemini 2.5 Flash Image (Nano Banana) gerado com sucesso no disco:', imageUrl);
+            console.log('[ImageGenHelper] Imagen 3 (Nano Banana) gerado com sucesso no disco:', imageUrl);
           } catch (writeErr: any) {
             console.warn('[ImageGenHelper] Falha ao escrever arquivo no disco, usando apenas Base64:', writeErr.message);
           }
         } else {
-          geminiErrorDetail = 'API Gemini 2.5 Flash Image não retornou imagem.';
-          console.warn('[ImageGenHelper] Gemini 2.5 Flash Image não retornou imagem.');
+          geminiErrorDetail = 'API Imagen 3 não retornou imagem no formato esperado.';
+          console.warn('[ImageGenHelper] API Imagen 3 não retornou imagem.', response.data);
         }
       } catch (geminiErr: any) {
-        geminiErrorDetail = geminiErr?.response?.data?.error?.message || geminiErr.message || 'Erro desconhecido na API Gemini 2.5 Flash Image';
-        console.warn('[ImageGenHelper] Falha no Gemini 2.5 Flash Image:', geminiErrorDetail);
+        geminiErrorDetail = geminiErr?.response?.data?.error?.message || geminiErr.message || 'Erro desconhecido na API Imagen 3';
+        console.warn('[ImageGenHelper] Falha no Imagen 3 (Nano Banana):', geminiErrorDetail);
       }
     }
 

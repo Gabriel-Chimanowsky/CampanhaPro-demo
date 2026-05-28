@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Bot, TrendingUp, Share2, Map, Send, Loader2, LayoutDashboard, Ticket, ArrowRight, CheckCircle2, Link as LinkIcon, ShieldCheck, Sparkles as SparklesIcon, History, Shield, Zap, X, BellRing, Download, ZoomIn, MessageSquarePlus, Video, Paperclip, Lightbulb, Cpu } from 'lucide-react';
+import { Bot, TrendingUp, Share2, Map, Send, Loader2, LayoutDashboard, Ticket, ArrowRight, CheckCircle2, Link as LinkIcon, ShieldCheck, Sparkles as SparklesIcon, History, Shield, Zap, X, BellRing, Download, MessageSquarePlus, Video, Paperclip, Lightbulb, Cpu } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { askStrategist, askGrowthHacker, askSocialMedia, askFieldCommander, askCreativeProducer, askBackupAgent, askFraudAuditor, runFullPipeline, savePipelineResult, getPipelineHistory, PipelineResult, generateCreativeImage, createProductionOrder, publishToSocialMedia } from '../services/agentsClientService';
 import { createBackup, restoreBackup, BackupData } from '../services/backupService';
@@ -132,22 +132,23 @@ const AgentsHQPage: React.FC = () => {
 
         const fetchData = async () => {
             try {
-                const { data: profile, error } = await supabase
-                    .from('users')
-                    .select('ai_credits, ai_used')
-                    .eq('id', user?.id)
-                    .single();
-                
-                if (error) {
-                    console.error("Erro ao buscar créditos:", error);
-                    return;
-                }
+                const token = localStorage.getItem('campanhapro-mysql-token');
+                const res = await fetch('/api/users/me', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) throw new Error("Erro ao buscar créditos no MySQL");
+                const profile = await res.json();
 
                 if (profile) {
                     const used = profile.ai_used || 0;
                     const total = profile.ai_credits !== null && profile.ai_credits !== undefined ? profile.ai_credits : 100;
                     setCredits({ used, total });
-                    if (used >= total) {
+                    
+                    // Se for Supreme Admin e não tiver limite definido (null ou <= 0), créditos ilimitados
+                    const isSupreme = !!profile.is_supreme_admin;
+                    const limitActive = profile.ai_credits !== null && profile.ai_credits > 0;
+                    
+                    if (used >= total && (!isSupreme || limitActive)) {
                         setIsLimitExceeded(true);
                     } else {
                         setIsLimitExceeded(false);
@@ -165,7 +166,10 @@ const AgentsHQPage: React.FC = () => {
             .on('postgres_changes', { event: '*', schema: 'public', table: 'users', filter: `id=eq.${user?.id}` }, fetchData)
             .subscribe();
 
+        window.addEventListener('refresh-credits', fetchData);
+
         return () => {
+            window.removeEventListener('refresh-credits', fetchData);
             supabase.removeChannel(channel);
         };
     }, [user?.id]);
@@ -658,6 +662,7 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
                     });
                 });
             }
+            window.dispatchEvent(new Event('refresh-credits'));
         } catch (error) {
             addMessage(agentId, { role: 'agent', content: "❌ Erro de comunicação com a base. Tente novamente." });
         } finally {
@@ -675,6 +680,7 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
             if (resultUrl) {
                 setGeneratedImages(prev => ({ ...prev, [msgKey]: resultUrl }));
                 addMessage(agentId, { role: 'agent', content: `![ATIVO](${resultUrl})` });
+                window.dispatchEvent(new Event('refresh-credits'));
             } else {
                 alert('Geração concluída mas a URL da imagem ficou vazia. Tente novamente.');
             }
@@ -738,6 +744,9 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
         !content.startsWith('🛡️') &&
         !content.startsWith('🛠️') &&
         !content.startsWith('❌') &&
+        !content.includes('![ATIVO]') &&
+        !content.includes('![REFERÊNCIA-USUÁRIO]') &&
+        !content.includes('[VIDEO-REFERÊNCIA:') &&
         content.trim().length > 10;
 
     const renderMarkdown = (text: string) => {
@@ -765,10 +774,12 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
     };
 
     const parseUserMessage = (content: string) => {
-        const imgMatch = content.match(/!\[REFERÊNCIA-USUÁRIO\]\((.+?)\)/);
+        const imgMatch = content.match(/!\[.*?\]\((.+?)\)/);
         const vidMatch = content.match(/\[VIDEO-REFERÊNCIA:(.+?)\]/);
         const cleanText = content
             .replace(/!\[REFERÊNCIA-USUÁRIO\]\(.+?\)/, '')
+            .replace(/!\[ATIVO\]\(.+?\)/, '')
+            .replace(/!\[.*?\]\(.+?\)/, '')
             .replace(/\[VIDEO-REFERÊNCIA:.+?\]/, '')
             .trim();
         return { cleanText, imgUrl: imgMatch?.[1], vidUrl: vidMatch?.[1] };
@@ -822,25 +833,7 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
                 )}
             </div>
 
-            {agentId === 'creative' && Object.keys(generatedImages).length > 0 && (
-                <div className="mb-3 p-2 bg-slate-900/60 border border-slate-700/50 rounded-xl flex-shrink-0 animate-in fade-in duration-500">
-                    <p className="text-[10px] font-bold text-slate-500 uppercase mb-2 tracking-widest flex items-center gap-2">
-                        <SparklesIcon className="w-3 h-3 text-yellow-400" /> Galeria desta Sessão
-                    </p>
-                    <div className="flex gap-2 flex-wrap">
-                        {Object.entries(generatedImages).map(([, url], i) => (
-                            <div key={i} className="w-16 h-16 rounded-lg border border-slate-700 overflow-hidden bg-slate-900 cursor-pointer relative group flex-shrink-0 shadow-md hover:shadow-yellow-500/10 transition-shadow"
-                                onClick={() => { setLightboxImage(url); setLightboxRefText(''); }}>
-                                <img src={url} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                                    onError={(e) => { (e.target as HTMLImageElement).closest('div')!.style.display = 'none'; }} />
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-1">
-                                    <ZoomIn className="w-3.5 h-3.5 text-white" />
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
+
 
             {agentId === 'fraud' && history.some(m => m.content.includes('🛡️')) && (
                 <div className="mb-3 bg-red-500/5 border border-red-500/15 p-3 rounded-xl flex-shrink-0 animate-in fade-in duration-500">
@@ -902,13 +895,14 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
                 ) : (
                     history.map((msg, idx) => {
                         const isUser = msg.role === 'user';
-                        const { cleanText, imgUrl, vidUrl } = isUser ? parseUserMessage(msg.content) : { cleanText: msg.content, imgUrl: undefined, vidUrl: undefined };
+                        const { cleanText, imgUrl, vidUrl } = parseUserMessage(msg.content);
                         return (
                             <div key={idx} className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`}>
                                 <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm shadow-sm ${isUser ? 'bg-emerald-600 text-white rounded-tr-none' : 'bg-slate-800 text-slate-200 rounded-tl-none border border-slate-700'}`}>
                                     {imgUrl && (
-                                        <div className="mb-2 rounded-lg overflow-hidden border border-white/10 max-w-[240px] cursor-pointer" onClick={() => { setLightboxImage(imgUrl); setLightboxRefText(''); }}>
-                                            <img src={imgUrl} alt="Upload" className="w-full h-auto object-cover max-h-[180px]" />
+                                        <div className="mb-2 rounded-xl overflow-hidden border border-slate-700/60 shadow-md max-w-full sm:max-w-[380px] cursor-pointer hover:opacity-95 transition-opacity" 
+                                             onClick={() => { setLightboxImage(imgUrl); setLightboxRefText(''); }}>
+                                            <img src={imgUrl} alt="Visual Asset" className="w-full h-auto object-cover max-h-[300px]" />
                                         </div>
                                     )}
                                     {vidUrl && (
