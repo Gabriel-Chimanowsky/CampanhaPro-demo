@@ -39,7 +39,6 @@ const AgentsHQPage: React.FC = () => {
     }, [isHydrated, activeTab]);
     const [isLimitExceeded, setIsLimitExceeded] = useState(false);
     const [credits, setCredits] = useState({ used: 0, total: 100 });
-    const [supportPhone, setSupportPhone] = useState(() => (window as any).SUPPORT_WHATSAPP || '5521999947477');
     const [pendingContext, setPendingContext] = useState<string | null>(null);
     const [autoPipelineEnabled, setAutoPipelineEnabled] = useState(true);
     const [notifications, setNotifications] = useState<AutoPipelineNotification[]>([]);
@@ -146,7 +145,6 @@ const AgentsHQPage: React.FC = () => {
                     setCredits({ used, total });
                     
                     if (profile.supportPhone) {
-                        setSupportPhone(profile.supportPhone);
                         (window as any).SUPPORT_WHATSAPP = profile.supportPhone;
                     }
                     
@@ -536,6 +534,7 @@ interface AgentRoomProps {
 }
 
 const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, campaignId, examples, icon, agentCall, placeholder, initialPrompt, onClearInitial, onExecuteAction, isLimitExceeded }) => {
+    const supportPhone = (window as any).SUPPORT_WHATSAPP || '5521999947477';
     const [input, setInput] = useState('');
     const { histories, setHistory, addMessage } = useAgentStore();
     const { user } = useAuth();
