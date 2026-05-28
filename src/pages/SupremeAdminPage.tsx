@@ -135,26 +135,37 @@ const SupremeAdminPage: React.FC = () => {
             });
             setCampaignConfigs(configs);
 
-            // 3. Fetch AI Usage
-            const { data: usageData, error: usageError } = await supabase
-                .from('ai_usage')
-                .select('*')
-                .order('timestamp', { ascending: false })
-                .limit(50);
-            if (usageError) throw usageError;
-            setAiUsageData(usageData as AIUsageRecord[]);
+            // 3. Fetch AI Usage (resiliente: tabela pode não existir ainda)
+            try {
+                const { data: usageData, error: usageError } = await supabase
+                    .from('ai_usage')
+                    .select('*')
+                    .order('timestamp', { ascending: false })
+                    .limit(50);
+                if (!usageError) {
+                    setAiUsageData(usageData as AIUsageRecord[]);
+                } else {
+                    console.warn('[SupremeAdmin] ai_usage not available yet:', usageError.message);
+                }
+            } catch (usageErr: any) {
+                console.warn('[SupremeAdmin] ai_usage fetch failed:', usageErr.message);
+            }
 
-            // 4. Fetch Platform Stats
-            const { data: statsData } = await supabase
-                .from('platform_stats')
-                .select('*')
-                .eq('id', 'global')
-                .single();
-            if (statsData) {
-                setUsageStats({
-                    totalTokens: statsData.total_tokens || 0,
-                    totalCost: statsData.total_cost || 0
-                });
+            // 4. Fetch Platform Stats (resiliente: tabela pode não existir ainda)
+            try {
+                const { data: statsData } = await supabase
+                    .from('platform_stats')
+                    .select('*')
+                    .eq('id', 'global')
+                    .single();
+                if (statsData) {
+                    setUsageStats({
+                        totalTokens: statsData.total_tokens || 0,
+                        totalCost: statsData.total_cost || 0
+                    });
+                }
+            } catch (statsErr: any) {
+                console.warn('[SupremeAdmin] platform_stats fetch failed:', statsErr.message);
             }
 
         } catch (error) {
