@@ -1,5 +1,4 @@
 import * as React from 'react';
-import { supabase } from '../lib/supabaseClient';
 import { calculateScenarioMetrics, getTodayString } from '../utils/helpers';
 import { useAuth } from '../contexts/AuthContext';
 import { useTeam } from '../contexts/TeamContext';

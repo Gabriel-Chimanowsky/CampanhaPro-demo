@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Bot, TrendingUp, Share2, Map, Send, Loader2, LayoutDashboard, Ticket, ArrowRight, CheckCircle2, Link as LinkIcon, ShieldCheck, Sparkles as SparklesIcon, History, Shield, Zap, X, BellRing, Trash2, Download, ZoomIn, MessageSquarePlus, Image as ImageIcon, Video, Paperclip, Lightbulb, Cpu } from 'lucide-react';
+import { Bot, TrendingUp, Share2, Map, Send, Loader2, LayoutDashboard, Ticket, ArrowRight, CheckCircle2, Link as LinkIcon, ShieldCheck, Sparkles as SparklesIcon, History, Shield, Zap, X, BellRing, Download, ZoomIn, MessageSquarePlus, Video, Paperclip, Lightbulb, Cpu } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { askStrategist, askGrowthHacker, askSocialMedia, askFieldCommander, askCreativeProducer, askBackupAgent, askFraudAuditor, runFullPipeline, savePipelineResult, getPipelineHistory, PipelineResult, generateCreativeImage, createProductionOrder, publishToSocialMedia } from '../services/agentsClientService';
 import { createBackup, restoreBackup, BackupData } from '../services/backupService';
@@ -262,6 +262,7 @@ const AgentsHQPage: React.FC = () => {
                     campaignId={user?.campaignId || 'default'}
                     agentCall={(p) => handleAgentCallGen(p, askStrategist, 'strategist')}
                     placeholder="Ex: Como lidar com nossa taxa de rejeição atual?"
+                    isLimitExceeded={isLimitExceeded}
                 />;
             case 'growth':
                 return <AgentRoom 
@@ -278,6 +279,7 @@ const AgentsHQPage: React.FC = () => {
                     campaignId={user?.campaignId || 'default'}
                     agentCall={(p) => handleAgentCallGen(p, askGrowthHacker, 'growth')}
                     placeholder="Ex: Crie um funil focado nas dores captadas na pesquisa."
+                    isLimitExceeded={isLimitExceeded}
                 />;
             case 'social':
                 return <AgentRoom 
@@ -298,6 +300,7 @@ const AgentsHQPage: React.FC = () => {
                     onClearInitial={() => setPendingContext(null)}
                     onHandoff={(script) => handleProductionHandoff('social', 'creative', script)}
                     onPublish={(content) => handlePublishToSocial(content)}
+                    isLimitExceeded={isLimitExceeded}
                 />;
             case 'creative':
                 return <AgentRoom 
@@ -319,6 +322,7 @@ const AgentsHQPage: React.FC = () => {
                     onExecuteAction={(p) => generateCreativeImage(p, user?.campaign_id || user?.campaignId || 'default', String(user?.id || 'unknown'))}
                     onGeneratePost={(content) => handleProductionHandoff('field', 'social', content)}
                     onPublish={(content, media) => handlePublishToSocial(content, media)}
+                    isLimitExceeded={isLimitExceeded}
                 />;
             case 'field':
                 return <AgentRoom 
@@ -336,6 +340,7 @@ const AgentsHQPage: React.FC = () => {
                     agentCall={(p) => handleAgentCallGen(p, askFieldCommander, 'field')}
                     placeholder="Ex: Onde focar panfletagem para mitigar críticas de asfalto detectadas na pesquisa?"
                     onGeneratePost={(content) => handleProductionHandoff('field', 'social', content)}
+                    isLimitExceeded={isLimitExceeded}
                 />;
             case 'connections':
                 return <SocialConnectionsHub />;
@@ -348,7 +353,7 @@ const AgentsHQPage: React.FC = () => {
                     description="Caça-Fraudes de Campanha. Especialista em detectar dados falsos, cadastros suspeitos e inconsistências nos reportes de rua."
                     examples={[
                         "Analise os últimos 10 cadastros de eleitores e procure por padrões de nomes falsos ou CEPs repetidos.",
-                        "Identifique se há reportes de rua com textos idênticos vindo de voluntários diferentes.",
+                        "Identifique si há reportes de rua com textos idênticos vindo de voluntários diferentes.",
                         "Sinale possíveis fraudes no bairro X baseadas nas contradições das notas de atendimento."
                     ]}
                     agentId="fraud"
@@ -356,6 +361,7 @@ const AgentsHQPage: React.FC = () => {
                     campaignId={user?.campaignId || 'default'}
                     agentCall={(p) => handleAgentCallGen(p, askFraudAuditor, 'fraud')}
                     placeholder="Ex: Verifique a integridade dos cadastros realizados hoje."
+                    isLimitExceeded={isLimitExceeded}
                 />;
         }
     };
@@ -508,17 +514,18 @@ interface AgentRoomProps {
     icon: React.ReactNode;
     agentId: string;
     campaignId: string;
-    agentCall: (prompt: string, agentId: string) => Promise<any>;
+    agentCall: (prompt: string, agent_id: string) => Promise<any>;
     placeholder: string;
-    initialPrompt?: string;
+    initialPrompt?: string | null;
     onClearInitial?: () => void;
     onHandoff?: (content: string) => void;
     onExecuteAction?: (content: string, agent_id: string) => Promise<string>;
     onGeneratePost?: (content: string) => void;
     onPublish?: (content: string, media?: string) => void;
+    isLimitExceeded?: boolean;
 }
 
-const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, campaignId, examples, icon, agentCall, placeholder, initialPrompt, onClearInitial, onGeneratePost, onHandoff, onExecuteAction, onPublish }) => {
+const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, campaignId, examples, icon, agentCall, placeholder, initialPrompt, onClearInitial, onExecuteAction, isLimitExceeded }) => {
     const [input, setInput] = useState('');
     const { histories, setHistory, addMessage } = useAgentStore();
     const { user } = useAuth();
@@ -526,7 +533,6 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
     const [isLoading, setIsLoading] = useState(false);
     const [pendingOrders, setPendingOrders] = useState<any[]>([]);
     const [generatedImages, setGeneratedImages] = useState<Record<string, string>>({});
-    const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
     const [loadingCardKey, setLoadingCardKey] = useState<string | null>(null);
     const [lightboxImage, setLightboxImage] = useState<string | null>(null);
     const [lightboxRefText, setLightboxRefText] = useState('');
@@ -609,6 +615,18 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if ((!input.trim() && !attachedMedia) || isLoading) return;
+
+        // Bloqueia se créditos esgotados — mostra mensagem no chat
+        if (isLimitExceeded) {
+            addMessage(agentId, {
+                role: 'agent',
+                content: '🚫 **Créditos esgotados.** Você atingiu o limite de chamadas de IA desta campanha.\n\nPor favor, entre em contato com o Administrador para liberar mais créditos e continuar usando os agentes.'
+            });
+            setInput('');
+            setAttachedMedia(null);
+            return;
+        }
+
         const userMsg = input.trim();
         const mediaToSend = attachedMedia;
         setInput('');
@@ -779,7 +797,7 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
         <div className="flex flex-col h-full overflow-hidden">
             <div className="flex items-center gap-3 mb-3 pb-3 border-b border-slate-700/60 flex-shrink-0">
                 <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${accent} flex items-center justify-center text-lg shadow-lg flex-shrink-0`}>
-                    {getAgentAvatar()}
+                    {icon || getAgentAvatar()}
                 </div>
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
@@ -882,14 +900,60 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
                         )}
                     </div>
                 ) : (
-                    history.map((msg, idx) => (
-                        <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                            <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm shadow-sm ${msg.role === 'user' ? 'bg-emerald-600 text-white rounded-tr-none' : 'bg-slate-800 text-slate-200 rounded-tl-none border border-slate-700'}`}>
-                                <div className="whitespace-pre-wrap">{renderMarkdown(msg.content)}</div>
-                                <span className="text-[9px] opacity-50 block mt-1 text-right">{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                    history.map((msg, idx) => {
+                        const isUser = msg.role === 'user';
+                        const { cleanText, imgUrl, vidUrl } = isUser ? parseUserMessage(msg.content) : { cleanText: msg.content, imgUrl: undefined, vidUrl: undefined };
+                        return (
+                            <div key={idx} className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`}>
+                                <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm shadow-sm ${isUser ? 'bg-emerald-600 text-white rounded-tr-none' : 'bg-slate-800 text-slate-200 rounded-tl-none border border-slate-700'}`}>
+                                    {imgUrl && (
+                                        <div className="mb-2 rounded-lg overflow-hidden border border-white/10 max-w-[240px] cursor-pointer" onClick={() => { setLightboxImage(imgUrl); setLightboxRefText(''); }}>
+                                            <img src={imgUrl} alt="Upload" className="w-full h-auto object-cover max-h-[180px]" />
+                                        </div>
+                                    )}
+                                    {vidUrl && (
+                                        <div className="mb-2 rounded-lg overflow-hidden border border-white/10 max-w-[240px]">
+                                            <video src={vidUrl} controls className="w-full h-auto max-h-[180px]" />
+                                        </div>
+                                    )}
+                                    {cleanText && <div className="whitespace-pre-wrap">{renderMarkdown(cleanText)}</div>}
+                                    
+                                    {!isUser && agentId === 'creative' && isActionable(msg.content) && (
+                                        <div className="mt-3 pt-2 border-t border-slate-700/50 flex flex-wrap gap-2">
+                                            {generatedImages[getMsgKey(msg, idx)] ? (
+                                                <div className="text-[10px] bg-slate-900/60 border border-slate-700/50 rounded-lg p-2 flex items-center gap-2 text-slate-400">
+                                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                                                    Ativo Gerado com Sucesso!
+                                                </div>
+                                            ) : (
+                                                <button
+                                                    onClick={() => handleExecuteAction(getMsgKey(msg, idx), msg.content)}
+                                                    disabled={isLoading}
+                                                    className="flex items-center gap-1.5 text-xs bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white px-3 py-1.5 rounded-xl font-bold transition-all shadow-md hover:scale-105 active:scale-95"
+                                                >
+                                                    {loadingCardKey === getMsgKey(msg, idx) ? (
+                                                        <>
+                                                            <Loader2 className="w-3 h-3 animate-spin" />
+                                                            Gerando Ativo...
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <SparklesIcon className="w-3 h-3 text-yellow-300" />
+                                                            Gerar Ativo Visual
+                                                        </>
+                                                    )}
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    <span className="text-[9px] opacity-50 block mt-1 text-right">
+                                        {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                </div>
                             </div>
-                        </div>
-                    ))
+                        );
+                    })
                 )}
                 {isLoading && (
                     <div className="flex justify-start">
@@ -955,7 +1019,7 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
                 )}
 
                 <form onSubmit={handleSubmit} className="flex items-end gap-2">
-                    <button type="button" onClick={() => mediaInputRef.current?.click()} disabled={isLoading}
+                    <button type="button" onClick={() => mediaInputRef.current?.click()} disabled={isLoading || isLimitExceeded}
                         className="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-xl bg-slate-800 border border-slate-700 hover:bg-slate-700 hover:border-indigo-500/50 text-slate-400 hover:text-indigo-400 transition-all disabled:opacity-40"
                         title="Anexar imagem ou vídeo">
                         <Paperclip className="w-4 h-4" />
@@ -969,14 +1033,14 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
                     <div className="flex-1">
                         <textarea ref={textareaRef} value={input} onChange={(e) => setInput(e.target.value)}
                             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit(e as any); } }}
-                            placeholder={placeholder}
-                            className="w-full bg-slate-800/90 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 transition-all resize-none leading-relaxed"
-                            style={{ minHeight: '44px', maxHeight: '120px' }} disabled={isLoading} rows={1} />
+                            placeholder={isLimitExceeded ? "🚫 Sem créditos de IA disponíveis nesta campanha" : placeholder}
+                            className="w-full bg-slate-800/90 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 transition-all resize-none leading-relaxed disabled:opacity-50 disabled:cursor-not-allowed"
+                            style={{ minHeight: '44px', maxHeight: '120px' }} disabled={isLoading || isLimitExceeded} rows={1} />
                     </div>
 
-                    <button type="submit" disabled={(!input.trim() && !attachedMedia) || isLoading}
+                    <button type="submit" disabled={(!input.trim() && !attachedMedia) || isLoading || isLimitExceeded}
                         className={`flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-xl transition-all shadow-lg ${
-                            (input.trim() || attachedMedia) && !isLoading
+                            (input.trim() || attachedMedia) && !isLoading && !isLimitExceeded
                                 ? `bg-gradient-to-br ${accent} hover:opacity-90 text-white hover:scale-105 active:scale-95`
                                 : 'bg-slate-800 text-slate-600 cursor-not-allowed border border-slate-700'
                         }`}>

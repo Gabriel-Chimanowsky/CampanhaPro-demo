@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { 
     User, Mail, Lock, Phone, 
-    ShieldCheck, AlertCircle, Loader2, 
+    AlertCircle, Loader2, 
     ChevronRight, CheckCircle2, Eye, EyeOff
 } from 'lucide-react';
 import Button from '../components/ui/Button';
