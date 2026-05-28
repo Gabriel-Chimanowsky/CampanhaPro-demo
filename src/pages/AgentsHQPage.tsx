@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Bot, TrendingUp, Share2, Map, Send, Loader2, LayoutDashboard, Ticket, ArrowRight, CheckCircle2, Link as LinkIcon, ShieldCheck, Sparkles as SparklesIcon, History, Shield, Zap, X, BellRing, Trash2, Download, ZoomIn, MessageSquarePlus } from 'lucide-react';
+import { Bot, TrendingUp, Share2, Map, Send, Loader2, LayoutDashboard, Ticket, ArrowRight, CheckCircle2, Link as LinkIcon, ShieldCheck, Sparkles as SparklesIcon, History, Shield, Zap, X, BellRing, Trash2, Download, ZoomIn, MessageSquarePlus, Image as ImageIcon, Video, Paperclip, Lightbulb, Cpu } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { askStrategist, askGrowthHacker, askSocialMedia, askFieldCommander, askCreativeProducer, askBackupAgent, askFraudAuditor, runFullPipeline, savePipelineResult, getPipelineHistory, PipelineResult, generateCreativeImage, createProductionOrder, publishToSocialMedia } from '../services/agentsClientService';
 import { createBackup, restoreBackup, BackupData } from '../services/backupService';
@@ -415,8 +415,8 @@ const AgentsHQPage: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-2">
                     <div className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-500/10 text-indigo-400 rounded-full text-xs font-bold border border-indigo-500/20 shadow-lg shadow-indigo-500/5">
-                        <Ticket className="w-3.5 h-3.5" />
-                        Créditos: {credits.used} / {credits.total}
+                        <Cpu className="w-3.5 h-3.5" />
+                        Créditos: {credits.used}
                     </div>
                     <button
                         onClick={() => setAutoPipelineEnabled((prev: boolean) => !prev)}
@@ -495,6 +495,12 @@ const AgentsHQPage: React.FC = () => {
     );
 };
 
+interface AttachedMedia {
+    type: 'image' | 'video';
+    dataUrl: string;
+    name: string;
+}
+
 interface AgentRoomProps {
     title: string;
     description: string;
@@ -526,17 +532,27 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
     const [lightboxRefText, setLightboxRefText] = useState('');
     const lightboxInputRef = useRef<HTMLInputElement>(null);
     
-    // Suporte para imagem de referência temporária no chat
+    const [attachedMedia, setAttachedMedia] = useState<AttachedMedia | null>(null);
     const [referenceImage, setReferenceImage] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
- 
-    // Chave estável por mensagem (usa id do banco ou índice absoluto)
+    const mediaInputRef = useRef<HTMLInputElement>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+    
+    const [suggestions, setSuggestions] = useState<string[]>([]);
+    const strategistHistory = histories['strategist'] || [];
+    
     const getMsgKey = (msg: any, absoluteIdx: number) => msg.id ? String(msg.id) : String(absoluteIdx);
     const scrollRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
+        if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto';
+            textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 120) + 'px';
+        }
+    }, [input]);
+
+    useEffect(() => {
         if (scrollRef.current) {
-            // Scroll safely after rendering frame
             setTimeout(() => {
                 if (scrollRef.current) {
                     scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -544,6 +560,24 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
             }, 100);
         }
     }, [history, isLoading]);
+
+    useEffect(() => {
+        if (strategistHistory.length > 0) {
+            const lastAgentMsgs = strategistHistory
+                .filter(m => m.role === 'agent')
+                .slice(-3)
+                .map(m => m.content);
+            const newSuggestions: string[] = [];
+            lastAgentMsgs.forEach(msg => {
+                const lines = msg.split('\n').filter(l => l.trim().length > 20 && l.trim().length < 120);
+                if (lines.length > 0) {
+                    const clean = lines[0].replace(/^[\-\*\d\.\s]+/, '').replace(/\*\*/g, '').trim();
+                    if (clean && !newSuggestions.includes(clean)) newSuggestions.push(clean);
+                }
+            });
+            setSuggestions(newSuggestions.slice(0, 3));
+        }
+    }, [strategistHistory.length]);
 
     useEffect(() => {
         const loadInitialData = async () => {
@@ -574,10 +608,23 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!input.trim() || isLoading) return;
+        if ((!input.trim() && !attachedMedia) || isLoading) return;
         const userMsg = input.trim();
+        const mediaToSend = attachedMedia;
         setInput('');
-        addMessage(agentId, { role: 'user', content: userMsg });
+        setAttachedMedia(null);
+
+        let displayContent = userMsg;
+        if (mediaToSend) {
+            displayContent = userMsg || `[${mediaToSend.type === 'image' ? 'Imagem' : 'Vídeo'}: ${mediaToSend.name}]`;
+        }
+        const messageToStore = mediaToSend && mediaToSend.type === 'image'
+            ? `${displayContent}\n![REFERÊNCIA-USUÁRIO](${mediaToSend.dataUrl})`
+            : mediaToSend && mediaToSend.type === 'video'
+            ? `${displayContent}\n[VIDEO-REFERÊNCIA:${mediaToSend.dataUrl}]`
+            : displayContent;
+
+        addMessage(agentId, { role: 'user', content: messageToStore });
         setIsLoading(true);
         try {
             const contextPrompt = history.length > 0 
@@ -605,11 +652,10 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
         setLoadingCardKey(msgKey);
         setIsLoading(true);
         try {
-            // Se houver uma imagem de referência anexada no chat pelo usuário, envia ela na chamada
-            const resultUrl = await generateCreativeImage(content, campaignId, String(user?.id || 'unknown'), referenceImage || undefined, agentId);
+            const refImg = attachedMedia?.type === 'image' ? attachedMedia.dataUrl : referenceImage || undefined;
+            const resultUrl = await generateCreativeImage(content, campaignId, String(user?.id || 'unknown'), refImg, agentId);
             if (resultUrl) {
                 setGeneratedImages(prev => ({ ...prev, [msgKey]: resultUrl }));
-                // Adiciona a imagem gerada imediatamente ao chat local do Zustand!
                 addMessage(agentId, { role: 'agent', content: `![ATIVO](${resultUrl})` });
             } else {
                 alert('Geração concluída mas a URL da imagem ficou vazia. Tente novamente.');
@@ -623,7 +669,29 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
         }
     };
 
-    // Download seguro via Blob (funciona com data URLs e URLs normais)
+    const handleMediaAttach = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const isVideo = file.type.startsWith('video/');
+        const isImage = file.type.startsWith('image/');
+        if (!isVideo && !isImage) return;
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setAttachedMedia({
+                type: isVideo ? 'video' : 'image',
+                dataUrl: reader.result as string,
+                name: file.name
+            });
+        };
+        reader.readAsDataURL(file);
+        if (isImage) {
+            const reader2 = new FileReader();
+            reader2.onloadend = () => setReferenceImage(reader2.result as string);
+            reader2.readAsDataURL(file);
+        }
+        e.target.value = '';
+    };
+
     const handleDownload = async (url: string) => {
         try {
             if (url.startsWith('data:')) {
@@ -648,59 +716,107 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
         }
     };
 
-    // Mensagem merece botões de ação só se for conteúdo real
     const isActionable = (content: string) =>
         !content.startsWith('🛡️') &&
         !content.startsWith('🛠️') &&
         !content.startsWith('❌') &&
         content.trim().length > 10;
 
-    // Renderiza texto com **bold** básico
-    const renderText = (text: string) => {
-        const parts = text.split(/(\*\*.*?\*\*)/g);
-        return parts.map((part, i) =>
-            part.startsWith('**') && part.endsWith('**')
-                ? <strong key={i} className="font-semibold text-slate-100">{part.slice(2, -2)}</strong>
-                : <span key={i}>{part}</span>
-        );
+    const renderMarkdown = (text: string) => {
+        const lines = text.split('\n');
+        return lines.map((line, lineIdx) => {
+            const parts = line.split(/(\*\*.*?\*\*|\*.*?\*)/g);
+            const rendered = parts.map((part, i) => {
+                if (part.startsWith('**') && part.endsWith('**')) return <strong key={i} className="font-semibold text-slate-100">{part.slice(2, -2)}</strong>;
+                if (part.startsWith('*') && part.endsWith('*')) return <em key={i} className="italic text-slate-300">{part.slice(1, -1)}</em>;
+                return <span key={i}>{part}</span>;
+            });
+            if (line.match(/^[\-\*]\s/)) {
+                return <div key={lineIdx} className="flex gap-2 items-start my-0.5"><span className="text-blue-400 mt-1 shrink-0">•</span><span>{rendered}</span></div>;
+            }
+            if (line.match(/^\d+\.\s/)) {
+                const num = line.match(/^(\d+)\./)![1];
+                const rest = line.replace(/^\d+\.\s/, '');
+                return <div key={lineIdx} className="flex gap-2 items-start my-0.5"><span className="text-blue-400 font-bold shrink-0 min-w-[1.2rem]">{num}.</span><span>{rest}</span></div>;
+            }
+            if (line.startsWith('# ')) return <h4 key={lineIdx} className="text-base font-bold text-slate-100 mt-2 mb-1">{line.slice(2)}</h4>;
+            if (line.startsWith('## ')) return <h5 key={lineIdx} className="text-sm font-bold text-slate-200 mt-2 mb-0.5">{line.slice(3)}</h5>;
+            if (line.trim() === '') return <div key={lineIdx} className="h-2" />;
+            return <div key={lineIdx} className="leading-relaxed">{rendered}</div>;
+        });
     };
+
+    const parseUserMessage = (content: string) => {
+        const imgMatch = content.match(/!\[REFERÊNCIA-USUÁRIO\]\((.+?)\)/);
+        const vidMatch = content.match(/\[VIDEO-REFERÊNCIA:(.+?)\]/);
+        const cleanText = content
+            .replace(/!\[REFERÊNCIA-USUÁRIO\]\(.+?\)/, '')
+            .replace(/\[VIDEO-REFERÊNCIA:.+?\]/, '')
+            .trim();
+        return { cleanText, imgUrl: imgMatch?.[1], vidUrl: vidMatch?.[1] };
+    };
+
+    const getAgentAvatar = () => {
+        const avatars: Record<string, string> = {
+            strategist: '🎯', growth: '📈', social: '📱', creative: '🎨',
+            field: '🗺️', backup: '🛡️', fraud: '🔍', backup_guardian: '🔒'
+        };
+        return avatars[agentId] || '🤖';
+    };
+
+    const accentColor: Record<string, string> = {
+        strategist: 'from-blue-600 to-blue-700',
+        growth: 'from-green-600 to-emerald-700',
+        social: 'from-purple-600 to-purple-700',
+        creative: 'from-yellow-600 to-amber-700',
+        field: 'from-orange-600 to-orange-700',
+        backup: 'from-emerald-600 to-teal-700',
+        fraud: 'from-red-600 to-red-700',
+    };
+    const accent = accentColor[agentId] || 'from-blue-600 to-blue-700';
 
     return (
         <div className="flex flex-col h-full overflow-hidden">
-            <div className="flex flex-col md:flex-row md:items-center gap-3 mb-4 pb-4 border-b border-slate-700 flex-shrink-0">
-                <div className="p-3 bg-slate-900 rounded-lg border border-slate-700 w-fit">{icon}</div>
-                <div className="flex-1">
-                    <h3 className="text-xl font-bold text-slate-50">{title}</h3>
-                    <p className="text-sm text-slate-400">{description}</p>
+            <div className="flex items-center gap-3 mb-3 pb-3 border-b border-slate-700/60 flex-shrink-0">
+                <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${accent} flex items-center justify-center text-lg shadow-lg flex-shrink-0`}>
+                    {getAgentAvatar()}
+                </div>
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                        <h3 className="text-base font-bold text-slate-50 truncate">{title}</h3>
+                        <span className="flex items-center gap-1 px-1.5 py-0.5 bg-emerald-500/15 text-emerald-400 text-[10px] font-bold rounded-full border border-emerald-500/20 shrink-0">
+                            <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
+                            Online
+                        </span>
+                        <span className="text-[10px] text-slate-500 shrink-0">Gemini AI</span>
+                    </div>
+                    <p className="text-xs text-slate-500 truncate">{description}</p>
                 </div>
                 {examples && examples.length > 0 && (
-                    <div className="hidden lg:block max-w-xs">
-                        <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Exemplos de uso:</p>
-                        <div className="flex flex-wrap gap-1">
-                            {examples.map((ex, i) => (
-                                <button key={i} onClick={() => setInput(ex)} className="text-[10px] bg-slate-700 hover:bg-slate-600 text-slate-300 px-2 py-1 rounded transition-colors text-left line-clamp-1">{ex}</button>
-                            ))}
-                        </div>
+                    <div className="hidden xl:flex flex-wrap gap-1 max-w-xs shrink-0">
+                        {examples.map((ex, i) => (
+                            <button key={i} onClick={() => setInput(ex)}
+                                className="text-[10px] bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-600 text-slate-400 hover:text-slate-200 px-2 py-1 rounded-lg transition-all text-left line-clamp-1 max-w-[140px]">
+                                {ex}
+                            </button>
+                        ))}
                     </div>
                 )}
             </div>
-            
-            {/* Galeria de Ativos desta Sessão — compacta, no topo */}
+
             {agentId === 'creative' && Object.keys(generatedImages).length > 0 && (
-                <div className="mb-4 animate-in fade-in zoom-in duration-500 flex-shrink-0">
+                <div className="mb-3 p-2 bg-slate-900/60 border border-slate-700/50 rounded-xl flex-shrink-0 animate-in fade-in duration-500">
                     <p className="text-[10px] font-bold text-slate-500 uppercase mb-2 tracking-widest flex items-center gap-2">
-                        <SparklesIcon className="w-3 h-3 text-yellow-400" /> Ativos desta Sessão
+                        <SparklesIcon className="w-3 h-3 text-yellow-400" /> Galeria desta Sessão
                     </p>
                     <div className="flex gap-2 flex-wrap">
                         {Object.entries(generatedImages).map(([, url], i) => (
-                            <div
-                                key={i}
-                                className="w-14 h-14 rounded-lg border border-slate-700 overflow-hidden bg-slate-900 cursor-pointer relative group flex-shrink-0"
-                                onClick={() => { setLightboxImage(url); setLightboxRefText(''); }}
-                            >
-                                <img src={url} className="w-full h-full object-cover group-hover:scale-110 transition-all" onError={(e) => { (e.target as HTMLImageElement).closest('div')!.style.display = 'none'; }} />
-                                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/50">
-                                    <ZoomIn className="w-4 h-4 text-white" />
+                            <div key={i} className="w-16 h-16 rounded-lg border border-slate-700 overflow-hidden bg-slate-900 cursor-pointer relative group flex-shrink-0 shadow-md hover:shadow-yellow-500/10 transition-shadow"
+                                onClick={() => { setLightboxImage(url); setLightboxRefText(''); }}>
+                                <img src={url} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                                    onError={(e) => { (e.target as HTMLImageElement).closest('div')!.style.display = 'none'; }} />
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-1">
+                                    <ZoomIn className="w-3.5 h-3.5 text-white" />
                                 </div>
                             </div>
                         ))}
@@ -708,362 +824,212 @@ const AgentRoom: React.FC<AgentRoomProps> = ({ title, description, agentId, camp
                 </div>
             )}
 
-            {/* Painel de Alertas do Auditor (Top 3) */}
             {agentId === 'fraud' && history.some(m => m.content.includes('🛡️')) && (
-                <div className="mb-4 animate-in fade-in slide-in-from-top-2 duration-500 bg-red-500/5 border border-red-500/10 p-4 rounded-xl flex-shrink-0">
-                    <p className="text-[10px] font-bold text-red-400 uppercase mb-3 tracking-widest flex items-center gap-2">
-                        <Shield className="w-3 h-3" /> Relatórios de Integridade Recentes
+                <div className="mb-3 bg-red-500/5 border border-red-500/15 p-3 rounded-xl flex-shrink-0 animate-in fade-in duration-500">
+                    <p className="text-[10px] font-bold text-red-400 uppercase mb-2 tracking-widest flex items-center gap-2">
+                        <Shield className="w-3 h-3" /> Relatórios de Integridade
                     </p>
-                    <div className="space-y-2">
-                        {history
-                            .filter(m => m.content.includes('🛡️'))
-                            .slice(-3)
-                            .map((msg, i) => (
-                                <div key={i} className="text-[11px] bg-slate-900/50 border border-red-500/20 text-red-200/70 p-2.5 rounded-lg flex items-center gap-2 italic shadow-sm">
-                                    <div className="w-1 h-1 rounded-full bg-red-500" />
-                                    {msg.content.replace(/🛡️ \*\*SISTEMA EM AÇÃO:\*\* /g, '').split('...')[0]}...
-                                </div>
-                            ))
-                        }
+                    <div className="space-y-1.5">
+                        {history.filter(m => m.content.includes('🛡️')).slice(-3).map((msg, i) => (
+                            <div key={i} className="text-[11px] bg-slate-900/50 border border-red-500/20 text-red-200/70 p-2 rounded-lg flex items-center gap-2 italic">
+                                <div className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />
+                                {msg.content.replace(/🛡️ \*\*SISTEMA EM AÇÃO:\*\* /g, '').split('...')[0]}...
+                            </div>
+                        ))}
                     </div>
                 </div>
             )}
 
-            <div className="flex-1 min-h-0 overflow-y-auto mb-4 space-y-4 pr-2 select-none" ref={scrollRef}>
+            <div className="flex-1 min-h-0 overflow-y-auto mb-3 px-1 space-y-1" ref={scrollRef}
+                style={{ scrollbarWidth: 'thin', scrollbarColor: '#334155 transparent' }}>
+
                 {pendingOrders.length > 0 && (
-                    <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 mb-6 flex-shrink-0">
-                        <div className="flex items-center gap-2 mb-3 text-blue-400 font-bold text-sm uppercase tracking-wider"><BellRing className="w-4 h-4" /> ⚡ Ordens de Produção Pendentes</div>
-                        <div className="space-y-3">
+                    <div className="bg-blue-500/10 border border-blue-500/25 rounded-xl p-3 mb-4">
+                        <div className="flex items-center gap-2 mb-2 text-blue-400 font-bold text-xs uppercase tracking-wider"><BellRing className="w-3.5 h-3.5" /> Ordens Pendentes</div>
+                        <div className="space-y-2">
                             {pendingOrders.map((order) => (
-                                <div key={order.id} className="bg-slate-900/50 rounded-md p-3 border border-slate-700">
-                                    <p className="text-xs text-slate-400 mb-2">Origem: <span className="text-blue-300 font-medium capitalize">{order.origin_agent}</span></p>
-                                    <p className="text-sm text-slate-200 line-clamp-2 italic mb-3">"{order.content}"</p>
-                                    <button onClick={() => { setInput(order.content); setPendingOrders((prev: any[]) => prev.filter(o => o.id !== order.id)); }} className="flex items-center gap-2 text-xs font-bold bg-blue-600 hover:bg-blue-500 text-slate-50 px-3 py-1.5 rounded transition-all"><ArrowRight className="w-3 h-3" /> USAR ESTE CONTEXTO</button>
+                                <div key={order.id} className="bg-slate-900/60 rounded-lg p-3 border border-slate-700/50">
+                                    <p className="text-xs text-slate-400 mb-1">De: <span className="text-blue-300 font-medium capitalize">{order.origin_agent}</span></p>
+                                    <p className="text-xs text-slate-300 line-clamp-2 italic mb-2">"{order.content}"</p>
+                                    <button onClick={() => { setInput(order.content); setPendingOrders((prev: any[]) => prev.filter(o => o.id !== order.id)); }}
+                                        className="flex items-center gap-1.5 text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white px-2.5 py-1 rounded-lg transition-all">
+                                        <ArrowRight className="w-3 h-3" /> Usar contexto
+                                    </button>
                                 </div>
                             ))}
                         </div>
                     </div>
                 )}
+
                 {history.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-full text-slate-500 space-y-4 py-10">
-                        {icon}
-                        <div className="text-center max-w-md">
-                            <p className="font-medium mb-2">Aguardando suas ordens, comandante.</p>
-                            {examples && (
-                                <div className="mt-4 space-y-2">
-                                    <p className="text-xs uppercase tracking-wider text-slate-600 font-bold">Tente perguntar:</p>
-                                    {examples.map((ex, i) => (
-                                        <button key={i} onClick={() => setInput(ex)} className="block w-full text-sm bg-slate-900/50 hover:bg-slate-700 border border-slate-700 p-3 rounded-lg text-slate-400 hover:text-slate-200 transition-all text-left">"{ex}"</button>
-                                    ))}
-                                </div>
-                            )}
+                    <div className="flex flex-col items-center justify-center h-full text-slate-600 py-10">
+                        <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${accent} flex items-center justify-center text-3xl mb-4 shadow-2xl opacity-80`}>
+                            {getAgentAvatar()}
                         </div>
-                    </div>
-                ) : (
-                    <>
-                        {history.length > 20 && (
-                            <div className="text-center py-2">
-                                <span className="text-[11px] text-slate-500 bg-slate-800 px-3 py-1 rounded-full border border-slate-700">
-                                    ⋯ {history.length - 20} mensagens anteriores não exibidas
-                                </span>
+                        <p className="font-semibold text-slate-400 mb-1">{title} pronto para operar</p>
+                        <p className="text-xs text-slate-600 mb-6 text-center max-w-xs">Powered by Gemini AI — envie sua primeira mensagem abaixo</p>
+                        {examples && (
+                            <div className="w-full max-w-md space-y-2">
+                                <p className="text-[10px] uppercase tracking-wider text-slate-600 font-bold text-center mb-3">Sugestões rápidas:</p>
+                                {examples.map((ex, i) => (
+                                    <button key={i} onClick={() => setInput(ex)}
+                                        className="block w-full text-xs bg-slate-800/80 hover:bg-slate-700 border border-slate-700 hover:border-slate-600 p-3 rounded-xl text-slate-400 hover:text-slate-200 transition-all text-left group">
+                                        <span className="text-slate-600 group-hover:text-slate-500 mr-2">💬</span>
+                                        {ex}
+                                    </button>
+                                ))}
                             </div>
                         )}
-                        {history.slice(-20).map((msg, sliceIdx) => {
-                        const absoluteIdx = history.length - 20 + sliceIdx < 0 ? sliceIdx : history.length - Math.min(20, history.length) + sliceIdx;
-                        const msgKey = getMsgKey(msg, absoluteIdx);
-                        
-                        // Extrai a imagem em formato markdown ![alt](url) se houver no conteúdo da mensagem
-                        let extractedImgUrl = '';
-                        const imgRegex = /!\[(.*?)\]\((.*?)\)/;
-                        const match = msg.content.match(imgRegex);
-                        if (match) {
-                            extractedImgUrl = match[2];
-                        }
-                        
-                         let imgUrl = generatedImages[msgKey] || extractedImgUrl;
-                         if (imgUrl && (
-                             imgUrl.includes('via.placeholder.com') ||
-                             imgUrl.includes('public/api/dalle') ||
-                             imgUrl.includes('public/uploads') ||
-                             imgUrl.startsWith('public/api/')
-                         )) {
-                             imgUrl = 'https://images.unsplash.com/photo-1540910419892-4a36d2c3266c';
-                         }
-                         const isThisCardLoading = loadingCardKey === msgKey;
-                        const cleanContent = msg.content.replace(/!\[(.*?)\]\((.*?)\)/g, '').trim();
-
-                        return (
-                        <div key={msgKey} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-300 relative group`}>
-                            <div className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-sm relative ${msg.role === 'user' ? 'bg-blue-600 text-slate-50 rounded-br-sm' : 'bg-slate-700/50 backdrop-blur-sm text-slate-100 border border-slate-600/50 rounded-bl-sm'}`}>
-                                {msg.role === 'agent' && title === 'O Produtor Criativo' && (
-                                    <button
-                                        onClick={async () => {
-                                            if (!confirm("Excluir este card permanentemente?")) return;
-                                            try {
-                                                if (msg.id) {
-                                                    const { data: { session } } = await supabase.auth.getSession();
-                                                    const token = session?.access_token;
-                                                    const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
-                                                    await fetch(`/api/db/agent_chat_history?id=${msg.id}`, {
-                                                        method: 'DELETE',
-                                                        headers
-                                                    });
-                                                }
-                                                const newHistory = history.filter((_, i) => i !== absoluteIdx);
-                                                setHistory(agentId, newHistory);
-                                            } catch (e) { console.error(e); }
-                                        }}
-                                        className="absolute -top-2 -right-2 p-1.5 bg-red-600 text-slate-50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg hover:bg-red-700 z-10"
-                                        title="Excluir Card"
-                                    >
-                                        <Trash2 className="w-3 h-3" />
-                                    </button>
-                                )}
-                                <div className="whitespace-pre-wrap text-sm leading-relaxed">
-                                    {msg.content.startsWith('🛡️') || msg.content.startsWith('🛠️') ? (
-                                        <div className="flex items-center gap-3 py-1 opacity-80">
-                                            <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-ping" />
-                                            <span className="text-[11px] font-medium text-indigo-300 italic">{cleanContent}</span>
-                                        </div>
-                                    ) : (
-                                        cleanContent ? renderText(cleanContent) : null
-                                    )}
-                                </div>
-
-                                {/* Imagem gerada inline */}
-                                {isThisCardLoading && (
-                                    <div className="mt-4 flex items-center gap-3 p-4 bg-slate-800/80 rounded-xl border border-indigo-500/30">
-                                        <Loader2 className="w-5 h-5 animate-spin text-indigo-400 shrink-0" />
-                                        <div>
-                                            <p className="text-xs font-bold text-indigo-400">Gerando ativo visual...</p>
-                                            <p className="text-[10px] text-slate-500 mt-0.5">Gemini Imagen 4 em processo — pode levar até 30s</p>
-                                        </div>
-                                    </div>
-                                )}
-                                {imgUrl && !isThisCardLoading && (
-                                    <div className={`${cleanContent ? 'mt-4' : 'mt-1'} animate-in fade-in zoom-in duration-500`}>
-                                        <p className="text-xs font-bold text-indigo-400 uppercase tracking-tighter mb-2 flex items-center gap-1">
-                                            <SparklesIcon className="w-3 h-3 text-yellow-400" /> Ativo Visual Gerado
-                                        </p>
-                                        <div
-                                            className="rounded-xl overflow-hidden border border-indigo-500/40 shadow-xl shadow-indigo-900/30 cursor-pointer relative group/img"
-                                            onClick={() => { if (!imageErrors[msgKey]) { setLightboxImage(imgUrl); setLightboxRefText(''); } }}
-                                            title={imageErrors[msgKey] ? "Erro ao carregar imagem" : "Clique para expandir, baixar ou referenciar no chat"}
-                                        >
-                                            {imageErrors[msgKey] ? (
-                                                <div className="p-4 text-center text-red-400 text-xs bg-slate-900/80 border border-red-500/20 rounded-xl">
-                                                    ❌ Erro ao carregar imagem.
-                                                </div>
-                                            ) : (
-                                                <>
-                                                    <img
-                                                        src={imgUrl}
-                                                        alt="Ativo Visual"
-                                                        className="w-full h-auto block group-hover/img:brightness-90 transition-all"
-                                                        onError={() => {
-                                                            setImageErrors(prev => ({ ...prev, [msgKey]: true }));
-                                                        }}
-                                                    />
-                                                    <div className="absolute inset-0 flex flex-col items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity bg-black/50 gap-2">
-                                                        <ZoomIn className="w-7 h-7 text-white drop-shadow-xl" />
-                                                        <span className="text-white text-xs font-bold">Clique para expandir</span>
-                                                    </div>
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Botões de ação */}
-                                {msg.role === 'agent' && title === 'O Comandante de Campo' && onGeneratePost && isActionable(msg.content) && (
-                                    <div className="mt-3 pt-3 border-t border-slate-600">
-                                        <p className="text-[10px] text-slate-400 mb-2 font-bold uppercase">Ação da Linha de Montagem:</p>
-                                        <button onClick={() => onGeneratePost(msg.content)} className="flex items-center gap-2 text-xs bg-purple-600 hover:bg-purple-700 text-slate-50 px-3 py-2 rounded-lg font-bold transition-all shadow-lg hover:scale-105 active:scale-95"><Share2 className="w-3 h-3" /> GERAR POST VIRAL AGORA</button>
-                                    </div>
-                                )}
-                                {msg.role === 'agent' && title === 'O Social Media' && onHandoff && isActionable(msg.content) && (
-                                    <div className="mt-3 pt-3 border-t border-slate-600">
-                                        <p className="text-[10px] text-slate-400 mb-2 font-bold uppercase">Integração Google Flow:</p>
-                                        <button onClick={() => onHandoff(msg.content)} className="flex items-center gap-2 text-xs bg-yellow-600 hover:bg-yellow-700 text-slate-50 px-3 py-2 rounded-lg font-bold transition-all shadow-lg hover:scale-105 active:scale-95"><SparklesIcon className="w-3 h-3" /> ENVIAR SCRIPT PARA PRODUÇÃO</button>
-                                    </div>
-                                )}
-                                {msg.role === 'agent' && title === 'O Produtor Criativo' && onExecuteAction && isActionable(msg.content) && !imgUrl && !isThisCardLoading && (
-                                    <div className="mt-3 pt-3 border-t border-slate-600">
-                                        <p className="text-[10px] text-slate-400 mb-2 font-bold uppercase">Execução Automática:</p>
-                                        <button onClick={() => handleExecuteAction(msgKey, msg.content)} disabled={isLoading} className="flex items-center gap-2 text-xs bg-indigo-600 hover:bg-indigo-700 text-slate-50 px-3 py-2 rounded-lg font-bold transition-all shadow-lg hover:scale-105 active:scale-95 disabled:opacity-50"><SparklesIcon className="w-3 h-3" /> 🚀 GERAR ATIVO VISUAL (Gemini Imagen)</button>
-                                    </div>
-                                )}
-                                {msg.role === 'agent' && title === 'O Produtor Criativo' && onGeneratePost && isActionable(msg.content) && (
-                                    <div className="mt-3 pt-3 border-t border-slate-600">
-                                        <p className="text-[10px] text-slate-400 mb-2 font-bold uppercase">Entrega de Ativo:</p>
-                                        <button onClick={() => onGeneratePost(msg.content)} className="flex items-center gap-2 text-xs bg-green-600 hover:bg-green-700 text-slate-50 px-3 py-2 rounded-lg font-bold transition-all shadow-lg hover:scale-105 active:scale-95"><CheckCircle2 className="w-3 h-3" /> DEVOLVER PARA SOCIAL MEDIA</button>
-                                    </div>
-                                )}
-                                {msg.role === 'agent' && onPublish && imgUrl && (
-                                    <div className="mt-3 pt-3 border-t border-slate-600/50">
-                                        <button
-                                            onClick={() => onPublish(msg.content.replace(/\*\*/g, '').trim(), imgUrl)}
-                                            className="w-full flex items-center justify-center gap-2 text-[10px] bg-emerald-600 hover:bg-emerald-500 text-slate-50 py-2 rounded-lg font-bold transition-all shadow-md active:scale-95"
-                                        >
-                                            <Send className="w-3 h-3" /> PUBLICAR NAS REDES CONECTADAS
-                                        </button>
-                                    </div>
-                                )}
+                    </div>
+                ) : (
+                    history.map((msg, idx) => (
+                        <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                            <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm shadow-sm ${msg.role === 'user' ? 'bg-emerald-600 text-white rounded-tr-none' : 'bg-slate-800 text-slate-200 rounded-tl-none border border-slate-700'}`}>
+                                <div className="whitespace-pre-wrap">{renderMarkdown(msg.content)}</div>
+                                <span className="text-[9px] opacity-50 block mt-1 text-right">{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                             </div>
                         </div>
-                        );
-                    })}
-                    </>
+                    ))
                 )}
                 {isLoading && (
                     <div className="flex justify-start">
-                        <div className="bg-slate-700 text-slate-100 rounded-2xl rounded-bl-sm px-4 py-3 flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /><span className="text-sm">Analisando dados...</span></div>
+                        <div className="bg-slate-800 px-4 py-3 rounded-2xl rounded-tl-none border border-slate-700 text-slate-400 flex gap-1">
+                            <div className="w-1.5 h-1.5 bg-slate-500 rounded-full animate-bounce" />
+                            <div className="w-1.5 h-1.5 bg-slate-500 rounded-full animate-bounce [animation-delay:0.2s]" />
+                            <div className="w-1.5 h-1.5 bg-slate-500 rounded-full animate-bounce [animation-delay:0.4s]" />
+                        </div>
                     </div>
                 )}
             </div>
-            {/* Área de anexo de imagem de referência no Chat input */}
-            <form onSubmit={handleSubmit} className="relative mt-auto flex-shrink-0">
-                {referenceImage && (
-                    <div className="absolute bottom-full left-0 mb-2 p-2 bg-slate-900 border border-slate-700 rounded-xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                        <div className="w-10 h-10 rounded-lg overflow-hidden border border-indigo-500/40 relative">
-                            <img src={referenceImage} alt="Referência" className="w-full h-full object-cover" />
-                            <button 
-                                type="button" 
-                                onClick={() => setReferenceImage(null)} 
-                                className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity text-red-400"
-                                title="Remover"
-                            >
-                                <X className="w-4 h-4" />
+
+            {/* Smart Suggestions from Strategist */}
+            {suggestions.length > 0 && history.length > 0 && (
+                <div className="mb-2 flex-shrink-0">
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                        <Lightbulb className="w-3 h-3 text-amber-400" />
+                        <span className="text-[10px] font-bold text-amber-400/80 uppercase tracking-wider">Sugestões do Estrategista:</span>
+                    </div>
+                    <div className="flex gap-2 flex-wrap">
+                        {suggestions.map((s, i) => (
+                            <button key={i} onClick={() => setInput(s)}
+                                className="text-[11px] bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/25 hover:border-amber-500/40 text-amber-300/90 px-3 py-1.5 rounded-xl transition-all text-left max-w-[200px] line-clamp-1">
+                                {s}
                             </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Input Area */}
+            <div className="flex-shrink-0">
+                {/* Attached Media Preview */}
+                {attachedMedia && (
+                    <div className="mb-2 p-2 bg-slate-900/80 border border-slate-700 rounded-xl flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                        {attachedMedia.type === 'image' ? (
+                            <div className="w-12 h-12 rounded-lg overflow-hidden border border-indigo-500/40 flex-shrink-0 relative group">
+                                <img src={attachedMedia.dataUrl} alt="Preview" className="w-full h-full object-cover" />
+                                <button type="button" onClick={() => setAttachedMedia(null)}
+                                    className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-red-400">
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="w-12 h-12 rounded-lg border border-purple-500/40 flex-shrink-0 relative group bg-slate-800 flex items-center justify-center">
+                                <Video className="w-5 h-5 text-purple-400" />
+                                <button type="button" onClick={() => setAttachedMedia(null)}
+                                    className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-red-400">
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                            <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">
+                                {attachedMedia.type === 'image' ? '📷 Imagem de referência' : '🎬 Vídeo de referência'}
+                            </p>
+                            <p className="text-[10px] text-slate-500 truncate">{attachedMedia.name}</p>
                         </div>
-                        <div className="text-[10px]">
-                            <p className="text-indigo-400 font-bold uppercase tracking-wider">Imagem de Referência Ativa</p>
-                            <p className="text-slate-500">Substituirá o candidato nesta geração.</p>
-                        </div>
+                        <button type="button" onClick={() => setAttachedMedia(null)} className="text-slate-500 hover:text-red-400 transition-colors p-1">
+                            <X className="w-4 h-4" />
+                        </button>
                     </div>
                 )}
-                
-                <input 
-                    type="text" 
-                    value={input} 
-                    onChange={(e) => setInput(e.target.value)} 
-                    placeholder={placeholder} 
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-12 pr-12 py-3.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm" 
-                    disabled={isLoading} 
-                />
-                
-                {/* Botão de Anexo */}
-                <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isLoading}
-                    className="absolute left-2.5 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-indigo-400 transition-colors disabled:opacity-50"
-                    title="Anexar Imagem de Referência para a IA"
-                >
-                    <ZoomIn className="w-5 h-5" />
-                </button>
-                <input 
-                    type="file" 
-                    ref={fileInputRef} 
-                    onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                            const reader = new FileReader();
-                            reader.onloadend = () => {
-                                setReferenceImage(reader.result as string);
-                            };
-                            reader.readAsDataURL(file);
-                        }
-                    }} 
-                    accept="image/*" 
-                    className="hidden" 
-                />
 
-                <button type="submit" disabled={!input.trim() || isLoading} className="absolute right-2.5 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-blue-400 disabled:opacity-50 disabled:hover:text-slate-400 transition-colors"><Send className="w-5 h-5" /></button>
-            </form>
+                <form onSubmit={handleSubmit} className="flex items-end gap-2">
+                    <button type="button" onClick={() => mediaInputRef.current?.click()} disabled={isLoading}
+                        className="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-xl bg-slate-800 border border-slate-700 hover:bg-slate-700 hover:border-indigo-500/50 text-slate-400 hover:text-indigo-400 transition-all disabled:opacity-40"
+                        title="Anexar imagem ou vídeo">
+                        <Paperclip className="w-4 h-4" />
+                    </button>
+                    <input type="file" ref={mediaInputRef} onChange={handleMediaAttach} accept="image/*,video/*" className="hidden" />
+                    <input type="file" ref={fileInputRef} onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) { const r = new FileReader(); r.onloadend = () => setReferenceImage(r.result as string); r.readAsDataURL(f); }
+                    }} accept="image/*" className="hidden" />
 
-            {/* ── Lightbox Modal ─────────────────────────────────────── */}
+                    <div className="flex-1">
+                        <textarea ref={textareaRef} value={input} onChange={(e) => setInput(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit(e as any); } }}
+                            placeholder={placeholder}
+                            className="w-full bg-slate-800/90 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 transition-all resize-none leading-relaxed"
+                            style={{ minHeight: '44px', maxHeight: '120px' }} disabled={isLoading} rows={1} />
+                    </div>
+
+                    <button type="submit" disabled={(!input.trim() && !attachedMedia) || isLoading}
+                        className={`flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-xl transition-all shadow-lg ${
+                            (input.trim() || attachedMedia) && !isLoading
+                                ? `bg-gradient-to-br ${accent} hover:opacity-90 text-white hover:scale-105 active:scale-95`
+                                : 'bg-slate-800 text-slate-600 cursor-not-allowed border border-slate-700'
+                        }`}>
+                        {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                    </button>
+                </form>
+                <p className="text-[10px] text-slate-600 mt-1.5 ml-12">Enter para enviar · Shift+Enter nova linha · Imagens e vídeos suportados</p>
+            </div>
+
+            {/* Lightbox Modal */}
             {lightboxImage && (
-                <div
-                    className="fixed inset-0 z-[9999] bg-black/90 backdrop-blur-md flex items-center justify-center p-4"
-                    onClick={() => setLightboxImage(null)}
-                >
-                    <div
-                        className="relative w-full max-w-2xl bg-slate-900 rounded-2xl border border-slate-700 shadow-2xl animate-in fade-in zoom-in duration-300 overflow-hidden flex flex-col max-h-[90vh]"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        {/* Header */}
+                <div className="fixed inset-0 z-[9999] bg-black/95 backdrop-blur-lg flex items-center justify-center p-4"
+                    onClick={() => setLightboxImage(null)}>
+                    <div className="relative w-full max-w-2xl bg-slate-900 rounded-2xl border border-slate-700/80 shadow-2xl animate-in fade-in zoom-in duration-200 overflow-hidden flex flex-col max-h-[90vh]"
+                        onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700 flex-shrink-0">
                             <p className="text-sm font-bold text-slate-100 flex items-center gap-2">
-                                <SparklesIcon className="w-4 h-4 text-indigo-400" />
-                                Ativo Visual Gerado
+                                <SparklesIcon className="w-4 h-4 text-indigo-400" /> Visualização
                             </p>
                             <div className="flex items-center gap-2">
-                                {/* Download */}
-                                <a
-                                    href="#"
-                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDownload(lightboxImage!); }}
-                                    className="flex items-center gap-1.5 text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg font-bold transition-all shadow-md hover:scale-105 active:scale-95"
-                                >
-                                    <Download className="w-3.5 h-3.5" /> Baixar Imagem
+                                <a href="#" onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDownload(lightboxImage!); }}
+                                    className="flex items-center gap-1.5 text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-xl font-bold transition-all shadow-md hover:scale-105">
+                                    <Download className="w-3.5 h-3.5" /> Baixar
                                 </a>
-                                {/* Close */}
-                                <button
-                                    onClick={() => setLightboxImage(null)}
-                                    className="p-1.5 text-slate-400 hover:text-slate-100 hover:bg-slate-700 rounded-lg transition-all"
-                                >
+                                <button onClick={() => setLightboxImage(null)} className="p-1.5 text-slate-400 hover:text-slate-100 hover:bg-slate-700 rounded-xl transition-all">
                                     <X className="w-4 h-4" />
                                 </button>
                             </div>
                         </div>
-
-                        {/* Image */}
                         <div className="overflow-auto flex-1 p-4">
-                            <img
-                                src={lightboxImage}
-                                alt="Ativo Visual"
-                                className="w-full h-auto rounded-xl border border-slate-700 block"
-                            />
+                            <img src={lightboxImage} alt="Ativo Visual" className="w-full h-auto rounded-xl border border-slate-700 block" />
                         </div>
-
-                        {/* Use in Chat */}
                         <div className="px-4 pb-4 pt-3 border-t border-slate-700 flex-shrink-0">
                             <p className="text-[11px] text-slate-400 mb-2 font-semibold flex items-center gap-1.5 uppercase tracking-wider">
-                                <MessageSquarePlus className="w-3.5 h-3.5 text-purple-400" />
-                                Referenciar este ativo no chat
+                                <MessageSquarePlus className="w-3.5 h-3.5 text-purple-400" /> Referenciar no chat
                             </p>
                             <div className="flex gap-2">
-                                <input
-                                    ref={lightboxInputRef}
-                                    type="text"
-                                    value={lightboxRefText}
-                                    onChange={(e) => setLightboxRefText(e.target.value)}
-                                    placeholder="Ex: Adicione o nome do candidato em destaque..."
-                                    className="flex-1 bg-slate-800 border border-slate-600 focus:border-indigo-500 rounded-lg px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all"
+                                <input ref={lightboxInputRef} type="text" value={lightboxRefText} onChange={(e) => setLightboxRefText(e.target.value)}
+                                    placeholder="Ex: Adicione o nome do candidato..."
+                                    className="flex-1 bg-slate-800 border border-slate-600 focus:border-indigo-500 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all"
                                     onKeyDown={(e) => {
-                                        if (e.key === 'Enter' && lightboxRefText.trim()) {
-                                            setInput(`[Referindo-se ao ativo visual gerado] ${lightboxRefText.trim()}`);
-                                            setLightboxImage(null);
-                                            setLightboxRefText('');
-                                        }
+                                        if (e.key === 'Enter' && lightboxRefText.trim()) { setInput(`[Referindo-se ao ativo visual gerado] ${lightboxRefText.trim()}`); setLightboxImage(null); setLightboxRefText(''); }
                                         if (e.key === 'Escape') setLightboxImage(null);
-                                    }}
-                                    autoFocus
-                                />
-                                <button
-                                    disabled={!lightboxRefText.trim()}
-                                    onClick={() => {
-                                        if (!lightboxRefText.trim()) return;
-                                        setInput(`[Referindo-se ao ativo visual gerado] ${lightboxRefText.trim()}`);
-                                        setLightboxImage(null);
-                                        setLightboxRefText('');
-                                    }}
-                                    className="flex items-center gap-1.5 text-xs bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-3 py-2 rounded-lg font-bold transition-all whitespace-nowrap shadow-md hover:scale-105 active:scale-95"
-                                >
-                                    <Send className="w-3 h-3" /> Usar no Chat
+                                    }} autoFocus />
+                                <button disabled={!lightboxRefText.trim()} onClick={() => {
+                                    if (!lightboxRefText.trim()) return;
+                                    setInput(`[Referindo-se ao ativo visual gerado] ${lightboxRefText.trim()}`);
+                                    setLightboxImage(null); setLightboxRefText('');
+                                }} className="flex items-center gap-1.5 text-xs bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white px-3 py-2 rounded-xl font-bold transition-all shadow-md hover:scale-105">
+                                    <Send className="w-3 h-3" /> Usar
                                 </button>
                             </div>
-                            <p className="text-[10px] text-slate-600 mt-1.5">Pressione Enter para enviar ou Esc para fechar</p>
+                            <p className="text-[10px] text-slate-600 mt-1.5">Enter para enviar · Esc para fechar</p>
                         </div>
                     </div>
                 </div>
