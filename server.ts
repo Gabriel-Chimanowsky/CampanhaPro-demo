@@ -476,7 +476,7 @@ async function startServer() {
         return res.status(403).json({ error: 'Acesso negado: Apenas Administrador Geral pode executar esta ação.' });
       }
       
-      const { name, email, password, type, campaign_id, role, ai_credits, ai_used } = req.body;
+      const { name, email, password, type, campaign_id, role, ai_credits, ai_used, phone } = req.body;
       const { userId } = req.params;
       
       const setClauses: string[] = [];
@@ -489,6 +489,7 @@ async function startServer() {
       if (role !== undefined) { setClauses.push('role = ?'); values.push(role); }
       if (ai_credits !== undefined) { setClauses.push('ai_credits = ?'); values.push(ai_credits); }
       if (ai_used !== undefined) { setClauses.push('ai_used = ?'); values.push(ai_used); }
+      if (phone !== undefined) { setClauses.push('phone = ?'); values.push(phone); }
       
       if (password !== undefined && password !== null && password.trim() !== '') {
         const hashedPassword = await bcrypt.hash(password.trim(), 10);

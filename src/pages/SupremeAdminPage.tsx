@@ -83,7 +83,8 @@ const SupremeAdminPage: React.FC = () => {
         campaign_id: '',
         ai_credits: 100,
         ai_used: 0,
-        role: 'active' as any
+        role: 'active' as any,
+        phone: ''
     });
     const [isSavingUser, setIsSavingUser] = useState(false);
     const [showConfigModal, setShowConfigModal] = useState<string | null>(null);
@@ -362,7 +363,8 @@ const SupremeAdminPage: React.FC = () => {
                     campaign_id: editUserForm.campaign_id,
                     role: editUserForm.role,
                     ai_credits: editUserForm.ai_credits,
-                    ai_used: editUserForm.ai_used
+                    ai_used: editUserForm.ai_used,
+                    phone: editUserForm.phone
                 })
             });
 
@@ -581,10 +583,10 @@ const SupremeAdminPage: React.FC = () => {
                                                     </td>
                                                     <td className="px-6 py-5">
                                                         <div className="flex gap-1">
-                                                            {config.features?.slice(0, 3).map((f, i) => (
+                                                            {Array.isArray(config.features) ? config.features.slice(0, 3).map((f, i) => (
                                                                 <span key={i} className="w-2 h-2 rounded-full bg-indigo-500" title={f} />
-                                                            ))}
-                                                            {(config.features?.length || 0) > 3 && <span className="text-[8px] text-slate-500 font-bold">+{config.features!.length - 3}</span>}
+                                                            )) : null}
+                                                            {Array.isArray(config.features) && config.features.length > 3 && <span className="text-[8px] text-slate-500 font-bold">+{config.features.length - 3}</span>}
                                                         </div>
                                                     </td>
                                                     <td className="px-6 py-5">
@@ -742,7 +744,8 @@ const SupremeAdminPage: React.FC = () => {
                                                                     campaign_id: String(u.campaign_id || u.campaignId || ''),
                                                                     ai_credits: (u as any).aiCredits !== undefined && (u as any).aiCredits !== null ? (u as any).aiCredits : 100,
                                                                     ai_used: (u as any).aiUsed !== undefined && (u as any).aiUsed !== null ? (u as any).aiUsed : 0,
-                                                                    role: u.role || 'active'
+                                                                    role: u.role || 'active',
+                                                                    phone: (u as any).phone || ''
                                                                 });
                                                                 setShowEditUserModal(true);
                                                             }}
@@ -1181,12 +1184,17 @@ const SupremeAdminPage: React.FC = () => {
                             <h4 className="text-[10px] font-black uppercase text-indigo-400 border-b border-indigo-500/20 pb-1">Funcionalidades Liberadas</h4>
                             <div className="grid grid-cols-2 gap-2">
                                 {['dashboard', 'visits', 'team', 'reports', 'financial', 'ai_agents', 'content_Brief', 'field_ops'].map(feat => {
-                                    const isEnabled = campaignConfigs[showConfigModal]?.features.includes(feat);
+                                    const featuresArray = Array.isArray(campaignConfigs[showConfigModal]?.features)
+                                        ? campaignConfigs[showConfigModal]?.features
+                                        : [];
+                                    const isEnabled = featuresArray.includes(feat);
                                     return (
                                         <button 
                                             key={feat}
                                             onClick={() => {
-                                                const current = campaignConfigs[showConfigModal]?.features || [];
+                                                const current = Array.isArray(campaignConfigs[showConfigModal]?.features)
+                                                    ? campaignConfigs[showConfigModal]?.features
+                                                    : [];
                                                 const next = isEnabled ? current.filter(f => f !== feat) : [...current, feat];
                                                 updateConfig(showConfigModal, { features: next });
                                             }}
@@ -1298,6 +1306,12 @@ const SupremeAdminPage: React.FC = () => {
                         placeholder="Mínimo 6 caracteres se preenchido"
                         value={editUserForm.password} 
                         onChange={e => setEditUserForm({...editUserForm, password: e.target.value})}
+                    />
+                    <Input 
+                        label="WhatsApp / Telefone de Suporte"
+                        placeholder="Ex: 5521999947477"
+                        value={editUserForm.phone || ''} 
+                        onChange={e => setEditUserForm({...editUserForm, phone: e.target.value})}
                     />
                     
                     <div className="grid grid-cols-2 gap-4">

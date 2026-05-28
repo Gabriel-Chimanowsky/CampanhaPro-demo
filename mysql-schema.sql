@@ -382,6 +382,21 @@ CREATE TABLE IF NOT EXISTS backups (
     INDEX idx_backups_campaign (campaign_id)
 );
 
+-- 26. Consumo de IA (ai_usage)
+DROP TABLE IF EXISTS ai_usage;
+CREATE TABLE IF NOT EXISTS ai_usage (
+    id CHAR(36) PRIMARY KEY,
+    campaign_id CHAR(36),
+    user_id CHAR(36),
+    model VARCHAR(255),
+    prompt_tokens INT DEFAULT 0,
+    response_tokens INT DEFAULT 0,
+    total_tokens INT DEFAULT 0,
+    estimated_cost DECIMAL(10,6) DEFAULT 0,
+    endpoint VARCHAR(255),
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- DADOS INICIAIS (SEED)
 INSERT IGNORE INTO campaign_configs (id, status, features, limits) 
 VALUES ('455d21f3-f254-4b96-b49c-e70192c3fe27', 'active', '{}', '{}');
