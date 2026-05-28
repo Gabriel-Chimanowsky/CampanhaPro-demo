@@ -12,7 +12,7 @@ import {
     Settings, Plus, Search, Lock, Unlock,
     Layout, Cpu, AlertTriangle, Trash2, Mail,
     CreditCard, Layers, TrendingUp as TrendingIcon,
-    Activity, Filter, Download, MessageSquarePlus
+    Activity, Filter, Download, MessageSquarePlus, LogOut
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -541,9 +541,14 @@ const SupremeAdminPage: React.FC = () => {
                             <p className="text-xs font-black text-slate-50 leading-none uppercase">{user?.name || 'ADMINISTRADOR'}</p>
                             <p className="text-[10px] text-slate-400 font-medium">GESTÃO SUPREMA</p>
                         </div>
-                        <Button variant="ghost" onClick={logout} className="h-8 w-8 p-0 rounded-full hover:bg-red-500/10">
-                            <Mail className="w-4 h-4 text-slate-500 hover:text-red-500" />
-                        </Button>
+                        <button
+                            onClick={logout}
+                            title="Sair do painel"
+                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold text-red-400 border border-red-500/20 bg-red-500/5 hover:bg-red-500/15 hover:text-red-300 hover:border-red-400/40 transition-all duration-200 group"
+                        >
+                            <LogOut className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform duration-200" />
+                            <span className="hidden sm:inline">Sair</span>
+                        </button>
                     </div>
                 </div>
             </header>
