@@ -426,7 +426,7 @@ const AgentsHQPage: React.FC = () => {
                 <div className="flex items-center gap-2">
                     <div className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-500/10 text-indigo-400 rounded-full text-xs font-bold border border-indigo-500/20 shadow-lg shadow-indigo-500/5">
                         <Cpu className="w-3.5 h-3.5" />
-                        Créditos: {credits.used}
+                        Créditos: {credits.total - credits.used}
                     </div>
                     <button
                         onClick={() => setAutoPipelineEnabled((prev: boolean) => !prev)}

@@ -1477,30 +1477,24 @@ Por favor, retorne APENAS o prompt final em inglês. Não inclua nenhuma introdu
     // 1. Tentar primeiro o Imagen 3 (Nano Banana)
     if (geminiKey) {
       try {
-        console.log('[ImageGenHelper] Tentando Imagen 3 (Nano Banana) para prompt:', ptPrompt);
+        console.log('[ImageGenHelper] Tentando Imagen 3 (Nano Banana) via OpenAI-compatible endpoint para prompt:', ptPrompt);
         const response = await axios.post(
-          `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${geminiKey}`,
+          'https://generativelanguage.googleapis.com/v1beta/openai/images/generations',
           {
-            instances: [
-              {
-                prompt: ptPrompt
-              }
-            ],
-            parameters: {
-              sampleCount: 1,
-              outputMimeType: "image/png",
-              aspectRatio: "1:1"
-            }
+            model: "imagen-3.0-generate-002",
+            prompt: ptPrompt,
+            n: 1,
+            response_format: "b64_json"
           },
           {
             headers: {
+              'Authorization': `Bearer ${geminiKey}`,
               'Content-Type': 'application/json'
             }
           }
         );
 
-        const predictions = response.data?.predictions || [];
-        const b64 = predictions[0]?.bytesBase64Encoded || response.data?.generatedImages?.[0]?.image?.imageBytes;
+        const b64 = response.data?.data?.[0]?.b64_json;
         if (b64) {
           imageBase64 = b64;
           try {
@@ -1520,7 +1514,7 @@ Por favor, retorne APENAS o prompt final em inglês. Não inclua nenhuma introdu
             console.warn('[ImageGenHelper] Falha ao escrever arquivo no disco, usando apenas Base64:', writeErr.message);
           }
         } else {
-          geminiErrorDetail = 'API Imagen 3 não retornou imagem no formato esperado.';
+          geminiErrorDetail = 'API Imagen 3 não retornou imagem no formato b64_json esperado.';
           console.warn('[ImageGenHelper] API Imagen 3 não retornou imagem.', response.data);
         }
       } catch (geminiErr: any) {
@@ -1589,9 +1583,8 @@ Por favor, retorne APENAS o prompt final em inglês. Não inclua nenhuma introdu
     }
 
     if (!imageUrl && !imageBase64) {
-      console.warn(`[ImageGenHelper] Todos os provedores falharam. Gemini Error: ${geminiErrorDetail} | DALL-E Error: ${dalleErrorDetail}. Usando imagem de contingência de alta qualidade...`);
-      // Contingência de fotografia real de campanha/palanque em alta qualidade (Unsplash)
-      imageUrl = "https://images.unsplash.com/photo-1540910419892-4a36d2c3266c?auto=format&fit=crop&q=80&w=1024";
+      console.warn(`[ImageGenHelper] Todos os provedores falharam. Gemini Error: ${geminiErrorDetail} | DALL-E Error: ${dalleErrorDetail}.`);
+      throw new Error(`Falha na geração de imagem com a IA: ${geminiErrorDetail}`);
     }
 
     return { imageUrl, imageBase64 };
