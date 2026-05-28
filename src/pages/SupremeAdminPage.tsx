@@ -10,7 +10,7 @@ import { syncPlanForCampaign, getPlanConfig } from '../utils/planUtils';
 import { 
     Users, ShieldAlert, Ban, CheckCircle, Globe, 
     Settings, Plus, Search, Lock, Unlock,
-    Layout, Cpu, AlertTriangle, Trash2, Mail,
+    Layout, Cpu, AlertTriangle, Trash2,
     CreditCard, Layers, TrendingUp as TrendingIcon,
     Activity, Filter, Download, MessageSquarePlus, LogOut
 } from 'lucide-react';
@@ -338,7 +338,7 @@ const SupremeAdminPage: React.FC = () => {
                 
                 // Obter custom fields globais para herança
                 const globalConfig = campaignConfigs['global'];
-                const defaultCustomFields = globalConfig?.customFields || globalConfig?.custom_fields || { visits: [], reports: [], surveys: [] };
+                const defaultCustomFields = globalConfig?.customFields || { visits: [], reports: [], surveys: [] };
 
                 await supabase.from('campaign_configs').insert({
                     id: campaignId,
@@ -1635,7 +1635,7 @@ const SupremeAdminPage: React.FC = () => {
 
                     // Carregar campos da campanha especial 'global'
                     const globalConfig = campaignConfigs['global'] || { customFields: { visits: [], reports: [], surveys: [] } } as any;
-                    const currentFields = (globalConfig.customFields?.[formKey] || globalConfig.custom_fields?.[formKey] || []) as CustomField[];
+                    const currentFields = (globalConfig.customFields?.[formKey] || []) as CustomField[];
 
                     return (
                         <div className="p-4 space-y-6">
