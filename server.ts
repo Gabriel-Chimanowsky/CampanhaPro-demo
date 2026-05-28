@@ -505,6 +505,27 @@ async function startServer() {
       const query = `UPDATE users SET ${setClauses.join(', ')} WHERE id = ?`;
       await pool.execute(query, values);
       
+      if (supabaseAdmin) {
+        try {
+          const supBody: any = {};
+          if (name !== undefined) supBody.name = name;
+          if (email !== undefined) supBody.email = email;
+          if (type !== undefined) supBody.type = type;
+          if (campaign_id !== undefined) supBody.campaign_id = campaign_id;
+          if (role !== undefined) supBody.role = role;
+          if (ai_credits !== undefined) supBody.ai_credits = ai_credits;
+          if (ai_used !== undefined) supBody.ai_used = ai_used;
+          if (phone !== undefined) supBody.phone = phone;
+          
+          await supabaseAdmin
+            .from('users')
+            .update(supBody)
+            .eq('id', userId);
+        } catch (supErr: any) {
+          console.warn('[ADMIN-USERS-PUT] Supabase Sync Warning:', supErr.message);
+        }
+      }
+      
       return res.json({ success: true, message: 'Usuário atualizado com sucesso' });
     } catch (err: any) {
       console.error('[ADMIN-USERS-PUT] Error:', err);
@@ -523,7 +544,7 @@ async function startServer() {
         return res.status(403).json({ error: 'Acesso negado: Apenas Administrador Geral pode executar esta ação.' });
       }
       
-      const { status, maintenance_status, limits, features } = req.body;
+      const { status, maintenance_status, limits, features, customFields, custom_fields } = req.body;
       const { campaignId } = req.params;
       
       const setClauses: string[] = [];
@@ -540,6 +561,12 @@ async function startServer() {
         values.push(typeof features === 'object' ? JSON.stringify(features) : features); 
       }
       
+      const cFields = customFields || custom_fields;
+      if (cFields !== undefined) {
+        setClauses.push('custom_fields = ?');
+        values.push(typeof cFields === 'object' ? JSON.stringify(cFields) : cFields);
+      }
+      
       if (setClauses.length === 0) {
         return res.json({ success: true });
       }
@@ -547,6 +574,24 @@ async function startServer() {
       values.push(campaignId);
       const query = `UPDATE campaign_configs SET ${setClauses.join(', ')} WHERE id = ?`;
       await pool.execute(query, values);
+      
+      if (supabaseAdmin) {
+        try {
+          const supBody: any = {};
+          if (status !== undefined) supBody.status = status;
+          if (limits !== undefined) supBody.limits = typeof limits === 'string' ? JSON.parse(limits) : limits;
+          if (features !== undefined) supBody.features = typeof features === 'string' ? JSON.parse(features) : features;
+          if (cFields !== undefined) supBody.custom_fields = typeof cFields === 'string' ? JSON.parse(cFields) : cFields;
+          
+          if (Object.keys(supBody).length > 0) {
+            await supabaseAdmin
+              .from('campaign_configs')
+              .upsert({ id: campaignId, ...supBody }, { onConflict: 'id' });
+          }
+        } catch (supErr: any) {
+          console.warn('[ADMIN-CAMPAIGNS-PUT] Supabase Sync Warning:', supErr.message);
+        }
+      }
       
       return res.json({ success: true, message: 'Campanha atualizada com sucesso' });
     } catch (err: any) {
@@ -2602,6 +2647,7 @@ Por favor, retorne APENAS o prompt final em inglês. Não inclua nenhuma introdu
             id CHAR(36) PRIMARY KEY,
             features LONGTEXT,
             limits LONGTEXT,
+            custom_fields LONGTEXT,
             status VARCHAR(50) DEFAULT 'active',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -2726,7 +2772,8 @@ Por favor, retorne APENAS o prompt final em inglês. Não inclua nenhuma introdu
         { name: 'instagram_engagements', sql: `CREATE TABLE IF NOT EXISTS instagram_engagements (id CHAR(36) PRIMARY KEY, campaign_id CHAR(36), instagram_handle VARCHAR(255), instagram_user_id VARCHAR(255), engagement_type VARCHAR(50), instagram_post_id VARCHAR(255), instagram_comment_id VARCHAR(255), comment_text TEXT, matched_lead_id CHAR(36), match_confidence FLOAT, webhook_received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;` },
         { name: 'instagram_webhook_logs', sql: `CREATE TABLE IF NOT EXISTS instagram_webhook_logs (id CHAR(36) PRIMARY KEY, campaign_id CHAR(36), event VARCHAR(100), raw_payload LONGTEXT, status VARCHAR(50), processed_engagements INT DEFAULT 0, matched_leads INT DEFAULT 0, error_message TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;` },
         { name: 'ai_compliance_logs', sql: `CREATE TABLE IF NOT EXISTS ai_compliance_logs (id CHAR(36) PRIMARY KEY, campaign_id CHAR(36), agent_id VARCHAR(100), action_type VARCHAR(100), input_summary TEXT, output_summary TEXT, ai_disclosure_required TINYINT(1) DEFAULT 1, human_approved TINYINT(1) DEFAULT 0, risk_level VARCHAR(50), created_by CHAR(36), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;` },
-        { name: 'backups', sql: `CREATE TABLE IF NOT EXISTS backups (id CHAR(36) PRIMARY KEY, campaign_id CHAR(36), name VARCHAR(255), status VARCHAR(50) DEFAULT 'completed', size_kb INT DEFAULT 0, data LONGTEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, INDEX idx_backups_campaign (campaign_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;` }
+        { name: 'backups', sql: `CREATE TABLE IF NOT EXISTS backups (id CHAR(36) PRIMARY KEY, campaign_id CHAR(36), name VARCHAR(255), status VARCHAR(50) DEFAULT 'completed', size_kb INT DEFAULT 0, data LONGTEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, INDEX idx_backups_campaign (campaign_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;` },
+        { name: 'ai_usage', sql: `CREATE TABLE IF NOT EXISTS ai_usage (id CHAR(36) PRIMARY KEY, campaign_id CHAR(36), user_id CHAR(36), model VARCHAR(255), prompt_tokens INT DEFAULT 0, response_tokens INT DEFAULT 0, total_tokens INT DEFAULT 0, estimated_cost DECIMAL(10,6) DEFAULT 0, endpoint VARCHAR(255), timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;` }
       ];
 
       for (const table of tables) {
@@ -2760,6 +2807,7 @@ Por favor, retorne APENAS o prompt final em inglês. Não inclua nenhuma introdu
         `ALTER TABLE agent_chat_history MODIFY COLUMN id BIGINT AUTO_INCREMENT`,
         // Recursos de gestão de crédito de IA e status financeiro
         `ALTER TABLE campaign_configs ADD COLUMN maintenance_status VARCHAR(50) DEFAULT 'paid'`,
+        `ALTER TABLE campaign_configs ADD COLUMN custom_fields LONGTEXT NULL`,
         `ALTER TABLE users ADD COLUMN ai_credits INT DEFAULT 100`,
         `ALTER TABLE users ADD COLUMN ai_used INT DEFAULT 0`
       ];

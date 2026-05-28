@@ -4,7 +4,7 @@ import { AuthenticatedUser, Plan } from '../types/user';
 import { ensureCampaignConfig } from '../utils/planUtils';
 
 const SUPREME_ADMIN_EMAIL = import.meta.env.VITE_SUPREME_ADMIN_EMAIL || 'eldastito@gmail.com';
-const VIP_EMAILS = [SUPREME_ADMIN_EMAIL, 'examepad@gmail.com'];
+const VIP_EMAILS = [SUPREME_ADMIN_EMAIL, 'examepad@gmail.com', 'supreme@campanhapro.com.br'];
 
 interface AuthContextType {
   user: AuthenticatedUser | null;
@@ -99,8 +99,8 @@ export const AuthProvider = ({ children }: { children?: React.ReactNode }) => {
             const dbIsSupremeAdmin = !!(userData.is_supreme_admin ?? userData.isSupremeAdmin);
             const dbAssignedLeaderId = userData.assigned_leader_id ?? userData.assignedLeaderId;
 
-            // isSupremeAdmin ONLY routes to SupremeAdminPage — keep it exclusive to eldastito
-            const isSupremeAdmin = session.user.email === SUPREME_ADMIN_EMAIL || dbIsSupremeAdmin;
+            // isSupremeAdmin ONLY routes to SupremeAdminPage — keep it exclusive to eldastito or supreme
+            const isSupremeAdmin = session.user.email === SUPREME_ADMIN_EMAIL || session.user.email === 'supreme@campanhapro.com.br' || dbIsSupremeAdmin;
             // VIP emails get Admin/Total plan but stay in CampaignWebApp (NOT SupremeAdminPage)
             const isVip = VIP_EMAILS.includes(session.user.email || '');
             setUser({

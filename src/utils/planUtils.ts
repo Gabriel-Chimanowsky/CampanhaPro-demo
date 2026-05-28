@@ -100,10 +100,27 @@ export async function ensureCampaignConfig(
 
   if (!existing) {
     const config = getPlanConfig(plan);
+    
+    // Obter custom fields globais para herança se existirem
+    let defaultCustomFields = { visits: [], reports: [], surveys: [] };
+    try {
+      const { data: globalConfig } = await supabase
+        .from('campaign_configs')
+        .select('custom_fields')
+        .eq('id', 'global')
+        .maybeSingle();
+      if (globalConfig?.custom_fields) {
+        defaultCustomFields = globalConfig.custom_fields;
+      }
+    } catch (e) {
+      console.warn('Erro ao carregar custom fields globais para herança:', e);
+    }
+
     await supabase.from('campaign_configs').insert({
       id: campaignId,
       features: config.features,
       limits: config.limits,
+      custom_fields: defaultCustomFields,
       status: 'active',
     });
   }

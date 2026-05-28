@@ -12,7 +12,7 @@ import {
     Settings, Plus, Search, Lock, Unlock,
     Layout, Cpu, AlertTriangle, Trash2, Mail,
     CreditCard, Layers, TrendingUp as TrendingIcon,
-    Activity, Filter, Download
+    Activity, Filter, Download, MessageSquarePlus
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -95,6 +95,11 @@ const SupremeAdminPage: React.FC = () => {
     const [isManagingPassword, setIsManagingPassword] = useState(false);
     const [error, setError] = useState<string | null>(null);
     
+    // Support Phone and Schema Modal States
+    const [globalSupportPhone, setGlobalSupportPhone] = useState('');
+    const [isSavingSupportPhone, setIsSavingSupportPhone] = useState(false);
+    const [schemaModal, setSchemaModal] = useState<{ isOpen: boolean; formName: string } | null>(null);
+    
     // Form Creation State
     const [newCampaign, setNewCampaign] = useState({
         name: '',
@@ -162,6 +167,57 @@ const SupremeAdminPage: React.FC = () => {
     useEffect(() => {
         fetchAllData();
     }, []);
+
+    useEffect(() => {
+        if (globalUsers.length > 0) {
+            const supremeAdmin = globalUsers.find(u => u.is_supreme_admin || (u as any).isSupremeAdmin || u.email === 'eldastito@gmail.com' || u.email === 'supreme@campanhapro.com.br');
+            if (supremeAdmin && supremeAdmin.phone) {
+                setGlobalSupportPhone(supremeAdmin.phone);
+            } else if (user && user.phone) {
+                setGlobalSupportPhone(user.phone);
+            }
+        } else if (user && user.phone) {
+            setGlobalSupportPhone(user.phone);
+        }
+    }, [globalUsers, user]);
+
+    const handleSaveSupportPhone = async () => {
+        let supremeAdmin = globalUsers.find(u => u.is_supreme_admin || (u as any).isSupremeAdmin || u.email === 'eldastito@gmail.com' || u.email === 'supreme@campanhapro.com.br');
+        if (!supremeAdmin && user) {
+            supremeAdmin = user;
+        }
+        if (!supremeAdmin) {
+            alert("Administrador Supremo não encontrado no sistema.");
+            return;
+        }
+        setIsSavingSupportPhone(true);
+        try {
+            const token = localStorage.getItem('campanhapro-mysql-token');
+            const response = await fetch(`/api/admin/users/${supremeAdmin.id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    phone: globalSupportPhone
+                })
+            });
+
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.error || 'Erro desconhecido');
+            }
+
+            alert('WhatsApp de Suporte Técnico atualizado com sucesso em toda a rede global.');
+            await fetchAllData();
+        } catch (error: any) {
+            console.error(error);
+            alert(`Erro ao salvar telefone de suporte: ${error.message}`);
+        } finally {
+            setIsSavingSupportPhone(false);
+        }
+    };
 
     const handleCreateInternalUser = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -268,10 +324,16 @@ const SupremeAdminPage: React.FC = () => {
 
                 // Cria campaign_configs com planTier/features/limits derivados do plano
                 const config = getPlanConfig(newCampaign.plan);
+                
+                // Obter custom fields globais para herança
+                const globalConfig = campaignConfigs['global'];
+                const defaultCustomFields = globalConfig?.customFields || globalConfig?.custom_fields || { visits: [], reports: [], surveys: [] };
+
                 await supabase.from('campaign_configs').insert({
                     id: campaignId,
                     features: config.features,
                     limits: config.limits,
+                    custom_fields: defaultCustomFields,
                     status: 'active'
                 });
                 
@@ -1045,6 +1107,38 @@ const SupremeAdminPage: React.FC = () => {
                             animate={{ opacity: 1 }}
                             className="space-y-8"
                         >
+                            {/* WhatsApp de Suporte Técnico Card */}
+                            <Card className="bg-slate-900 border-slate-700/50 p-6 space-y-4 max-w-2xl">
+                                <div className="flex items-center gap-3 border-b border-slate-700/50 pb-4">
+                                    <MessageSquarePlus className="w-6 h-6 text-emerald-400" />
+                                    <h3 className="font-bold text-slate-50 uppercase tracking-widest text-sm">Suporte Técnico da Plataforma</h3>
+                                </div>
+                                <p className="text-xs text-slate-400 leading-relaxed italic">
+                                    Defina o número de WhatsApp padrão para onde os usuários de todas as campanhas serão redirecionados quando ocorrer algum erro de sistema ou limite de créditos de IA.
+                                </p>
+                                <div className="space-y-4 pt-2">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black uppercase text-slate-500">Número de WhatsApp (com DDI e DDD - Apenas números)</label>
+                                        <div className="flex gap-2">
+                                            <input 
+                                                type="text" 
+                                                placeholder="Ex: 5521999947477"
+                                                className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-xs outline-none focus:ring-1 focus:ring-indigo-500 text-slate-200"
+                                                value={globalSupportPhone}
+                                                onChange={e => setGlobalSupportPhone(e.target.value)}
+                                            />
+                                            <Button 
+                                                onClick={handleSaveSupportPhone} 
+                                                disabled={isSavingSupportPhone}
+                                                className="bg-emerald-600 hover:bg-emerald-500 font-bold text-xs"
+                                            >
+                                                {isSavingSupportPhone ? 'Salvando...' : 'Salvar WhatsApp'}
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </Card>
+
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                 <Card className="bg-slate-900 border-slate-700/50 p-6 space-y-4">
                                     <div className="flex items-center gap-3 border-b border-slate-700/50 pb-4">
@@ -1059,7 +1153,13 @@ const SupremeAdminPage: React.FC = () => {
                                         {['Configuração de Visitas', 'Reportes de Rua', 'Pesquisa Quantitativa'].map((f, i) => (
                                             <div key={i} className="flex items-center justify-between p-3 bg-slate-950 rounded-lg border border-slate-700/50 group">
                                                 <span className="text-xs font-bold text-slate-300">{f}</span>
-                                                <Button variant="ghost" className="h-6 text-[10px] p-0 px-2 opacity-50 group-hover:opacity-100">Configurar Schema</Button>
+                                                <Button 
+                                                    variant="ghost" 
+                                                    onClick={() => setSchemaModal({ isOpen: true, formName: f })}
+                                                    className="h-6 text-[10px] p-0 px-2 opacity-50 group-hover:opacity-100 text-indigo-400 hover:text-indigo-300"
+                                                >
+                                                    Configurar Schema
+                                                </Button>
                                             </div>
                                         ))}
                                     </div>
@@ -1502,6 +1602,89 @@ const SupremeAdminPage: React.FC = () => {
                         </Button>
                     </div>
                 </form>
+            </Modal>
+
+            {/* Schema Global Config Modal */}
+            <Modal 
+                isOpen={!!schemaModal?.isOpen} 
+                onClose={() => setSchemaModal(null)} 
+                title={`SCHEMA GLOBAL: ${schemaModal?.formName.toUpperCase()}`}
+            >
+                {schemaModal && (() => {
+                    const formKey = schemaModal.formName === 'Configuração de Visitas' 
+                        ? 'visits' 
+                        : schemaModal.formName === 'Reportes de Rua' 
+                        ? 'reports' 
+                        : 'surveys';
+
+                    // Carregar campos da campanha especial 'global'
+                    const globalConfig = campaignConfigs['global'] || { customFields: { visits: [], reports: [], surveys: [] } } as any;
+                    const currentFields = (globalConfig.customFields?.[formKey] || globalConfig.custom_fields?.[formKey] || []) as CustomField[];
+
+                    return (
+                        <div className="p-4 space-y-6">
+                            <p className="text-xs text-slate-400 leading-relaxed italic">
+                                Defina os campos adicionais padrão que todas as novas campanhas herdarão para o formulário de <strong>{schemaModal.formName}</strong>.
+                            </p>
+                            
+                            <div className="space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar">
+                                {currentFields.map((field, idx) => (
+                                    <div key={idx} className="flex items-center justify-between p-2.5 bg-slate-950 rounded-xl border border-slate-800/80 text-xs">
+                                        <div className="flex flex-col">
+                                            <span className="font-bold text-slate-200">{field.label}</span>
+                                            <span className="text-[10px] text-slate-500 font-mono uppercase tracking-wider mt-0.5">{field.type} {field.required ? '• Obrigatório' : ''}</span>
+                                        </div>
+                                        <button 
+                                            type="button"
+                                            onClick={async () => {
+                                                const nextFields = currentFields.filter((_, i) => i !== idx);
+                                                const nextCustomFields = {
+                                                    ...(globalConfig.customFields || {}),
+                                                    [formKey]: nextFields
+                                                };
+                                                await updateConfig('global', { customFields: nextCustomFields });
+                                            }}
+                                            className="text-red-500 hover:text-red-400 p-1.5 hover:bg-red-500/10 rounded-lg transition-colors"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                ))}
+                                {currentFields.length === 0 && (
+                                    <p className="text-center text-xs text-slate-500 italic py-6">Nenhum campo customizado global definido ainda.</p>
+                                )}
+                            </div>
+
+                            <div className="pt-4 border-t border-slate-800">
+                                <Button 
+                                    variant="ghost" 
+                                    className="w-full border-dashed border-slate-700 h-9 font-bold text-xs flex items-center justify-center gap-2 hover:bg-slate-900"
+                                    onClick={async () => {
+                                        const label = prompt('Digite o nome/rótulo do novo campo:');
+                                        if (!label) return;
+                                        const type = prompt('Digite o tipo do campo (text, number, select, boolean):', 'text');
+                                        if (!type || !['text', 'number', 'select', 'boolean'].includes(type)) {
+                                            alert('Tipo inválido. Escolha entre: text, number, select, boolean');
+                                            return;
+                                        }
+                                        const nextFields = [...currentFields, { id: `field_${Date.now()}`, label, type: type as any, required: false }];
+                                        const nextCustomFields = {
+                                            ...(globalConfig.customFields || {}),
+                                            [formKey]: nextFields
+                                        };
+                                        await updateConfig('global', { customFields: nextCustomFields });
+                                    }}
+                                >
+                                    + Adicionar Campo Customizado
+                                </Button>
+                            </div>
+                            
+                            <div className="pt-4 flex justify-end">
+                                <Button onClick={() => setSchemaModal(null)} className="px-6">Fechar</Button>
+                            </div>
+                        </div>
+                    );
+                })()}
             </Modal>
         </div>
     );
